@@ -5,6 +5,7 @@ node_modules/
 __pycache__/
 dist/
 build/
+.temp/
 
 # Environment & Secret Files
 .env
