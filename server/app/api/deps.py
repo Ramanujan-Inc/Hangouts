@@ -5,14 +5,14 @@ from supabase import Client
 import jwt
 
 from app.core.config import settings
-from app.core.supabase import supabase
+from app.core.supabase import get_supabase_client
 
 security = HTTPBearer(auto_error=False)
 
 
 def get_db() -> Client:
-    """Dependency for obtaining the Supabase client."""
-    return supabase
+    """Dependency for obtaining a fresh Supabase client per request."""
+    return get_supabase_client()
 
 
 def get_current_user(

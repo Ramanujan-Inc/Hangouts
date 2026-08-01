@@ -3,7 +3,7 @@ from app.core.config import settings
 
 
 def get_supabase_client() -> Client:
-    """Returns an instance of the Supabase Client."""
+    """Returns a fresh instance of the Supabase Client using SUPABASE_KEY."""
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
 

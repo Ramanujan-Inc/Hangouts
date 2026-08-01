@@ -1,5 +1,9 @@
 from fastapi import APIRouter
+from app.api.v1 import auth, profiles
 
 api_router = APIRouter()
 
-# Future sub-routers (profiles, groups, hangouts, photos, notes) will be included here
+api_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
+api_router.include_router(profiles.router, prefix="/profiles", tags=["Profiles"])
+
+
