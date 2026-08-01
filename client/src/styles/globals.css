@@ -1,0 +1,240 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&family=Quicksand:wght@300..700&display=swap');
+
+:root {
+  --color-surface: #fff8f5;
+  --color-surface-dim: #e1d8d5;
+  --color-surface-bright: #fff8f5;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #fbf2ee;
+  --color-surface-container: #f5ece9;
+  --color-surface-container-high: #efe6e3;
+  --color-surface-container-highest: #e9e1dd;
+  
+  --color-blush: #e36888;
+  --color-tangerine: #f08c21;
+  --color-butter: #f2d88f;
+  --color-sea: #6698cc;
+  --color-matcha: #b4b534;
+  --color-background: #fbf3ec;
+  --color-text: #2e2a28;
+  --color-text-muted: #564245;
+  --color-outline: #897175;
+  --color-outline-variant: #dcc0c4;
+  
+  --font-display: 'Quicksand', sans-serif;
+  --font-body: 'Nunito Sans', sans-serif;
+  
+  --shadow-ambient: 0 30px 40px -15px rgba(46, 42, 40, 0.08);
+  --shadow-inner: inset 0 2px 4px 0 rgba(46, 42, 40, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+a {
+  color: var(--color-sea);
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+a:hover {
+  opacity: 0.8;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-dim);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-outline-variant);
+}
+
+/* Polaroid Memory Card Style */
+.polaroid-card {
+  background: var(--color-surface-container-lowest);
+  border-radius: 24px;
+  padding: 16px 16px 28px 16px;
+  box-shadow: var(--shadow-ambient);
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s;
+}
+
+.polaroid-card:hover {
+  transform: scale(1.02) rotate(var(--hover-rotate, 1deg));
+  box-shadow: 0 40px 50px -15px rgba(227, 104, 136, 0.12);
+  z-index: 10;
+}
+
+.polaroid-image-container {
+  aspect-ratio: 4/3;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  background-color: var(--color-surface-container);
+  border: 1px solid var(--color-surface-container-high);
+}
+
+.polaroid-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Sticky Note Style */
+.sticky-note {
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 10px 20px -5px rgba(46, 42, 40, 0.1);
+  font-family: var(--font-body);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+}
+
+.sticky-note:hover {
+  transform: translateY(-4px) rotate(0deg) !important;
+  box-shadow: 0 15px 25px -5px rgba(46, 42, 40, 0.15);
+  z-index: 5;
+}
+
+.sticky-note-butter {
+  background-color: #fcf1d3; /* Butter tint */
+  border-left: 5px solid var(--color-butter);
+}
+
+.sticky-note-blush {
+  background-color: #fbe6eb; /* Blush tint */
+  border-left: 5px solid var(--color-blush);
+}
+
+.sticky-note-sea {
+  background-color: #e6f0fa; /* Sea tint */
+  border-left: 5px solid var(--color-sea);
+}
+
+/* Custom interactive inputs */
+.pill-input {
+  width: 100%;
+  background-color: var(--color-surface-container-low);
+  border: 2px solid transparent;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  padding: 12px 20px;
+  border-radius: 9999px;
+  outline: none;
+  font-size: 16px;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.pill-input:focus {
+  border-color: var(--color-blush);
+  background-color: var(--color-surface-container-lowest);
+}
+
+.pill-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  border-radius: 9999px;
+  border: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform 0.2s, opacity 0.2s, box-shadow 0.2s;
+  gap: 8px;
+}
+
+.pill-button:active {
+  transform: scale(0.95);
+}
+
+.pill-button-primary {
+  background-color: var(--color-blush);
+  color: white;
+  box-shadow: 0 4px 10px rgba(227, 104, 136, 0.2);
+}
+
+.pill-button-primary:hover {
+  background-color: #d15676;
+}
+
+.pill-button-secondary {
+  background-color: var(--color-sea);
+  color: white;
+  box-shadow: 0 4px 10px rgba(102, 152, 204, 0.2);
+}
+
+.pill-button-secondary:hover {
+  background-color: #5587ba;
+}
+
+.pill-button-outline {
+  background-color: transparent;
+  border: 2px solid var(--color-sea);
+  color: var(--color-sea);
+}
+
+.pill-button-outline:hover {
+  background-color: rgba(102, 152, 204, 0.05);
+}
+
+/* Emoji Slider */
+.emoji-slider-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--color-surface-container-high);
+  position: relative;
+  cursor: pointer;
+}
+
+.emoji-slider-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  user-select: none;
+  transition: transform 0.1s;
+}
+
+.emoji-slider-thumb:hover {
+  transform: translate(-50%, -50%) scale(1.1);
+}
