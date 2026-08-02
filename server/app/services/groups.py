@@ -63,6 +63,19 @@ def get_group_by_id(db: Client, group_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def get_full_group_details(db: Client, group_id: str) -> Dict[str, Any]:
+    """Fetch group details by ID including member list. Raises NotFoundError if group doesn't exist."""
+    from app.core.exceptions import NotFoundError
+
+    group = get_group_by_id(db=db, group_id=group_id)
+    if not group:
+        raise NotFoundError("Group not found.")
+
+    members = get_group_members(db=db, group_id=group_id)
+    group["members"] = members
+    return group
+
+
 def get_group_members(db: Client, group_id: str) -> List[Dict[str, Any]]:
     """Fetch all members of a group with profile information."""
     response = (
