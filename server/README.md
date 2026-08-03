@@ -61,3 +61,13 @@ Once running, access:
 - **API Base**: [http://127.0.0.1:8000](http://127.0.0.1:8000)
 - **Swagger Documentation**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **Supabase Studio**: [http://127.0.0.1:54323](http://127.0.0.1:54323)
+
+### 5. Running Tests
+
+Run the end-to-end integration test suite against the running local Supabase stack:
+
+```bash
+uv run pytest
+```
+
+
