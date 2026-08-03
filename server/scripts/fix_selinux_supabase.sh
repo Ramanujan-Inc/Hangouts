@@ -8,6 +8,8 @@ if command -v getenforce >/dev/null && [ "$(getenforce)" = "Enforcing" ]; then
   mkdir -p supabase/.temp/start-secrets
   sudo semanage fcontext -a -t container_file_t "$(pwd)/supabase/.temp/start-secrets(/.*)?" 2>/dev/null || true
   sudo restorecon -Rv supabase/.temp/start-secrets/
+  sudo semanage fcontext -a -t container_file_t "$(pwd)/supabase/snippets(/.*)?" 2>/dev/null || true
+  sudo restorecon -Rv supabase/snippets/
 else
   echo "SELinux not enforcing — nothing to do."
 fi
