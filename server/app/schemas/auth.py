@@ -1,13 +1,14 @@
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class UserSignUp(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=8, description="Password must be at least 8 characters long")
     display_name: str
     avatar_url: Optional[str] = None
+
 
 
 class UserLogin(BaseModel):
