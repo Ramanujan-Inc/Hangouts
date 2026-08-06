@@ -76,12 +76,11 @@ def get_current_user(
     )
 
 
-def require_group_access(require_admin: bool = False):
-    """Parameterized dependency that validates group membership and optional admin role.
+def require_group_access():
+    """Dependency that validates active group membership.
 
     Usage:
-        Depends(require_group_access()) -> Requires member role
-        Depends(require_group_access(require_admin=True)) -> Requires admin role
+        Depends(require_group_access()) -> Requires active ('accepted') member status
     """
     def dependency(
         group_id: str,
@@ -91,14 +90,11 @@ def require_group_access(require_admin: bool = False):
         from app.services import groups as group_service
         from app.core.exceptions import ForbiddenError
 
-        role = group_service.get_member_role(db=db, group_id=group_id, user_id=current_user["id"])
-        if not role:
-            raise ForbiddenError("You are not a member of this group.")
+        status = group_service.get_member_status(db=db, group_id=group_id, user_id=current_user["id"])
+        if not status or status.lower() != "accepted":
+            raise ForbiddenError("You are not an active member of this group.")
 
-        if require_admin and role.lower() != "admin":
-            raise ForbiddenError("Only group admins can perform this action.")
-
-        return role
+        return status
 
     return dependency
 

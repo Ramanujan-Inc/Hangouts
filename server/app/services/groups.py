@@ -2,10 +2,11 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from supabase import Client
 from app.schemas.group import GroupCreate, GroupUpdate
+from app.core.exceptions import ForbiddenError, NotFoundError
 
 
 def create_group(db: Client, group_create: GroupCreate, user_id: str) -> Dict[str, Any]:
-    """Create a new group and assign the creator as the initial admin member."""
+    """Create a new group and assign the creator as the initial accepted member."""
     now = datetime.now(timezone.utc).isoformat()
     group_data = {
         "name": group_create.name,
@@ -19,15 +20,16 @@ def create_group(db: Client, group_create: GroupCreate, user_id: str) -> Dict[st
     response = db.table("groups").insert(group_data).execute()
     if not response.data or len(response.data) == 0:
         raise Exception("Failed to create group.")
-    
+
     group = response.data[0]
     group_id = group["id"]
 
-    # 2. Add creator as admin in group_members
+    # 2. Add creator as accepted member in group_members
     member_data = {
         "group_id": group_id,
         "user_id": user_id,
-        "role": "admin",
+        "status": "accepted",
+        "invited_by": user_id,
         "joined_at": now,
     }
     db.table("group_members").insert(member_data).execute()
@@ -36,21 +38,21 @@ def create_group(db: Client, group_create: GroupCreate, user_id: str) -> Dict[st
 
 
 def get_user_groups(db: Client, user_id: str) -> List[Dict[str, Any]]:
-    """Retrieve all groups that the specified user belongs to."""
-    # Select group_members filtered by user_id, joining groups details
+    """Retrieve all accepted groups that the specified user belongs to."""
     response = (
         db.table("group_members")
-        .select("role, joined_at, groups(*)")
+        .select("status, invited_by, joined_at, groups(*)")
         .eq("user_id", user_id)
+        .eq("status", "accepted")
         .execute()
     )
-    
+
     groups = []
     if response.data:
         for item in response.data:
             group_info = item.get("groups")
             if group_info:
-                group_info["user_role"] = item.get("role")
+                group_info["user_status"] = item.get("status")
                 groups.append(group_info)
     return groups
 
@@ -65,8 +67,6 @@ def get_group_by_id(db: Client, group_id: str) -> Optional[Dict[str, Any]]:
 
 def get_full_group_details(db: Client, group_id: str) -> Dict[str, Any]:
     """Fetch group details by ID including member list. Raises NotFoundError if group doesn't exist."""
-    from app.core.exceptions import NotFoundError
-
     group = get_group_by_id(db=db, group_id=group_id)
     if not group:
         raise NotFoundError("Group not found.")
@@ -80,11 +80,11 @@ def get_group_members(db: Client, group_id: str) -> List[Dict[str, Any]]:
     """Fetch all members of a group with profile information."""
     response = (
         db.table("group_members")
-        .select("id, group_id, user_id, role, joined_at, profiles(*)")
+        .select("id, group_id, user_id, status, invited_by, joined_at, profile:profiles!group_members_user_id_fkey(*)")
         .eq("group_id", group_id)
         .execute()
     )
-    
+
     members = []
     if response.data:
         for item in response.data:
@@ -92,91 +92,97 @@ def get_group_members(db: Client, group_id: str) -> List[Dict[str, Any]]:
                 "id": item["id"],
                 "group_id": item["group_id"],
                 "user_id": item["user_id"],
-                "role": item["role"],
+                "status": item.get("status", "accepted"),
+                "invited_by": item.get("invited_by"),
                 "joined_at": item["joined_at"],
-                "profile": item.get("profiles"),
+                "profile": item.get("profile"),
             }
             members.append(member)
     return members
 
 
-def get_member_role(db: Client, group_id: str, user_id: str) -> Optional[str]:
-    """Check user's role in a specific group. Returns 'admin', 'member', or None if not a member."""
+def get_member_status(db: Client, group_id: str, user_id: str) -> Optional[str]:
+    """Check user's status in a specific group. Returns 'accepted', 'pending', 'declined', or None."""
     response = (
         db.table("group_members")
-        .select("role")
+        .select("status")
         .eq("group_id", group_id)
         .eq("user_id", user_id)
         .execute()
     )
     if response.data and len(response.data) > 0:
-        return response.data[0]["role"]
+        return response.data[0]["status"]
     return None
-
-
-
 
 
 def add_group_member(
     db: Client,
     group_id: str,
+    inviter_id: str,
     target_user_id: str,
-    role: str = "member",
 ) -> Dict[str, Any]:
-    """Add a user to a group with the specified role."""
-    # Check if already a member
-    existing_role = get_member_role(db, group_id, target_user_id)
-    if existing_role:
+    """Invite a user to a group (sets status to 'pending')."""
+    existing_status = get_member_status(db, group_id, target_user_id)
+    if existing_status == "accepted":
         raise ValueError("User is already a member of this group.")
+    if existing_status == "pending":
+        raise ValueError("User has already been invited to this group.")
 
     now = datetime.now(timezone.utc).isoformat()
     member_data = {
         "group_id": group_id,
         "user_id": target_user_id,
-        "role": role,
+        "status": "pending",
+        "invited_by": inviter_id,
         "joined_at": now,
     }
     response = db.table("group_members").insert(member_data).execute()
     if response.data and len(response.data) > 0:
         return response.data[0]
-    raise Exception("Failed to add member to group.")
+    raise Exception("Failed to invite member to group.")
 
 
-def remove_group_member(db: Client, group_id: str, target_user_id: str) -> bool:
-    """Remove a user from a group."""
-    existing_role = get_member_role(db, group_id, target_user_id)
-    if not existing_role:
-        raise ValueError("User is not a member of this group.")
-
-    db.table("group_members").delete().eq("group_id", group_id).eq("user_id", target_user_id).execute()
-    return True
-
-
-def update_group_member_role(
+def respond_to_group_invite(
     db: Client,
     group_id: str,
-    target_user_id: str,
-    new_role: str = "admin",
+    user_id: str,
+    action: str,
 ) -> Dict[str, Any]:
-    """Promote a group member to 'admin' role."""
-    if new_role != "admin":
-        raise ValueError("Cannot demote an admin or assign invalid roles. Only promotion to 'admin' is allowed.")
+    """Accept or decline a group invitation."""
+    existing_status = get_member_status(db, group_id, user_id)
+    if existing_status != "pending":
+        raise ValueError("No pending invitation found for this group.")
 
-    existing_role = get_member_role(db, group_id, target_user_id)
-    if not existing_role:
-        raise ValueError("User is not a member of this group.")
-    if existing_role == "admin":
-        raise ValueError("User is already an admin of this group.")
+    action_lower = action.lower()
+    if action_lower not in ["accept", "decline"]:
+        raise ValueError("Invalid action. Must be 'accept' or 'decline'.")
 
+    new_status = "accepted" if action_lower == "accept" else "declined"
     response = (
         db.table("group_members")
-        .update({"role": "admin"})
+        .update({"status": new_status})
         .eq("group_id", group_id)
-        .eq("user_id", target_user_id)
+        .eq("user_id", user_id)
         .execute()
     )
     if response.data and len(response.data) > 0:
         return response.data[0]
-    raise Exception("Failed to update member role.")
+    raise Exception("Failed to respond to group invitation.")
 
 
+def remove_group_member(
+    db: Client,
+    group_id: str,
+    current_user_id: str,
+    target_user_id: str,
+) -> bool:
+    """Remove a user from a group. Strictly allows self-removal only."""
+    if current_user_id != target_user_id:
+        raise ForbiddenError("Members can only remove themselves from a group.")
+
+    existing_status = get_member_status(db, group_id, target_user_id)
+    if not existing_status:
+        raise ValueError("User is not a member of this group.")
+
+    db.table("group_members").delete().eq("group_id", group_id).eq("user_id", target_user_id).execute()
+    return True

@@ -23,7 +23,8 @@ class GroupMemberResponse(BaseModel):
     id: UUID
     group_id: UUID
     user_id: UUID
-    role: str
+    status: str = "accepted"
+    invited_by: Optional[UUID] = None
     joined_at: datetime
     profile: Optional[ProfileResponse] = None
 
@@ -32,11 +33,10 @@ class GroupMemberResponse(BaseModel):
 
 class GroupMemberAdd(BaseModel):
     user_id: UUID
-    role: str = "member"
 
 
-class GroupMemberRoleUpdate(BaseModel):
-    role: str = "admin"
+class GroupInviteRespond(BaseModel):
+    action: str  # "accept" or "decline"
 
 
 

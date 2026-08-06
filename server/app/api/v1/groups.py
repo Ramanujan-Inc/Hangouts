@@ -11,7 +11,7 @@ from app.schemas.group import (
     GroupResponse,
     GroupMemberAdd,
     GroupMemberResponse,
-    GroupMemberRoleUpdate,
+    GroupInviteRespond,
 )
 from app.services import groups as group_service
 from app.core.exceptions import ForbiddenError
@@ -25,7 +25,7 @@ def create_new_group(
     current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
 ):
-    """Create a new group. The authenticated user is set as the initial admin."""
+    """Create a new group. The authenticated user is set as the initial accepted member."""
     return group_service.create_group(
         db=db,
         group_create=group_create,
@@ -38,7 +38,7 @@ def list_my_groups(
     current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
 ):
-    """List all groups the currently authenticated user belongs to."""
+    """List all groups the currently authenticated user is an accepted member of."""
     return group_service.get_user_groups(db=db, user_id=current_user["id"])
 
 
@@ -53,35 +53,35 @@ def get_group_details(
 
 
 @router.post("/{group_id}/members", response_model=GroupMemberResponse)
-def add_member_to_group(
+def invite_member_to_group(
     group_id: str,
     member_add: GroupMemberAdd,
-    _: str = Depends(require_group_access(require_admin=True)),
+    _: str = Depends(require_group_access()),
+    current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
 ):
-    """Add a new member to a group (Admin only)."""
+    """Invite a user to a group (Any active group member can invite)."""
     return group_service.add_group_member(
         db=db,
         group_id=group_id,
+        inviter_id=current_user["id"],
         target_user_id=str(member_add.user_id),
-        role=member_add.role,
     )
 
 
-@router.patch("/{group_id}/members/{user_id}", response_model=GroupMemberResponse)
-def promote_member_to_admin(
+@router.post("/{group_id}/invites/respond", response_model=GroupMemberResponse)
+def respond_to_invite(
     group_id: str,
-    user_id: str,
-    role_update: GroupMemberRoleUpdate,
-    _: str = Depends(require_group_access(require_admin=True)),
+    respond_data: GroupInviteRespond,
+    current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
 ):
-    """Promote a group member to admin (Admin only). Demotion is not permitted."""
-    return group_service.update_group_member_role(
+    """Accept or decline a pending group invitation."""
+    return group_service.respond_to_group_invite(
         db=db,
         group_id=group_id,
-        target_user_id=user_id,
-        new_role=role_update.role,
+        user_id=current_user["id"],
+        action=respond_data.action,
     )
 
 
@@ -89,12 +89,16 @@ def promote_member_to_admin(
 def remove_member_from_group(
     group_id: str,
     user_id: str,
-    role: str = Depends(require_group_access()),
     current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
 ):
-    """Remove a member from a group (Admin only, or user removing themselves)."""
-    if current_user["id"] != user_id and role.lower() != "admin":
-        raise ForbiddenError("Only group admins can remove other members from the group.")
+    """Remove a member from a group (Self-removal only)."""
+    if current_user["id"] != user_id:
+        raise ForbiddenError("Members can only remove themselves from a group.")
 
-    group_service.remove_group_member(db=db, group_id=group_id, target_user_id=user_id)
+    group_service.remove_group_member(
+        db=db,
+        group_id=group_id,
+        current_user_id=current_user["id"],
+        target_user_id=user_id,
+    )
