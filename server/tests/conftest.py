@@ -70,12 +70,16 @@ def create_test_user(db: Client) -> Generator[Callable[..., Dict[str, Any]], Non
 
     yield _create_user
 
+    admin_db = get_supabase_client()
     for uid in created_users:
         try:
-            db.table("groups").delete().eq("created_by", uid).execute()
-            db.table("profiles").delete().eq("id", uid).execute()
+            admin_db.table("groups").delete().eq("created_by", uid).execute()
+            admin_db.auth.admin.delete_user(uid)
         except Exception:
-            pass
+            try:
+                admin_db.table("profiles").delete().eq("id", uid).execute()
+            except Exception:
+                pass
 
 
 
