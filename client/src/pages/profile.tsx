@@ -1,7 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import Layout from '../components/Layout'
+import { ProtectedRoute } from '../components/ProtectedRoute'
+import { useAuth } from '../context/AuthContext'
 import { Camera, Sparkles, User, Settings, Bell, LogOut, ChevronRight, Check } from 'lucide-react'
 
 const avatars = [
@@ -13,12 +15,20 @@ const avatars = [
 
 export default function ProfileSettings() {
   const router = useRouter()
-  const [name, setName] = useState('Mika')
-  const [email] = useState('mika@example.com')
+  const { user, logout } = useAuth()
   const [avatarIndex, setAvatarIndex] = useState(0)
   const [isEditingName, setIsEditingName] = useState(false)
-  const [tempName, setTempName] = useState(name)
+  const [tempName, setTempName] = useState('')
   const [toastMessage, setToastMessage] = useState('')
+
+  const displayName = user?.display_name || 'User'
+  const displayEmail = user?.email || ''
+
+  useEffect(() => {
+    if (user?.display_name) {
+      setTempName(user.display_name)
+    }
+  }, [user])
 
   const handleCycleAvatar = () => {
     const nextIdx = (avatarIndex + 1) % avatars.length
@@ -29,7 +39,6 @@ export default function ProfileSettings() {
   const handleSaveName = (e: React.FormEvent) => {
     e.preventDefault()
     if (!tempName.trim()) return
-    setName(tempName)
     setIsEditingName(false)
     showToast('Profile name updated!')
   }
@@ -40,63 +49,65 @@ export default function ProfileSettings() {
   }
 
   const handleLogout = () => {
+    logout()
     router.push('/')
   }
 
   return (
-    <Layout>
-      <Head>
-        <title>My Profile | Hangout</title>
-      </Head>
+    <ProtectedRoute>
+      <Layout>
+        <Head>
+          <title>My Profile | Hangout</title>
+        </Head>
 
-      <div className="profile-page-container">
-        {toastMessage && (
-          <div className="toast-notification">
-            <Check size={16} />
-            <span>{toastMessage}</span>
-          </div>
-        )}
-
-        <h2 className="page-heading">Settings</h2>
-
-        {/* Profile Card Header */}
-        <div className="profile-header-card">
-          {/* Sparkle Decorative Flourishes */}
-          <Sparkles className="sparkle-flourish pos-left" size={20} />
-          <Sparkles className="sparkle-flourish pos-right" size={24} />
-
-          <div className="avatar-edit-wrapper" onClick={handleCycleAvatar}>
-            <img src={avatars[avatarIndex]} alt="Profile Avatar" className="profile-avatar-img" />
-            <div className="camera-badge">
-              <Camera size={14} />
-            </div>
-          </div>
-
-          {isEditingName ? (
-            <form onSubmit={handleSaveName} className="name-edit-form">
-              <input 
-                type="text" 
-                className="pill-input compact" 
-                value={tempName}
-                onChange={(e) => setTempName(e.target.value)}
-                autoFocus
-                required
-              />
-              <div className="edit-btn-row">
-                <button type="submit" className="pill-button pill-button-primary compact-btn">Save</button>
-                <button type="button" className="pill-button pill-button-outline compact-btn" onClick={() => setIsEditingName(false)}>Cancel</button>
-              </div>
-            </form>
-          ) : (
-            <div className="profile-name-block">
-              <h3>{name}</h3>
-              <p>{email}</p>
-              <button className="edit-name-link" onClick={() => { setTempName(name); setIsEditingName(true); }}>
-                Edit Name
-              </button>
+        <div className="profile-page-container">
+          {toastMessage && (
+            <div className="toast-notification">
+              <Check size={16} />
+              <span>{toastMessage}</span>
             </div>
           )}
-        </div>
+
+          <h2 className="page-heading">Settings</h2>
+
+          {/* Profile Card Header */}
+          <div className="profile-header-card">
+            {/* Sparkle Decorative Flourishes */}
+            <Sparkles className="sparkle-flourish pos-left" size={20} />
+            <Sparkles className="sparkle-flourish pos-right" size={24} />
+
+            <div className="avatar-edit-wrapper" onClick={handleCycleAvatar}>
+              <img src={avatars[avatarIndex]} alt="Profile Avatar" className="profile-avatar-img" />
+              <div className="camera-badge">
+                <Camera size={14} />
+              </div>
+            </div>
+
+            {isEditingName ? (
+              <form onSubmit={handleSaveName} className="name-edit-form">
+                <input 
+                  type="text" 
+                  className="pill-input compact" 
+                  value={tempName}
+                  onChange={(e) => setTempName(e.target.value)}
+                  autoFocus
+                  required
+                />
+                <div className="edit-btn-row">
+                  <button type="submit" className="pill-button pill-button-primary compact-btn">Save</button>
+                  <button type="button" className="pill-button pill-button-outline compact-btn" onClick={() => setIsEditingName(false)}>Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <div className="profile-name-block">
+                <h3>{displayName}</h3>
+                <p>{displayEmail}</p>
+                <button className="edit-name-link" onClick={() => { setTempName(displayName); setIsEditingName(true); }}>
+                  Edit Name
+                </button>
+              </div>
+            )}
+          </div>
 
         {/* Settings Rows */}
         <div className="settings-list-card">
@@ -409,6 +420,7 @@ export default function ProfileSettings() {
           50% { transform: translateY(-4px); }
         }
       `}</style>
-    </Layout>
+      </Layout>
+    </ProtectedRoute>
   )
 }

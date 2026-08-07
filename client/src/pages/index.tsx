@@ -1,16 +1,41 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import { Sparkles, Mail, Lock, User as UserIcon, ArrowLeft } from 'lucide-react'
+import { Sparkles, Mail, Lock, User as UserIcon, ArrowLeft, Eye, EyeOff } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { ApiError } from '../lib/api'
 
 type AuthStep = 'welcome' | 'signup' | 'login'
 
 export default function Onboarding() {
   const router = useRouter()
+  const { user, token, login, signup, loginDemoUser } = useAuth()
   const [step, setStep] = useState<AuthStep>('welcome')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (user && token) {
+      router.push('/timeline')
+    }
+  }, [user, token, router])
+
+  const handleGoogleDemo = async () => {
+    setError(null)
+    setSubmitting(true)
+    try {
+      await loginDemoUser()
+      router.push('/timeline')
+    } catch (err: any) {
+      setError(err?.message || 'Failed to authenticate demo user.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   // Simple password strength calculation
   const getPasswordStrength = () => {
@@ -22,10 +47,26 @@ export default function Onboarding() {
 
   const strength = getPasswordStrength()
 
-  const handleAuthSubmit = (e: React.FormEvent) => {
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Simulated auth success, redirect to timeline
-    router.push('/timeline')
+    setError(null)
+    setSubmitting(true)
+    try {
+      if (step === 'signup') {
+        await signup(name, email, password)
+      } else if (step === 'login') {
+        await login(email, password)
+      }
+      router.push('/timeline')
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        setError(err.message)
+      } else {
+        setError(err?.message || 'Authentication failed. Please check your credentials.')
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -102,7 +143,7 @@ export default function Onboarding() {
             <div className="button-stack">
               <button 
                 className="pill-button pill-button-primary"
-                onClick={() => router.push('/timeline')} // Instant login demo
+                onClick={handleGoogleDemo}
               >
                 <Sparkles size={18} />
                 Continue with Google
@@ -139,6 +180,21 @@ export default function Onboarding() {
               <p>Start a new memory space for your friends</p>
             </div>
 
+            {error && (
+              <div style={{
+                background: 'rgba(227, 104, 136, 0.15)',
+                border: '1px solid var(--color-blush, #e36888)',
+                color: '#e36888',
+                padding: '0.75rem 1rem',
+                borderRadius: '12px',
+                fontSize: '0.875rem',
+                marginBottom: '1rem',
+                textAlign: 'center'
+              }}>
+                {error}
+              </div>
+            )}
+
             <div className="input-group">
               <label><UserIcon size={16} /> Display Name</label>
               <input 
@@ -165,14 +221,36 @@ export default function Onboarding() {
 
             <div className="input-group">
               <label><Lock size={16} /> Password</label>
-              <input 
-                type="password" 
-                required 
-                className="pill-input" 
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  required 
+                  className="pill-input" 
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={{ width: '100%', paddingRight: '2.5rem' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '14px',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--color-text-muted, #8e8e8e)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0
+                  }}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
               {password && (
                 <div className="strength-meter">
                   <div className="strength-bar" style={{ width: strength.width, backgroundColor: strength.color }}></div>
@@ -181,8 +259,8 @@ export default function Onboarding() {
               )}
             </div>
 
-            <button type="submit" className="pill-button pill-button-primary full-width">
-              Create Account
+            <button type="submit" disabled={submitting} className="pill-button pill-button-primary full-width">
+              {submitting ? 'Creating Account...' : 'Create Account'}
             </button>
 
             <div className="form-divider">
@@ -192,13 +270,13 @@ export default function Onboarding() {
             <button 
               type="button" 
               className="pill-button pill-button-outline full-width"
-              onClick={() => router.push('/timeline')}
+              onClick={handleGoogleDemo}
             >
               Continue with Google
             </button>
 
             <div className="footer-link">
-              Already have an account? <span onClick={() => setStep('login')}>Log in</span>
+              Already have an account? <span onClick={() => { setError(null); setStep('login'); }}>Log in</span>
             </div>
           </form>
         )}
@@ -212,6 +290,21 @@ export default function Onboarding() {
               <h2>Welcome Back</h2>
               <p>Access your group's memory archive</p>
             </div>
+
+            {error && (
+              <div style={{
+                background: 'rgba(227, 104, 136, 0.15)',
+                border: '1px solid var(--color-blush, #e36888)',
+                color: '#e36888',
+                padding: '0.75rem 1rem',
+                borderRadius: '12px',
+                fontSize: '0.875rem',
+                marginBottom: '1rem',
+                textAlign: 'center'
+              }}>
+                {error}
+              </div>
+            )}
 
             <div className="input-group">
               <label><Mail size={16} /> Email Address</label>
@@ -227,18 +320,40 @@ export default function Onboarding() {
 
             <div className="input-group">
               <label><Lock size={16} /> Password</label>
-              <input 
-                type="password" 
-                required 
-                className="pill-input" 
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  required 
+                  className="pill-input" 
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={{ width: '100%', paddingRight: '2.5rem' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '14px',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--color-text-muted, #8e8e8e)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0
+                  }}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
-            <button type="submit" className="pill-button pill-button-primary full-width">
-              Log In
+            <button type="submit" disabled={submitting} className="pill-button pill-button-primary full-width">
+              {submitting ? 'Logging In...' : 'Log In'}
             </button>
 
             <div className="form-divider">
@@ -248,13 +363,13 @@ export default function Onboarding() {
             <button 
               type="button" 
               className="pill-button pill-button-outline full-width"
-              onClick={() => router.push('/timeline')}
+              onClick={handleGoogleDemo}
             >
               Continue with Google
             </button>
 
             <div className="footer-link">
-              Don't have an account yet? <span onClick={() => setStep('signup')}>Sign up</span>
+              Don't have an account yet? <span onClick={() => { setError(null); setStep('signup'); }}>Sign up</span>
             </div>
           </form>
         )}
