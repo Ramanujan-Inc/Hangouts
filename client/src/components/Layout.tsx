@@ -1,7 +1,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { Clock, Map, Plus, Image, User, Sparkles } from 'lucide-react'
+import { Clock, Compass, Plus, Image, User, Sparkles } from 'lucide-react'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -13,7 +13,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const navItems = [
     { label: 'Timeline', path: '/timeline', icon: Clock },
-    { label: 'Map', path: '/map', icon: Map },
+    { label: 'Explore', path: '/map', icon: Compass },
     { label: 'Create', path: '/create', icon: Plus, isFab: true },
     { label: 'Notes', path: '/notes', icon: Image },
     { label: 'Profile', path: '/profile', icon: User },
