@@ -31,16 +31,18 @@ def create_test_user(db: Client) -> Generator[Callable[..., Dict[str, Any]], Non
     """Factory fixture to register a real user in local Supabase Auth and perform targeted cleanup."""
     created_users = []
 
-    def _create_user(email: str = None, password: str = "TestPassword123!", display_name: str = "Test User") -> Dict[str, Any]:
+    def _create_user(email: str = None, password: str = "TestPassword123!", username: str = "Test User") -> Dict[str, Any]:
         if not email:
             email = f"test_{uuid.uuid4().hex[:8]}@example.com"
+
+        user_name = username
 
         auth_res = db.auth.sign_up({
             "email": email,
             "password": password,
             "options": {
                 "data": {
-                    "display_name": display_name,
+                    "username": user_name,
                 }
             },
         })
@@ -63,13 +65,14 @@ def create_test_user(db: Client) -> Generator[Callable[..., Dict[str, Any]], Non
             "id": user_id,
             "email": email,
             "password": password,
-            "display_name": display_name,
+            "username": user_name,
             "access_token": access_token,
             "headers": {"Authorization": f"Bearer {access_token}"},
         }
 
     yield _create_user
 
+    # Cleanup after test suite
     admin_db = get_supabase_client()
     for uid in created_users:
         try:
@@ -89,13 +92,13 @@ def create_test_user(db: Client) -> Generator[Callable[..., Dict[str, Any]], Non
 @pytest.fixture
 def primary_user(create_test_user: Callable[..., Dict[str, Any]]) -> Dict[str, Any]:
     """Standard primary test user fixture."""
-    return create_test_user(display_name="Primary User")
+    return create_test_user(username="Primary User")
 
 
 @pytest.fixture
 def secondary_user(create_test_user: Callable[..., Dict[str, Any]]) -> Dict[str, Any]:
     """Standard secondary test user fixture for permission testing."""
-    return create_test_user(display_name="Secondary User")
+    return create_test_user(username="Secondary User")
 
 
 @pytest.fixture

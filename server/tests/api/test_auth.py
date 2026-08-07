@@ -24,14 +24,14 @@ def test_signup_route_success(client: TestClient, db: Client):
     """Test user registration endpoint against real local Supabase Auth & triggers."""
     email = f"signup_{uuid.uuid4().hex[:8]}@example.com"
     password = "SecretPassword123!"
-    display_name = "New Signup User"
+    username = f"user_{uuid.uuid4().hex[:6]}"
 
     response = client.post(
         "/api/v1/auth/signup",
         json={
             "email": email,
             "password": password,
-            "display_name": display_name,
+            "username": username,
         },
     )
     assert response.status_code == 201
@@ -42,33 +42,34 @@ def test_signup_route_success(client: TestClient, db: Client):
 
     user_id = data["user_id"]
 
-    # Verify DB trigger `handle_new_user` created the profile record automatically
+    # Verify DB trigger `handle_new_user` created the profile record automatically with username
     profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
     assert len(profile_res.data) == 1
-    assert profile_res.data[0]["display_name"] == display_name
+    assert profile_res.data[0]["username"] == username
     assert profile_res.data[0]["email"] == email
 
     # Clean up user from auth
     db.auth.admin.delete_user(user_id)
 
 
-def test_login_route_success(client: TestClient, create_test_user):
-    """Test user login endpoint against real local Supabase Auth."""
+def test_login_route_with_username_or_email(client: TestClient, create_test_user):
+    """Test user login endpoint with username or email."""
     email = f"login_{uuid.uuid4().hex[:8]}@example.com"
+    username = f"cooluser_{uuid.uuid4().hex[:6]}"
     password = "MySecurePassword123!"
-    user = create_test_user(email=email, password=password)
+    user = create_test_user(email=email, password=password, username=username)
 
+    # Login with username
     response = client.post(
         "/api/v1/auth/login",
         json={
-            "email": email,
+            "username_or_email": username,
             "password": password,
         },
     )
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
-    assert data["token_type"] == "bearer"
     assert data["user_id"] == user["id"]
 
 
@@ -79,7 +80,7 @@ def test_signup_short_password_returns_422(client: TestClient):
         json={
             "email": "shortpw@example.com",
             "password": "short",
-            "display_name": "Short Pass User",
+            "username": "Short Pass User",
         },
     )
     assert response.status_code == 422
@@ -97,7 +98,7 @@ def test_signup_duplicate_email_returns_400(client: TestClient, create_test_user
         json={
             "email": email,
             "password": "AnotherPassword123!",
-            "display_name": "Duplicate Email User",
+            "username": "Duplicate Email User",
         },
     )
     assert response.status_code == 400

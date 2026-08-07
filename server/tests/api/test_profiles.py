@@ -10,22 +10,22 @@ def test_get_current_user_profile(authenticated_client: TestClient, primary_user
     data = response.json()
     assert data["id"] == primary_user["id"]
     assert data["email"] == primary_user["email"]
-    assert data["display_name"] == primary_user["display_name"]
+    assert data["username"] == primary_user["username"]
 
 
 def test_update_current_user_profile(authenticated_client: TestClient, primary_user: Dict[str, Any]):
-    """Update profile display_name in real database."""
-    new_name = "Updated Display Name"
+    """Update profile username in real database."""
+    new_name = "Updated Username"
     response = authenticated_client.patch(
         "/api/v1/profiles/me",
-        json={"display_name": new_name},
+        json={"username": new_name},
     )
     assert response.status_code == 200
-    assert response.json()["display_name"] == new_name
+    assert response.json()["username"] == new_name
 
     # Confirm update persisted
     me_response = authenticated_client.get("/api/v1/profiles/me")
-    assert me_response.json()["display_name"] == new_name
+    assert me_response.json()["username"] == new_name
 
 
 def test_get_profile_by_id_success(authenticated_client: TestClient, secondary_user: Dict[str, Any]):
@@ -34,7 +34,7 @@ def test_get_profile_by_id_success(authenticated_client: TestClient, secondary_u
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == secondary_user["id"]
-    assert data["display_name"] == secondary_user["display_name"]
+    assert data["username"] == secondary_user["username"]
 
 
 def test_get_profile_by_id_not_found(authenticated_client: TestClient):

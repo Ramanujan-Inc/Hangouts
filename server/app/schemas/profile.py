@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr, ConfigDict
 
 
 class ProfileBase(BaseModel):
-    display_name: str
+    username: str
     avatar_url: Optional[str] = None
 
 
@@ -14,7 +14,7 @@ class ProfileCreate(ProfileBase):
 
 
 class ProfileUpdate(BaseModel):
-    display_name: Optional[str] = None
+    username: Optional[str] = None
     avatar_url: Optional[str] = None
 
 

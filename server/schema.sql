@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "postgis";
 -- 1. Profiles Table (Extends Supabase Auth users)
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    display_name VARCHAR(255) NOT NULL,
+    username VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     avatar_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -109,11 +109,11 @@ CREATE TABLE IF NOT EXISTS expenses (
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, display_name, avatar_url)
+  INSERT INTO public.profiles (id, email, username, avatar_url)
   VALUES (
     new.id,
     new.email,
-    COALESCE(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)),
+    COALESCE(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
     new.raw_user_meta_data->>'avatar_url'
   )
   ON CONFLICT (id) DO NOTHING;

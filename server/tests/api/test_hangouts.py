@@ -175,7 +175,7 @@ def test_add_and_remove_participant(
     create_test_user: Any,
 ):
     """Test participant invitation, self-removal, and creator kick."""
-    third_user = create_test_user(display_name="Third User")
+    third_user = create_test_user(username="Third User")
 
     create_res = authenticated_client.post(
         "/api/v1/hangouts",

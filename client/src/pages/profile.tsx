@@ -16,12 +16,12 @@ export default function ProfileSettings() {
   const [tempName, setTempName] = useState('')
   const [toastMessage, setToastMessage] = useState('')
 
-  const displayName = user?.display_name || 'User'
+  const displayName = user?.username || 'User'
   const displayEmail = user?.email || ''
 
   useEffect(() => {
-    if (user?.display_name) {
-      setTempName(user.display_name)
+    if (user?.username) {
+      setTempName(user.username)
     }
   }, [user])
 

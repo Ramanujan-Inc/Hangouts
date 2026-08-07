@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 export interface UserProfile {
   id: string;
   email: string;
-  display_name: string;
+  username: string;
   avatar_url?: string | null;
   bio?: string | null;
   created_at?: string;
@@ -21,8 +21,8 @@ interface AuthContextType {
   user: UserProfile | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (displayName: string, email: string, password: string) => Promise<void>;
+  login: (usernameOrEmail: string, password: string) => Promise<void>;
+  signup: (username: string, email: string, password: string) => Promise<void>;
   loginDemoUser: () => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -58,16 +58,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [fetchProfile]);
 
-  const login = async (email: string, password: string) => {
-    const res = await api.post<TokenResponse>('/auth/login', { email, password });
+  const login = async (usernameOrEmail: string, password: string) => {
+    const res = await api.post<TokenResponse>('/auth/login', {
+      username_or_email: usernameOrEmail,
+      password,
+    });
     localStorage.setItem('hangout_token', res.access_token);
     setToken(res.access_token);
     await fetchProfile();
   };
 
-  const signup = async (displayName: string, email: string, password: string) => {
+  const signup = async (username: string, email: string, password: string) => {
     const res = await api.post<TokenResponse>('/auth/signup', {
-      display_name: displayName,
+      username,
       email,
       password,
     });

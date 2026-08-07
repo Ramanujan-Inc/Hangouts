@@ -177,10 +177,10 @@ export default function Onboarding() {
             {error && <InlineAlert>{error}</InlineAlert>}
 
             <TextField
-              label="Display Name"
+              label="Username"
               icon={<UserIcon size={16} />}
               required
-              placeholder="e.g. Mika"
+              placeholder="e.g. mika"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -243,11 +243,10 @@ export default function Onboarding() {
             {error && <InlineAlert>{error}</InlineAlert>}
 
             <TextField
-              label="Email Address"
-              icon={<Mail size={16} />}
-              type="email"
+              label="Username or Email"
+              icon={<UserIcon size={16} />}
               required
-              placeholder="mika@example.com"
+              placeholder="mika or mika@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />

@@ -6,6 +6,7 @@ from app.schemas.auth import UserSignUp, UserLogin
 
 def sign_up_user(db: Client, user_in: UserSignUp) -> Dict[str, Any]:
     """Register user in Supabase Auth (profile is initialized via DB trigger)."""
+    username_val = user_in.username or user_in.email.split("@")[0]
     try:
         auth_response = db.auth.sign_up(
             {
@@ -13,7 +14,7 @@ def sign_up_user(db: Client, user_in: UserSignUp) -> Dict[str, Any]:
                 "password": user_in.password,
                 "options": {
                     "data": {
-                        "display_name": user_in.display_name,
+                        "username": username_val,
                         "avatar_url": user_in.avatar_url,
                     }
                 },
@@ -44,11 +45,25 @@ def sign_up_user(db: Client, user_in: UserSignUp) -> Dict[str, Any]:
 
 
 def login_user(db: Client, user_in: UserLogin) -> Dict[str, Any]:
-    """Authenticate user with email/password against Supabase Auth."""
+    """Authenticate user with email or username and password against Supabase Auth."""
+    identifier = (user_in.username_or_email or user_in.email or "").strip()
+    if not identifier:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email or username is required.",
+        )
+
+    target_email = identifier
+    if "@" not in identifier:
+        # Lookup user's registered email by username in profiles table
+        profile_res = db.table("profiles").select("email").ilike("username", identifier).execute()
+        if profile_res.data and len(profile_res.data) > 0:
+            target_email = profile_res.data[0]["email"]
+
     try:
         auth_response = db.auth.sign_in_with_password(
             {
-                "email": user_in.email,
+                "email": target_email,
                 "password": user_in.password,
             }
         )
