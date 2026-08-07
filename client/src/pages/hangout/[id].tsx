@@ -3,85 +3,31 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import Layout from '../../components/Layout'
-import { 
-  ArrowLeft, Share2, MapPin, Calendar, Heart, Trash2, Plus, 
+import {
+  ArrowLeft, Share2, MapPin, Calendar, Heart, Trash2, Plus,
   Smile, Image as ImageIcon, FileText, DollarSign, X, Check, ArrowRight
 } from 'lucide-react'
-
-// Members
-const members = {
-  mika: { name: 'Mika', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=mika' },
-  jam: { name: 'Jam', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=jam' },
-  dave: { name: 'Dave', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=dave' },
-  chloe: { name: 'Chloe', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=chloe' },
-}
-
-// Initial mockup data
-const initialHangoutData = {
-  '1': {
-    title: 'Friday Night Ramen',
-    description: 'Craving spicy tonkotsu ramen after a long week. Ended up talking for hours about trip planning and old college memories. We ordered the special Gyoza too!',
-    date: '2025-07-29',
-    location: 'Ramen Nagi, BGC',
-    coverImage: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80',
-    participants: ['mika', 'jam', 'dave'],
-    rating: 4, // out of 5
-    photos: [
-      { id: 'p1', url: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=600&q=80', uploadedBy: 'mika', likes: 4, span: 2 },
-      { id: 'p2', url: 'https://images.unsplash.com/photo-1557872943-16a5ac26437e?auto=format&fit=crop&w=600&q=80', uploadedBy: 'jam', likes: 2, span: 1 },
-      { id: 'p3', url: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=600&q=80', uploadedBy: 'dave', likes: 3, span: 1 },
-      { id: 'p4', url: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80', uploadedBy: 'mika', likes: 5, span: 2 }
-    ],
-    notes: [
-      { id: 'n1', author: 'mika', text: 'Jam ate 3 bowls of noodles! Certified black hole stomach.', time: '1 year ago', type: 'butter', rotation: -1.5 },
-      { id: 'n2', author: 'dave', text: 'Note to self: The Red King ramen at Level 3 spice is actually spicy. Bring milk next time.', time: '1 year ago', type: 'blush', rotation: 1.2 },
-      { id: 'n3', author: 'jam', text: 'Next meetup should be at the beach! Let’s plan for next month.', time: '1 year ago', type: 'sea', rotation: 2.0 }
-    ],
-    expenses: [
-      { id: 'e1', desc: 'Ramen Bowls & Gyoza', amount: 1800, paidBy: 'mika', splitWith: ['mika', 'jam', 'dave'], category: 'Food' },
-      { id: 'e2', desc: 'Dessert & Milk tea', amount: 450, paidBy: 'jam', splitWith: ['mika', 'jam', 'dave'], category: 'Drinks' }
-    ]
-  },
-  '2': {
-    title: 'Beach Day Picnic',
-    description: 'Road trip to the beach! Super clear waters and awesome music.',
-    date: '2026-07-15',
-    location: 'Anawangin Cove',
-    coverImage: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
-    participants: ['mika', 'jam', 'dave', 'chloe'],
-    rating: 5,
-    photos: [],
-    notes: [],
-    expenses: []
-  },
-  '3': {
-    title: 'Coffee & Boardgames',
-    description: 'Relaxing afternoon cafe session.',
-    date: '2026-07-26',
-    location: 'Wildflour Cafe',
-    coverImage: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=1200&q=80',
-    participants: ['mika', 'dave'],
-    rating: 4,
-    photos: [],
-    notes: [],
-    expenses: []
-  }
-}
+import { members, hangoutById, mockUploadOptions, HangoutPhoto } from '../../data/mock'
+import { formatDate } from '../../lib/format'
+import {
+  AvatarStack, BottomSheet, Button, EmptyState, Modal, SegmentedTabs, TextArea, TextField
+} from '../../components/ui'
+import MemberAvatar from '../../components/MemberAvatar'
 
 const emojis = ['😴', '😐', '🙂', '😊', '😍']
 
 export default function HangoutDetail() {
   const router = useRouter()
   const { id } = router.query
-  const hangoutId = (id as string) || '1'
-  const data = initialHangoutData[hangoutId as keyof typeof initialHangoutData]
+  const hangoutId = (Array.isArray(id) ? id[0] : id) || '1'
+  const data = hangoutById(hangoutId)
 
   const [activeTab, setActiveTab] = useState<'overview' | 'photos' | 'notes' | 'expenses'>('overview')
   const [rating, setRating] = useState(data?.rating || 4)
 
   // Photos states
-  const [photos, setPhotos] = useState(data?.photos || [])
-  const [activePhoto, setActivePhoto] = useState<any>(null)
+  const [photos, setPhotos] = useState<HangoutPhoto[]>(data?.photos || [])
+  const [activePhoto, setActivePhoto] = useState<HangoutPhoto | null>(null)
   const [showUploadMenu, setShowUploadMenu] = useState(false)
 
   // Notes states
@@ -113,7 +59,7 @@ export default function HangoutDetail() {
 
   // Expense calculations
   const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0)
-  
+
   // Calculate individual balances
   const computeBalances = () => {
     const spends: Record<string, number> = {}
@@ -123,7 +69,7 @@ export default function HangoutDetail() {
       const payer = exp.paidBy
       const splitCount = exp.splitWith.length
       if (splitCount === 0) return
-      
+
       const share = exp.amount / splitCount
       data.participants.forEach(p => {
         if (exp.splitWith.includes(p)) {
@@ -143,7 +89,7 @@ export default function HangoutDetail() {
   const getOwesWhomList = () => {
     const list: Array<{ from: string, to: string, amount: number }> = []
     const sortedBalances = Object.entries(balances).map(([user, bal]) => ({ user, bal }))
-    
+
     // Simple greedy matching for simplified debts
     const debtors = sortedBalances.filter(x => x.bal < 0).map(x => ({ ...x, bal: Math.abs(x.bal) }))
     const creditors = sortedBalances.filter(x => x.bal > 0)
@@ -192,7 +138,7 @@ export default function HangoutDetail() {
     e.preventDefault()
     const amt = parseFloat(expAmount)
     if (isNaN(amt) || amt <= 0 || !expDesc.trim()) return
-    
+
     const newExp = {
       id: `e-${Date.now()}`,
       desc: expDesc,
@@ -221,7 +167,7 @@ export default function HangoutDetail() {
   }
 
   const handleMockUpload = (url: string) => {
-    const newPhoto = {
+    const newPhoto: HangoutPhoto = {
       id: `p-${Date.now()}`,
       url,
       uploadedBy: 'mika',
@@ -231,6 +177,13 @@ export default function HangoutDetail() {
     setPhotos([...photos, newPhoto])
     setShowUploadMenu(false)
   }
+
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: <Smile size={16} /> },
+    { id: 'photos', label: 'Photos', icon: <ImageIcon size={16} /> },
+    { id: 'notes', label: 'Notes', icon: <FileText size={16} /> },
+    { id: 'expenses', label: 'Expenses', icon: <DollarSign size={16} /> },
+  ]
 
   return (
     <Layout>
@@ -257,11 +210,11 @@ export default function HangoutDetail() {
           <div className="title-row">
             <h2>{data.title}</h2>
           </div>
-          
+
           <div className="metadata-row">
             <div className="meta-item">
               <Calendar size={16} />
-              <span>{new Date(data.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+              <span>{formatDate(data.date, 'long')}</span>
             </div>
             <div className="meta-item">
               <MapPin size={16} className="loc-pin" />
@@ -271,41 +224,24 @@ export default function HangoutDetail() {
 
           <div className="participants-row">
             <span className="participants-label">Joined:</span>
-            <div className="avatar-stack-large">
-              {data.participants.map((p, i) => (
-                <div 
-                  key={p} 
-                  className="stack-avatar-wrapper"
-                  style={{ zIndex: 10 - i, transform: `translateX(-${i * 12}px)` }}
-                  title={members[p as keyof typeof members].name}
-                >
-                  <img src={members[p as keyof typeof members].avatar} alt={p} />
-                </div>
-              ))}
-              <span className="avatar-count-badge" style={{ transform: `translateX(-${(data.participants.length - 1) * 8}px)` }}>
-                {data.participants.length} friends
-              </span>
-            </div>
+            <AvatarStack
+              size={36}
+              overlap={12}
+              avatars={data.participants.map((p) => ({
+                src: members[p].avatar,
+                alt: members[p].name,
+                title: members[p].name,
+              }))}
+            />
+            <span className="avatar-count-badge" style={{ transform: `translateX(-${(data.participants.length - 1) * 12}px)` }}>
+              {data.participants.length} friends
+            </span>
           </div>
         </section>
 
         {/* Segmented Pill Tab Bar */}
         <div className="tab-bar-container">
-          <div className="segmented-tab-bar">
-            {(['overview', 'photos', 'notes', 'expenses'] as const).map((tab) => (
-              <button
-                key={tab}
-                className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab === 'overview' && <Smile size={16} />}
-                {tab === 'photos' && <ImageIcon size={16} />}
-                {tab === 'notes' && <FileText size={16} />}
-                {tab === 'expenses' && <DollarSign size={16} />}
-                <span>{tab.charAt(0).toUpperCase() + tab.slice(1)}</span>
-              </button>
-            ))}
-          </div>
+          <SegmentedTabs tabs={tabs} active={activeTab} onChange={(t) => setActiveTab(t as typeof activeTab)} />
         </div>
 
         {/* Tab Contents */}
@@ -335,11 +271,11 @@ export default function HangoutDetail() {
                 <div className="emoji-slider-wrapper">
                   <div className="emoji-display">{emojis[rating]}</div>
                   <div className="slider-container-box">
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="4" 
-                      value={rating} 
+                    <input
+                      type="range"
+                      min="0"
+                      max="4"
+                      value={rating}
                       onChange={(e) => setRating(parseInt(e.target.value))}
                       className="emoji-range-input"
                     />
@@ -358,27 +294,27 @@ export default function HangoutDetail() {
             <div className="photos-tab">
               <div className="tab-section-header">
                 <h3>Photo Stack ({photos.length})</h3>
-                <button className="pill-button pill-button-primary compact-btn" onClick={() => setShowUploadMenu(true)}>
+                <Button size="compact" onClick={() => setShowUploadMenu(true)}>
                   <Plus size={16} /> Add Photos
-                </button>
+                </Button>
               </div>
 
               {photos.length === 0 ? (
-                <div className="empty-sub-state">
-                  <ImageIcon size={32} />
-                  <p>No photos uploaded yet. Drop a memory here!</p>
-                </div>
+                <EmptyState
+                  icon={<ImageIcon size={32} />}
+                  title="No photos uploaded yet. Drop a memory here!"
+                />
               ) : (
                 <div className="masonry-gallery">
                   {photos.map((photo) => (
-                    <div 
-                      key={photo.id} 
+                    <div
+                      key={photo.id}
                       className={`gallery-item span-${photo.span}`}
                       onClick={() => setActivePhoto(photo)}
                     >
                       <img src={photo.url} alt="Hangout memory" />
                       <div className="uploader-badge">
-                        <img src={members[photo.uploadedBy as keyof typeof members].avatar} alt={photo.uploadedBy} />
+                        <MemberAvatar memberId={photo.uploadedBy} size={24} />
                       </div>
                       <div className="photo-likes-overlay">
                         <Heart size={14} fill="white" />
@@ -395,29 +331,29 @@ export default function HangoutDetail() {
             <div className="notes-tab">
               <div className="tab-section-header">
                 <h3>Collaborative Sticky Notes</h3>
-                <button className="pill-button pill-button-primary compact-btn" onClick={() => setShowAddNote(true)}>
+                <Button size="compact" onClick={() => setShowAddNote(true)}>
                   <Plus size={16} /> Add Note
-                </button>
+                </Button>
               </div>
 
               {notes.length === 0 ? (
-                <div className="empty-sub-state">
-                  <FileText size={32} />
-                  <p>No notes written yet. Jot down funny quotes or memories!</p>
-                </div>
+                <EmptyState
+                  icon={<FileText size={32} />}
+                  title="No notes written yet. Jot down funny quotes or memories!"
+                />
               ) : (
                 <div className="sticky-notes-board">
                   {notes.map((note) => (
-                    <div 
-                      key={note.id} 
+                    <div
+                      key={note.id}
                       className={`sticky-note sticky-note-${note.type}`}
                       style={{ transform: `rotate(${note.rotation}deg)` }}
                     >
                       <p className="note-text">"{note.text}"</p>
                       <div className="note-meta-footer">
                         <div className="note-author">
-                          <img src={members[note.author as keyof typeof members].avatar} alt={note.author} />
-                          <span>{members[note.author as keyof typeof members].name}</span>
+                          <MemberAvatar memberId={note.author} size={20} />
+                          <span>{members[note.author].name}</span>
                         </div>
                         <span className="note-time">{note.time}</span>
                       </div>
@@ -437,9 +373,9 @@ export default function HangoutDetail() {
                   <h3>₱{totalSpent.toLocaleString()}</h3>
                   <span className="summary-sub">across {expenses.length} payments</span>
                 </div>
-                <button className="pill-button pill-button-primary" onClick={() => setShowAddExpense(true)}>
+                <Button onClick={() => setShowAddExpense(true)}>
                   <Plus size={18} /> Log Expense
-                </button>
+                </Button>
               </div>
 
               {/* Spend Chart breakdown */}
@@ -452,16 +388,16 @@ export default function HangoutDetail() {
                         .filter(e => e.paidBy === user)
                         .reduce((s, e) => s + e.amount, 0)
                       const pct = totalSpent > 0 ? (totalPaid / totalSpent) * 100 : 0
-                      
+
                       return (
                         <div key={user} className="chart-row">
                           <div className="chart-member-label">
-                            <img src={members[user as keyof typeof members].avatar} alt={user} />
-                            <span>{members[user as keyof typeof members].name}</span>
+                            <MemberAvatar memberId={user} size={24} />
+                            <span>{members[user].name}</span>
                           </div>
                           <div className="chart-bar-track">
-                            <div 
-                              className="chart-bar-fill" 
+                            <div
+                              className="chart-bar-fill"
                               style={{ width: `${Math.max(pct, 5)}%`, backgroundColor: user === 'mika' ? 'var(--color-blush)' : user === 'jam' ? 'var(--color-tangerine)' : 'var(--color-sea)' }}
                             />
                             <span className="bar-val">₱{totalPaid.toLocaleString()}</span>
@@ -481,12 +417,12 @@ export default function HangoutDetail() {
                     {debtsList.map((debt, index) => (
                       <div key={index} className="debt-row-card">
                         <div className="debt-avatars">
-                          <img src={members[debt.from as keyof typeof members].avatar} alt={debt.from} className="avatar-side" />
+                          <MemberAvatar memberId={debt.from} size={28} />
                           <ArrowRight size={16} className="arrow-icon" />
-                          <img src={members[debt.to as keyof typeof members].avatar} alt={debt.to} className="avatar-side" />
+                          <MemberAvatar memberId={debt.to} size={28} />
                         </div>
                         <div className="debt-message">
-                          <strong>{members[debt.from as keyof typeof members].name}</strong> owes <strong>{members[debt.to as keyof typeof members].name}</strong>
+                          <strong>{members[debt.from].name}</strong> owes <strong>{members[debt.to].name}</strong>
                         </div>
                         <div className="debt-badge">
                           ₱{debt.amount}
@@ -501,19 +437,19 @@ export default function HangoutDetail() {
               <div className="expense-history-list">
                 <h4>Expense History</h4>
                 {expenses.length === 0 ? (
-                  <div className="empty-sub-state">
-                    <DollarSign size={32} />
-                    <p>No expenses logged yet. Keep track of group splits here!</p>
-                  </div>
+                  <EmptyState
+                    icon={<DollarSign size={32} />}
+                    title="No expenses logged yet. Keep track of group splits here!"
+                  />
                 ) : (
                   <div className="expenses-grid">
                     {expenses.map((exp) => (
                       <div key={exp.id} className="expense-row-item">
                         <div className="payer-col">
-                          <img src={members[exp.paidBy as keyof typeof members].avatar} alt={exp.paidBy} />
+                          <MemberAvatar memberId={exp.paidBy} size={36} />
                           <div>
                             <div className="exp-desc">{exp.desc}</div>
-                            <div className="exp-meta">Paid by {members[exp.paidBy as keyof typeof members].name} • Split among {exp.splitWith.length}</div>
+                            <div className="exp-meta">Paid by {members[exp.paidBy].name} • Split among {exp.splitWith.length}</div>
                           </div>
                         </div>
                         <div className="amount-col">
@@ -535,15 +471,15 @@ export default function HangoutDetail() {
           <button className="lightbox-close" onClick={() => setActivePhoto(null)}>
             <X size={24} />
           </button>
-          
+
           <div className="lightbox-container">
             <img src={activePhoto.url} alt="Lightbox View" className="lightbox-img" />
-            
+
             {/* Top info bar */}
             <div className="lightbox-top-bar">
-              <img src={members[activePhoto.uploadedBy as keyof typeof members].avatar} alt="Uploader" className="light-avatar" />
+              <MemberAvatar memberId={activePhoto.uploadedBy} size={32} />
               <div>
-                <div className="light-author">Uploaded by {members[activePhoto.uploadedBy as keyof typeof members].name}</div>
+                <div className="light-author">Uploaded by {members[activePhoto.uploadedBy].name}</div>
                 <div className="light-time">1 year ago</div>
               </div>
             </div>
@@ -554,7 +490,7 @@ export default function HangoutDetail() {
                 <Heart size={20} fill={activePhoto.likes > 4 ? 'white' : 'transparent'} />
                 <span>{activePhoto.likes} Likes</span>
               </button>
-              
+
               {activePhoto.uploadedBy === 'mika' && (
                 <button className="light-action-btn delete-btn" onClick={() => handleDeletePhoto(activePhoto.id)}>
                   <Trash2 size={20} />
@@ -568,40 +504,33 @@ export default function HangoutDetail() {
 
       {/* Mock Upload Menu (Bottom Sheet) */}
       {showUploadMenu && (
-        <div className="bottom-sheet-backdrop" onClick={() => setShowUploadMenu(false)}>
-          <div className="bottom-sheet" onClick={(e) => e.stopPropagation()}>
-            <h3>Add Photos to Gallery</h3>
-            <div className="sheet-options">
-              <div 
+        <BottomSheet onClose={() => setShowUploadMenu(false)}>
+          <h3>Add Photos to Gallery</h3>
+          <div className="sheet-options">
+            {mockUploadOptions.map((opt) => (
+              <div
+                key={opt.url}
                 className="sheet-option-card"
-                onClick={() => handleMockUpload('https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=600&q=80')}
+                onClick={() => handleMockUpload(opt.url)}
               >
-                <img src="https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=120&q=80" alt="Option 1" />
-                <span>Mock: Group Toast</span>
+                <img src={opt.url} alt={opt.label} />
+                <span>{opt.label}</span>
               </div>
-              <div 
-                className="sheet-option-card"
-                onClick={() => handleMockUpload('https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&w=600&q=80')}
-              >
-                <img src="https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&w=120&q=80" alt="Option 2" />
-                <span>Mock: Cafe Latte</span>
-              </div>
-            </div>
-            <button className="pill-button pill-button-outline full-width-btn" onClick={() => setShowUploadMenu(false)}>
-              Cancel
-            </button>
+            ))}
           </div>
-        </div>
+          <Button variant="outline" fullWidth onClick={() => setShowUploadMenu(false)}>
+            Cancel
+          </Button>
+        </BottomSheet>
       )}
 
       {/* Add Note Modal */}
       {showAddNote && (
-        <div className="modal-backdrop">
-          <form className="modal-content" onSubmit={handleAddNoteSubmit}>
-            <h3>Write a Sticky Note</h3>
-            <textarea 
+        <Modal onClose={() => setShowAddNote(false)} title="Write a Sticky Note">
+          <form onSubmit={handleAddNoteSubmit}>
+            <TextArea
               required
-              className="note-textarea"
+              height={120}
               placeholder="Write down funny quotes, inside jokes, or anything memorable..."
               value={newNoteText}
               onChange={(e) => setNewNoteText(e.target.value)}
@@ -611,7 +540,7 @@ export default function HangoutDetail() {
               <span className="picker-lbl">Note Style:</span>
               <div className="color-options">
                 {(['butter', 'blush', 'sea'] as const).map((type) => (
-                  <button 
+                  <button
                     key={type}
                     type="button"
                     className={`color-dot note-${type} ${newNoteType === type ? 'active' : ''}`}
@@ -622,29 +551,23 @@ export default function HangoutDetail() {
             </div>
 
             <div className="modal-btn-row">
-              <button type="submit" className="pill-button pill-button-primary">
-                Post Note
-              </button>
-              <button type="button" className="pill-button pill-button-outline" onClick={() => setShowAddNote(false)}>
-                Cancel
-              </button>
+              <Button type="submit">Post Note</Button>
+              <Button variant="outline" onClick={() => setShowAddNote(false)}>Cancel</Button>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
 
       {/* Add Expense Drawer */}
       {showAddExpense && (
-        <div className="modal-backdrop">
-          <form className="modal-content drawer-content" onSubmit={handleAddExpenseSubmit}>
-            <h3>Log a Group Expense</h3>
-
+        <Modal onClose={() => setShowAddExpense(false)} title="Log a Group Expense">
+          <form onSubmit={handleAddExpenseSubmit}>
             {/* Oversized Amount Field */}
             <div className="amount-input-wrapper">
               <span className="currency-lbl">₱</span>
-              <input 
-                type="number" 
-                required 
+              <input
+                type="number"
+                required
                 placeholder="0.00"
                 value={expAmount}
                 onChange={(e) => setExpAmount(e.target.value)}
@@ -653,29 +576,25 @@ export default function HangoutDetail() {
               />
             </div>
 
-            <div className="input-group-field">
-              <label>What was this for?</label>
-              <input 
-                type="text" 
-                required 
-                placeholder="e.g. Ramen Bowls"
-                className="pill-input"
-                value={expDesc}
-                onChange={(e) => setExpDesc(e.target.value)}
-              />
-            </div>
+            <TextField
+              label="What was this for?"
+              required
+              placeholder="e.g. Ramen Bowls"
+              value={expDesc}
+              onChange={(e) => setExpDesc(e.target.value)}
+            />
 
-            <div className="input-group-field">
-              <label>Paid by:</label>
+            <div className="payer-field">
+              <label className="field-label">Paid by:</label>
               <div className="payer-chips">
                 {data.participants.map((p) => (
-                  <div 
+                  <div
                     key={p}
                     className={`payer-chip ${expPaidBy === p ? 'active' : ''}`}
                     onClick={() => setExpPaidBy(p)}
                   >
-                    <img src={members[p as keyof typeof members].avatar} alt={p} />
-                    <span>{members[p as keyof typeof members].name}</span>
+                    <MemberAvatar memberId={p} size={20} />
+                    <span>{members[p].name}</span>
                   </div>
                 ))}
               </div>
@@ -689,15 +608,11 @@ export default function HangoutDetail() {
             )}
 
             <div className="modal-btn-row">
-              <button type="submit" className="pill-button pill-button-primary">
-                Save Expense
-              </button>
-              <button type="button" className="pill-button pill-button-outline" onClick={() => setShowAddExpense(false)}>
-                Cancel
-              </button>
+              <Button type="submit">Save Expense</Button>
+              <Button variant="outline" onClick={() => setShowAddExpense(false)}>Cancel</Button>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
 
       <style jsx>{`
@@ -793,19 +708,6 @@ export default function HangoutDetail() {
           color: var(--color-text-muted);
         }
 
-        .avatar-stack-large {
-          display: flex;
-          align-items: center;
-        }
-
-        .stack-avatar-wrapper img {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          border: 2px solid white;
-          background-color: var(--color-surface-container);
-        }
-
         .avatar-count-badge {
           font-size: 13px;
           font-weight: 700;
@@ -816,39 +718,6 @@ export default function HangoutDetail() {
         /* Segmented tab bar */
         .tab-bar-container {
           margin-bottom: 28px;
-        }
-
-        .segmented-tab-bar {
-          background-color: var(--color-surface-container);
-          padding: 6px;
-          border-radius: 9999px;
-          display: flex;
-          gap: 4px;
-          box-shadow: var(--shadow-inner);
-        }
-
-        .tab-btn {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          padding: 10px 12px;
-          border-radius: 9999px;
-          border: none;
-          background: transparent;
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 14px;
-          color: var(--color-text-muted);
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .tab-btn.active {
-          background-color: var(--color-blush);
-          color: white;
-          box-shadow: 0 4px 10px rgba(227, 104, 136, 0.2);
         }
 
         /* Content cards */
@@ -974,17 +843,6 @@ export default function HangoutDetail() {
           font-family: var(--font-display);
         }
 
-        .compact-btn {
-          padding: 8px 16px;
-          font-size: 14px;
-        }
-
-        .empty-sub-state {
-          text-align: center;
-          padding: 40px;
-          color: var(--color-text-muted);
-        }
-
         .masonry-gallery {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
@@ -1025,11 +883,6 @@ export default function HangoutDetail() {
           border-radius: 50%;
           border: 1.5px solid white;
           overflow: hidden;
-        }
-
-        .uploader-badge img {
-          width: 100%;
-          height: 100%;
         }
 
         .photo-likes-overlay {
@@ -1079,19 +932,13 @@ export default function HangoutDetail() {
           font-weight: 700;
         }
 
-        .note-author img {
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-        }
-
         .note-time {
           color: var(--color-text-muted);
         }
 
         /* Expenses tab */
         .expense-summary-card {
-          background-color: #fcf1d3; /* Butter fill */
+          background-color: var(--tint-butter); /* Butter fill */
           border-radius: 24px;
           padding: 24px;
           display: flex;
@@ -1148,12 +995,6 @@ export default function HangoutDetail() {
           gap: 8px;
           font-weight: 700;
           font-size: 14px;
-        }
-
-        .chart-member-label img {
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
         }
 
         .chart-bar-track {
@@ -1214,12 +1055,6 @@ export default function HangoutDetail() {
           gap: 8px;
         }
 
-        .avatar-side {
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-        }
-
         .arrow-icon {
           color: var(--color-text-muted);
         }
@@ -1231,7 +1066,7 @@ export default function HangoutDetail() {
         }
 
         .debt-badge {
-          background-color: #fbe6eb;
+          background-color: var(--tint-blush);
           color: var(--color-blush);
           padding: 4px 12px;
           border-radius: 9999px;
@@ -1264,12 +1099,6 @@ export default function HangoutDetail() {
           display: flex;
           align-items: center;
           gap: 12px;
-        }
-
-        .payer-col img {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
         }
 
         .exp-desc {
@@ -1339,12 +1168,6 @@ export default function HangoutDetail() {
           color: white;
         }
 
-        .light-avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-        }
-
         .light-author {
           font-size: 13px;
           font-weight: 700;
@@ -1385,24 +1208,6 @@ export default function HangoutDetail() {
         }
 
         /* Add Note Modal Custom styles */
-        .note-textarea {
-          width: 100%;
-          height: 120px;
-          background-color: var(--color-surface-container-low);
-          border: 2px solid transparent;
-          border-radius: 14px;
-          padding: 12px;
-          font-family: var(--font-body);
-          outline: none;
-          resize: none;
-          margin-top: 12px;
-        }
-
-        .note-textarea:focus {
-          border-color: var(--color-blush);
-          background-color: white;
-        }
-
         .color-picker-row {
           display: flex;
           align-items: center;
@@ -1428,9 +1233,9 @@ export default function HangoutDetail() {
           cursor: pointer;
         }
 
-        .color-dot.note-butter { background-color: #fcf1d3; }
-        .color-dot.note-blush { background-color: #fbe6eb; }
-        .color-dot.note-sea { background-color: #e6f0fa; }
+        .color-dot.note-butter { background-color: var(--tint-butter); }
+        .color-dot.note-blush { background-color: var(--tint-blush); }
+        .color-dot.note-sea { background-color: var(--tint-sea); }
 
         .color-dot.active {
           border-color: var(--color-text);
@@ -1470,22 +1275,17 @@ export default function HangoutDetail() {
           font-family: var(--font-display);
         }
 
-        .input-group-field {
+        .payer-field {
           display: flex;
           flex-direction: column;
           gap: 8px;
           margin-bottom: 16px;
         }
 
-        .input-group-field label {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 14px;
-        }
-
         .payer-chips {
           display: flex;
           gap: 8px;
+          flex-wrap: wrap;
         }
 
         .payer-chip {
@@ -1503,13 +1303,7 @@ export default function HangoutDetail() {
 
         .payer-chip.active {
           border-color: var(--color-blush);
-          background-color: #fbe6eb;
-        }
-
-        .payer-chip img {
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
+          background-color: var(--tint-blush);
         }
 
         .split-summary-badge {
@@ -1524,28 +1318,6 @@ export default function HangoutDetail() {
         }
 
         /* Bottom sheet mock upload */
-        .bottom-sheet-backdrop {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0,0,0,0.3);
-          z-index: 2500;
-        }
-
-        .bottom-sheet {
-          position: fixed;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          background-color: var(--color-surface-container-lowest);
-          border-radius: 24px 24px 0 0;
-          padding: 24px;
-          box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
-          z-index: 2501;
-        }
-
         .sheet-options {
           display: flex;
           gap: 16px;
@@ -1581,24 +1353,7 @@ export default function HangoutDetail() {
           font-weight: 700;
         }
 
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
-        }
-
         @media (max-width: 650px) {
-          .segmented-tab-bar {
-            flex-wrap: wrap;
-          }
-
-          .tab-btn span {
-            display: none;
-          }
-
-          .tab-btn {
-            padding: 8px;
-          }
-
           .masonry-gallery {
             grid-template-columns: repeat(2, 1fr);
           }

@@ -3,21 +3,8 @@ import Head from 'next/head'
 import { useRouter } from 'next/router'
 import Layout from '../components/Layout'
 import { Camera, MapPin, Calendar, Clock, Check, Users, Sparkles } from 'lucide-react'
-
-// Cover illustrations
-const placeholders = [
-  { name: 'Bonfire Vibe', url: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&w=600&q=80' },
-  { name: 'Picnic Park', url: 'https://images.unsplash.com/photo-1526218626217-dc65a29bb444?auto=format&fit=crop&w=600&q=80' },
-  { name: 'City Night Lights', url: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=600&q=80' },
-  { name: 'Sunny Beach', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' }
-]
-
-// Mock friends
-const initialRoster = [
-  { id: 'jam', name: 'Jam', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=jam' },
-  { id: 'dave', name: 'Dave', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=dave' },
-  { id: 'chloe', name: 'Chloe', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=chloe' },
-]
+import { selectableMembers, coverPlaceholders } from '../data/mock'
+import { Button, Modal, TextArea, TextField } from '../components/ui'
 
 export default function CreateHangout() {
   const router = useRouter()
@@ -27,19 +14,19 @@ export default function CreateHangout() {
   const [time, setTime] = useState('')
   const [location, setLocation] = useState('')
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([])
-  
+
   // Custom illustrated cover picker
   const [currentCoverIndex, setCurrentCoverIndex] = useState(-1)
-  
+
   // Map/Location mock modal
   const [showLocationPicker, setShowLocationPicker] = useState(false)
   const [searchLocationQuery, setSearchLocationQuery] = useState('')
 
   const handleSelectAll = () => {
-    if (selectedParticipants.length === initialRoster.length) {
+    if (selectedParticipants.length === selectableMembers.length) {
       setSelectedParticipants([])
     } else {
-      setSelectedParticipants(initialRoster.map(m => m.id))
+      setSelectedParticipants(selectableMembers.map(m => m.id))
     }
   }
 
@@ -52,12 +39,12 @@ export default function CreateHangout() {
   }
 
   const cycleCover = () => {
-    setCurrentCoverIndex((prev) => (prev + 1) % placeholders.length)
+    setCurrentCoverIndex((prev) => (prev + 1) % coverPlaceholders.length)
   }
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()
-    // In real app, we would push to state/DB. 
+    // In real app, we would push to state/DB.
     // Here we'll redirect back to timeline.
     router.push('/timeline')
   }
@@ -70,15 +57,15 @@ export default function CreateHangout() {
 
       <div className="create-hangout-page">
         <h2 className="page-heading">Create a Hangout</h2>
-        
+
         <form onSubmit={handleCreate} className="create-form">
           {/* Cover Photo Picker */}
           <div className="cover-picker-section">
-            <div 
+            <div
               className="cover-picker-box"
               onClick={cycleCover}
               style={{
-                backgroundImage: currentCoverIndex >= 0 ? `url(${placeholders[currentCoverIndex].url})` : 'none',
+                backgroundImage: currentCoverIndex >= 0 ? `url(${coverPlaceholders[currentCoverIndex].url})` : 'none',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center'
               }}
@@ -89,11 +76,11 @@ export default function CreateHangout() {
                     <Camera size={24} />
                   </div>
                   <span>Add a cover photo</span>
-                  <p className="hint">Click to cycle throughIllustrated Vibe Covers</p>
+                  <p className="hint">Click to cycle through illustrated vibe covers</p>
                 </div>
               ) : (
                 <div className="picker-overlay">
-                  <span>Vibe: {placeholders[currentCoverIndex].name} (Tap to change)</span>
+                  <span>Vibe: {coverPlaceholders[currentCoverIndex].name} (Tap to change)</span>
                 </div>
               )}
             </div>
@@ -101,55 +88,46 @@ export default function CreateHangout() {
 
           {/* Form Fields */}
           <div className="form-fields">
-            <div className="input-group">
-              <label>Hangout Title</label>
-              <input 
-                type="text" 
-                required 
-                className="pill-input" 
-                placeholder="e.g. Friday Night Ramen"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </div>
+            <TextField
+              label="Hangout Title"
+              required
+              placeholder="e.g. Friday Night Ramen"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
 
-            <div className="input-group">
-              <label>Description</label>
-              <textarea 
-                className="description-box"
-                placeholder="What are we doing? Write down any notes or plans..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
+            <TextArea
+              label="Description"
+              placeholder="What are we doing? Write down any notes or plans..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
 
             {/* Date & Time Row */}
             <div className="datetime-row">
-              <div className="input-group half-width">
-                <label><Calendar size={16} /> Date</label>
-                <input 
-                  type="date" 
-                  required 
-                  className="pill-input" 
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                />
-              </div>
+              <TextField
+                label="Date"
+                icon={<Calendar size={16} />}
+                type="date"
+                required
+                wrapperClassName="half-width"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
 
-              <div className="input-group half-width">
-                <label><Clock size={16} /> Time</label>
-                <input 
-                  type="time" 
-                  className="pill-input" 
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                />
-              </div>
+              <TextField
+                label="Time"
+                icon={<Clock size={16} />}
+                type="time"
+                wrapperClassName="half-width"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+              />
             </div>
 
             {/* Location Selector */}
             <div className="input-group">
-              <label><MapPin size={16} /> Location</label>
+              <label className="field-label"><MapPin size={16} /> Location</label>
               <div className="location-picker-trigger" onClick={() => setShowLocationPicker(true)}>
                 <MapPin size={18} className="loc-pin" />
                 <span>{location || 'Add a location...'}</span>
@@ -159,17 +137,17 @@ export default function CreateHangout() {
             {/* Participants Selector */}
             <div className="input-group">
               <div className="label-row-with-action">
-                <label><Users size={16} /> Participants</label>
+                <label className="field-label"><Users size={16} /> Participants</label>
                 <span className="action-text" onClick={handleSelectAll}>
-                  {selectedParticipants.length === initialRoster.length ? 'Deselect All' : 'Select All'}
+                  {selectedParticipants.length === selectableMembers.length ? 'Deselect All' : 'Select All'}
                 </span>
               </div>
-              
+
               <div className="participants-scroll">
-                {initialRoster.map((member) => {
+                {selectableMembers.map((member) => {
                   const isSelected = selectedParticipants.includes(member.id)
                   return (
-                    <div 
+                    <div
                       key={member.id}
                       className={`participant-chip ${isSelected ? 'selected' : ''}`}
                       onClick={() => toggleParticipant(member.id)}
@@ -192,64 +170,57 @@ export default function CreateHangout() {
 
           {/* Sticky Bottom CTA */}
           <div className="sticky-cta-footer">
-            <button type="submit" className="pill-button pill-button-primary full-width-btn">
+            <Button type="submit" fullWidth>
               <Sparkles size={18} />
               Create Hangout
-            </button>
+            </Button>
           </div>
         </form>
 
         {/* Location Picker Mock Modal */}
         {showLocationPicker && (
-          <div className="modal-backdrop">
-            <div className="modal-content">
-              <h3>Search & Select Location</h3>
-              <div className="search-bar-wrapper">
-                <input 
-                  type="text" 
-                  className="pill-input" 
-                  placeholder="Search a place (e.g. Ramen Nagi, BGC)"
-                  value={searchLocationQuery}
-                  onChange={(e) => setSearchLocationQuery(e.target.value)}
-                  autoFocus
-                />
-              </div>
-
-              {/* Mock map geocoding results */}
-              <div className="mock-results">
-                {[
-                  { name: 'Ramen Nagi, Bonifacio High Street', desc: 'BGC, Taguig City' },
-                  { name: 'Wildflour Cafe, Net Lima', desc: 'BGC, Taguig City' },
-                  { name: 'Anawangin Cove Campground', desc: 'San Antonio, Zambales' },
-                  { name: 'Mika\'s House Backyard', desc: 'Quezon City, Manila' }
-                ].filter(r => r.name.toLowerCase().includes(searchLocationQuery.toLowerCase()) || r.desc.toLowerCase().includes(searchLocationQuery.toLowerCase()))
-                 .map((res, i) => (
-                  <div 
-                    key={i} 
-                    className="result-row"
-                    onClick={() => {
-                      setLocation(res.name)
-                      setShowLocationPicker(false)
-                    }}
-                  >
-                    <MapPin size={16} />
-                    <div>
-                      <div className="result-name">{res.name}</div>
-                      <div className="result-desc">{res.desc}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <button 
-                type="button" 
-                className="pill-button pill-button-secondary close-modal-btn"
-                onClick={() => setShowLocationPicker(false)}
-              >
-                Cancel
-              </button>
+          <Modal onClose={() => setShowLocationPicker(false)} title="Search & Select Location">
+            <div className="search-input-row">
+              <input
+                type="text"
+                className="pill-input"
+                placeholder="Search a place (e.g. Ramen Nagi, BGC)"
+                value={searchLocationQuery}
+                onChange={(e) => setSearchLocationQuery(e.target.value)}
+                autoFocus
+              />
             </div>
-          </div>
+
+            {/* Mock map geocoding results */}
+            <div className="mock-results">
+              {[
+                { name: 'Ramen Nagi, Bonifacio High Street', desc: 'BGC, Taguig City' },
+                { name: 'Wildflour Cafe, Net Lima', desc: 'BGC, Taguig City' },
+                { name: 'Anawangin Cove Campground', desc: 'San Antonio, Zambales' },
+                { name: 'Mika\'s House Backyard', desc: 'Quezon City, Manila' }
+              ].filter(r => r.name.toLowerCase().includes(searchLocationQuery.toLowerCase()) || r.desc.toLowerCase().includes(searchLocationQuery.toLowerCase()))
+               .map((res, i) => (
+                <div
+                  key={i}
+                  className="result-row"
+                  onClick={() => {
+                    setLocation(res.name)
+                    setShowLocationPicker(false)
+                  }}
+                >
+                  <MapPin size={16} />
+                  <div>
+                    <div className="result-name">{res.name}</div>
+                    <div className="result-desc">{res.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Button variant="secondary" fullWidth onClick={() => setShowLocationPicker(false)}>
+              Cancel
+            </Button>
+          </Modal>
         )}
       </div>
 
@@ -258,12 +229,6 @@ export default function CreateHangout() {
           max-width: 600px;
           margin: 0 auto;
           position: relative;
-        }
-
-        .page-heading {
-          font-size: 28px;
-          margin-bottom: 24px;
-          font-family: var(--font-display);
         }
 
         .create-form {
@@ -350,43 +315,9 @@ export default function CreateHangout() {
           gap: 8px;
         }
 
-        .input-group label {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 14px;
-          color: var(--color-text);
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-
-        .description-box {
-          width: 100%;
-          height: 100px;
-          background-color: var(--color-surface-container-low);
-          border: 2px solid transparent;
-          color: var(--color-text);
-          font-family: var(--font-body);
-          padding: 12px 16px;
-          border-radius: 18px;
-          outline: none;
-          font-size: 16px;
-          resize: none;
-          transition: border-color 0.2s, background-color 0.2s;
-        }
-
-        .description-box:focus {
-          border-color: var(--color-blush);
-          background-color: var(--color-surface-container-lowest);
-        }
-
         .datetime-row {
           display: flex;
           gap: 16px;
-        }
-
-        .half-width {
-          flex: 1;
         }
 
         .location-picker-trigger {
@@ -491,41 +422,7 @@ export default function CreateHangout() {
           padding-bottom: 24px;
         }
 
-        .full-width-btn {
-          width: 100%;
-        }
-
-        /* Modal styling */
-        .modal-backdrop {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(46, 42, 40, 0.4);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 2000;
-          padding: 20px;
-        }
-
-        .modal-content {
-          background-color: var(--color-surface-container-lowest);
-          border-radius: 28px;
-          width: 100%;
-          max-width: 440px;
-          padding: 24px;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-          border: 1px solid var(--color-surface-container-high);
-        }
-
-        .modal-content h3 {
-          font-size: 20px;
-          margin-bottom: 16px;
-        }
-
-        .search-bar-wrapper {
+        .search-input-row {
           margin-bottom: 16px;
         }
 
@@ -560,10 +457,6 @@ export default function CreateHangout() {
         .result-desc {
           font-size: 12px;
           color: var(--color-text-muted);
-        }
-
-        .close-modal-btn {
-          width: 100%;
         }
       `}</style>
     </Layout>

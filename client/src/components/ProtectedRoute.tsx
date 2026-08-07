@@ -35,11 +35,6 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
           }} />
           <p style={{ opacity: 0.8, fontSize: '0.95rem' }}>Loading session...</p>
         </div>
-        <style jsx>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
       </div>
     );
   }

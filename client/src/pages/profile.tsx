@@ -5,13 +5,8 @@ import Layout from '../components/Layout'
 import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
 import { Camera, Sparkles, User, Settings, Bell, LogOut, ChevronRight, Check } from 'lucide-react'
-
-const avatars = [
-  'https://api.dicebear.com/7.x/adventurer/svg?seed=mika',
-  'https://api.dicebear.com/7.x/adventurer/svg?seed=bunny',
-  'https://api.dicebear.com/7.x/adventurer/svg?seed=adventurer-1',
-  'https://api.dicebear.com/7.x/adventurer/svg?seed=happy-cat'
-]
+import { profileAvatars } from '../data/mock'
+import { Button } from '../components/ui'
 
 export default function ProfileSettings() {
   const router = useRouter()
@@ -31,7 +26,7 @@ export default function ProfileSettings() {
   }, [user])
 
   const handleCycleAvatar = () => {
-    const nextIdx = (avatarIndex + 1) % avatars.length
+    const nextIdx = (avatarIndex + 1) % profileAvatars.length
     setAvatarIndex(nextIdx)
     showToast('Avatar updated!')
   }
@@ -77,7 +72,7 @@ export default function ProfileSettings() {
             <Sparkles className="sparkle-flourish pos-right" size={24} />
 
             <div className="avatar-edit-wrapper" onClick={handleCycleAvatar}>
-              <img src={avatars[avatarIndex]} alt="Profile Avatar" className="profile-avatar-img" />
+              <img src={profileAvatars[avatarIndex]} alt="Profile Avatar" className="profile-avatar-img" />
               <div className="camera-badge">
                 <Camera size={14} />
               </div>
@@ -85,17 +80,17 @@ export default function ProfileSettings() {
 
             {isEditingName ? (
               <form onSubmit={handleSaveName} className="name-edit-form">
-                <input 
-                  type="text" 
-                  className="pill-input compact" 
+                <input
+                  type="text"
+                  className="pill-input compact"
                   value={tempName}
                   onChange={(e) => setTempName(e.target.value)}
                   autoFocus
                   required
                 />
                 <div className="edit-btn-row">
-                  <button type="submit" className="pill-button pill-button-primary compact-btn">Save</button>
-                  <button type="button" className="pill-button pill-button-outline compact-btn" onClick={() => setIsEditingName(false)}>Cancel</button>
+                  <Button size="small" type="submit">Save</Button>
+                  <Button variant="outline" size="small" onClick={() => setIsEditingName(false)}>Cancel</Button>
                 </div>
               </form>
             ) : (
@@ -167,12 +162,6 @@ export default function ProfileSettings() {
           max-width: 600px;
           margin: 0 auto;
           position: relative;
-        }
-
-        .page-heading {
-          font-size: 28px;
-          margin-bottom: 24px;
-          font-family: var(--font-display);
         }
 
         .toast-notification {
@@ -300,19 +289,9 @@ export default function ProfileSettings() {
           max-width: 280px;
         }
 
-        .pill-input.compact {
-          padding: 8px 16px;
-          text-align: center;
-        }
-
         .edit-btn-row {
           display: flex;
           gap: 8px;
-        }
-
-        .compact-btn {
-          padding: 6px 16px;
-          font-size: 13px;
         }
 
         /* Settings list */
@@ -348,9 +327,9 @@ export default function ProfileSettings() {
           color: var(--color-text);
         }
 
-        .settings-icon-box.note-butter { background-color: #fcf1d3; color: var(--color-tangerine); }
-        .settings-icon-box.note-blush { background-color: #fbe6eb; color: var(--color-blush); }
-        .settings-icon-box.note-sea { background-color: #e6f0fa; color: var(--color-sea); }
+        .settings-icon-box.note-butter { background-color: var(--tint-butter); color: var(--color-tangerine); }
+        .settings-icon-box.note-blush { background-color: var(--tint-blush); color: var(--color-blush); }
+        .settings-icon-box.note-sea { background-color: var(--tint-sea); color: var(--color-sea); }
 
         .settings-title {
           font-weight: 700;
@@ -402,22 +381,7 @@ export default function ProfileSettings() {
         }
 
         .logout-btn-row:hover {
-          background-color: #fbe6eb;
-        }
-
-        @keyframes slideDown {
-          from { transform: translate(-50%, -40px); opacity: 0; }
-          to { transform: translate(-50%, 0); opacity: 1; }
-        }
-
-        @keyframes spinSlow {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-4px); }
+          background-color: var(--tint-blush);
         }
       `}</style>
       </Layout>

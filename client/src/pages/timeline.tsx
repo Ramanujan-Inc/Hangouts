@@ -2,55 +2,13 @@ import React, { useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import Layout from '../components/Layout'
-import { Search, MapPin, Calendar, Heart, X, Sparkles, Filter } from 'lucide-react'
-
-// Mock data representing friend roster
-const members = {
-  mika: { name: 'Mika', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=mika' },
-  jam: { name: 'Jam', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=jam' },
-  dave: { name: 'Dave', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=dave' },
-  chloe: { name: 'Chloe', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=chloe' },
-}
-
-// Mock data for Hangouts
-const initialHangouts = [
-  {
-    id: '1',
-    title: 'Friday Night Ramen',
-    description: 'Craving spicy tonkotsu ramen after a long week. Ended up talking for hours about trip planning.',
-    date: '2025-07-29', // Exactly 1 year ago (assuming current date is July 2026)
-    location: 'Ramen Nagi, BGC',
-    coverImage: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=600&q=80',
-    participants: ['mika', 'jam', 'dave'],
-    rating: 5,
-    rotation: -1,
-  },
-  {
-    id: '2',
-    title: 'Beach Day Picnic',
-    description: 'Road trip to the beach. Chloe brought her guitar and we set up a bonfire just before sunset.',
-    date: '2026-07-15',
-    location: 'Anawangin Cove',
-    coverImage: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
-    participants: ['mika', 'jam', 'dave', 'chloe'],
-    rating: 5,
-    rotation: 1.5,
-  },
-  {
-    id: '3',
-    title: 'Coffee & Boardgames',
-    description: 'Trying out a new local coffee shop. Dave lost terribly at Settlers of Catan.',
-    date: '2026-07-26',
-    location: 'Wildflour Cafe',
-    coverImage: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80',
-    participants: ['mika', 'dave'],
-    rating: 4,
-    rotation: -2,
-  }
-]
+import { MapPin, Calendar, Heart, X, Sparkles } from 'lucide-react'
+import { members, hangouts } from '../data/mock'
+import { formatDate } from '../lib/format'
+import { Avatar, AvatarStack, EmptyState, SearchInput } from '../components/ui'
 
 export default function Timeline() {
-  const [hangouts, setHangouts] = useState(initialHangouts)
+  const [filteredHangouts, setFilteredHangouts] = useState(hangouts)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('All')
   const [showMemory, setShowMemory] = useState(true)
@@ -74,7 +32,7 @@ export default function Timeline() {
   }
 
   const filterHangouts = (query: string, filter: string) => {
-    let filtered = initialHangouts.filter(
+    let filtered = hangouts.filter(
       (h) =>
         h.title.toLowerCase().includes(query) ||
         h.location.toLowerCase().includes(query) ||
@@ -90,11 +48,11 @@ export default function Timeline() {
       filtered = filtered.filter((h) => h.date.startsWith('2025'))
     }
 
-    setHangouts(filtered)
+    setFilteredHangouts(filtered)
   }
 
   // Find memory from exactly 1 year ago (id = 1)
-  const memoryHangout = initialHangouts.find(h => h.id === '1')
+  const memoryHangout = hangouts.find(h => h.id === '1')
 
   return (
     <Layout>
@@ -110,22 +68,18 @@ export default function Timeline() {
             <p className="subtitle">College Barkada • 4 active members</p>
           </div>
           <div className="header-avatar">
-            <img src={members.mika.avatar} alt="Mika" />
+            <Avatar src={members.mika.avatar} alt="Mika" size={52} />
           </div>
         </header>
 
         {/* Search Bar */}
         <div className="search-section">
-          <div className="search-bar-wrapper">
-            <Search className="search-icon" size={20} />
-            <input
-              type="text"
-              className="pill-input-custom"
-              placeholder="Search hangouts, places, notes..."
-              value={searchQuery}
-              onChange={handleSearch}
-            />
-          </div>
+          <SearchInput
+            placeholder="Search hangouts, places, notes..."
+            value={searchQuery}
+            onChange={handleSearch}
+            inputClassName="pill-input-butter"
+          />
         </div>
 
         {/* Horizontal Quick Filter Row */}
@@ -179,18 +133,19 @@ export default function Timeline() {
         <div className="timeline-feed">
           <div className="feed-title-row">
             <h3>Recent Hangouts</h3>
-            <span className="feed-count">{hangouts.length} entries</span>
+            <span className="feed-count">{filteredHangouts.length} entries</span>
           </div>
 
-          {hangouts.length === 0 ? (
-            <div className="empty-state">
-              <Sparkles size={48} className="empty-icon" />
-              <h4>No hangouts found</h4>
-              <p>Try refining your search query or add a new hangout meetup.</p>
-            </div>
+          {filteredHangouts.length === 0 ? (
+            <EmptyState
+              variant="card"
+              icon={<Sparkles size={48} />}
+              title="No hangouts found"
+              description="Try refining your search query or add a new hangout meetup."
+            />
           ) : (
             <div className="hangout-cards-grid">
-              {hangouts.map((h, idx) => (
+              {filteredHangouts.map((h, idx) => (
                 <Link href={`/hangout/${h.id}`} key={h.id} className="hangout-card-link">
                   <div
                     className="polaroid-card hangout-card"
@@ -203,7 +158,7 @@ export default function Timeline() {
                       <img src={h.coverImage} className="polaroid-image" alt={h.title} />
                       <div className="date-badge">
                         <Calendar size={12} />
-                        <span>{new Date(h.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                        <span>{formatDate(h.date)}</span>
                       </div>
                     </div>
                     <div className="card-info">
@@ -215,17 +170,11 @@ export default function Timeline() {
                           <span>{h.location}</span>
                         </div>
                         {/* Avatar stack */}
-                        <div className="avatar-stack">
-                          {h.participants.map((p, i) => (
-                            <img
-                              key={p}
-                              src={members[p as keyof typeof members].avatar}
-                              alt={p}
-                              className="stack-avatar"
-                              style={{ zIndex: 10 - i, transform: `translateX(-${i * 8}px)` }}
-                            />
-                          ))}
-                        </div>
+                        <AvatarStack
+                          size={28}
+                          overlap={8}
+                          avatars={h.participants.map((p) => ({ src: members[p].avatar, alt: members[p].name }))}
+                        />
                       </div>
                     </div>
                   </div>
@@ -269,37 +218,6 @@ export default function Timeline() {
 
         .search-section {
           margin-bottom: 24px;
-        }
-
-        .search-bar-wrapper {
-          position: relative;
-          display: flex;
-          align-items: center;
-        }
-
-        .search-icon {
-          position: absolute;
-          left: 18px;
-          color: var(--color-text-muted);
-        }
-
-        .pill-input-custom {
-          width: 100%;
-          background-color: #f2d88f; /* Butter fill */
-          color: var(--color-text);
-          font-family: var(--font-body);
-          padding: 14px 20px 14px 48px;
-          border-radius: 9999px;
-          outline: none;
-          font-size: 16px;
-          border: none;
-          box-shadow: inset 0 2px 4px rgba(46, 42, 40, 0.08);
-          font-weight: 600;
-        }
-
-        .pill-input-custom::placeholder {
-          color: var(--color-text-muted);
-          opacity: 0.8;
         }
 
         .filters-section {
@@ -553,39 +471,6 @@ export default function Timeline() {
           font-size: 13px;
           color: var(--color-text-muted);
           font-weight: 600;
-        }
-
-        .avatar-stack {
-          display: flex;
-          align-items: center;
-          padding-right: 8px;
-        }
-
-        .stack-avatar {
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: 1.5px solid white;
-          background-color: var(--color-surface-container);
-        }
-
-        .empty-state {
-          text-align: center;
-          padding: 48px;
-          background-color: var(--color-surface-container-low);
-          border-radius: 24px;
-          border: 2px dashed var(--color-outline-variant);
-          color: var(--color-text-muted);
-        }
-
-        .empty-icon {
-          color: var(--color-butter);
-          margin-bottom: 16px;
-        }
-
-        .empty-state h4 {
-          margin-bottom: 8px;
-          font-size: 18px;
         }
 
         @media (max-width: 580px) {

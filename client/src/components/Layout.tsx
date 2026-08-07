@@ -190,11 +190,6 @@ export default function Layout({ children }: LayoutProps) {
           display: none;
         }
 
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-4px); }
-        }
-
         /* Responsive Breakpoint for Mobile/Tablets */
         @media (max-width: 768px) {
           .desktop-sidebar {

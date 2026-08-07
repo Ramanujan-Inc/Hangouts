@@ -2,43 +2,28 @@ import React, { useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import Layout from '../components/Layout'
-import { MapPin, Calendar, Heart, ArrowRight, Filter, ChevronDown } from 'lucide-react'
+import { MapPin, Calendar, ArrowRight, ChevronDown } from 'lucide-react'
+import { mapPins, hangoutById } from '../data/mock'
+import { formatDate } from '../lib/format'
 
-const hangoutsOnMap = [
-  {
-    id: '1',
-    title: 'Friday Night Ramen',
-    date: '2025-07-29',
-    location: 'Ramen Nagi, BGC',
-    coverImage: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=150&q=80',
-    type: 'older', // Sea colored ring
-    x: 280, // coordinates on our custom stylized map SVG
-    y: 190,
-  },
-  {
-    id: '2',
-    title: 'Beach Day Picnic',
-    date: '2026-07-15',
-    location: 'Anawangin Cove',
-    coverImage: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=150&q=80',
-    type: 'recent', // Blush colored ring
-    x: 120,
-    y: 110,
-  },
-  {
-    id: '3',
-    title: 'Coffee & Boardgames',
-    date: '2026-07-26',
-    location: 'Wildflour Cafe',
-    coverImage: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=150&q=80',
-    type: 'recent', // Blush colored ring
-    x: 310,
-    y: 160,
-  }
-]
+interface MapPinData {
+  id: string
+  x: number
+  y: number
+  type: 'recent' | 'older'
+  title: string
+  date: string
+  location: string
+  coverImage: string
+}
+
+const pins: MapPinData[] = mapPins.map((pin) => {
+  const h = hangoutById(pin.id)!
+  return { ...pin, title: h.title, date: h.date, location: h.location, coverImage: h.coverImage }
+})
 
 export default function GroupMap() {
-  const [selectedPin, setSelectedPin] = useState<typeof hangoutsOnMap[0] | null>(hangoutsOnMap[0])
+  const [selectedPin, setSelectedPin] = useState<MapPinData | null>(pins[0])
   const [filterGroup, setFilterGroup] = useState('College Barkada')
   const [showDropdown, setShowDropdown] = useState(false)
 
@@ -56,7 +41,7 @@ export default function GroupMap() {
               <span>{filterGroup}</span>
               <ChevronDown size={16} />
             </button>
-            
+
             {showDropdown && (
               <div className="filter-dropdown">
                 <div className="dropdown-item" onClick={() => { setFilterGroup('College Barkada'); setShowDropdown(false); }}>College Barkada</div>
@@ -80,7 +65,7 @@ export default function GroupMap() {
 
             {/* Landmass 1 (Butter tone) */}
             <path d="M50,40 Q150,20 220,90 T350,110 T450,280 L480,330 L20,330 Z" fill="#fcf1d3" opacity="0.9" />
-            
+
             {/* Landmass 2 (Warm Cream tone) */}
             <path d="M300,50 Q380,80 440,40 T480,200 L500,350 L200,350 Z" fill="#fff8f5" opacity="0.75" />
 
@@ -89,26 +74,26 @@ export default function GroupMap() {
             <path d="M120,110 Q280,190 310,160" fill="none" stroke="#e9e1dd" strokeWidth="4" strokeLinecap="round" strokeDasharray="5,5" />
 
             {/* Custom Pins */}
-            {hangoutsOnMap.map((pin) => {
+            {pins.map((pin) => {
               const isSelected = selectedPin?.id === pin.id
               const ringColor = pin.type === 'recent' ? 'var(--color-blush)' : 'var(--color-sea)'
-              
+
               return (
-                <g 
-                  key={pin.id} 
-                  transform={`translate(${pin.x}, ${pin.y})`} 
+                <g
+                  key={pin.id}
+                  transform={`translate(${pin.x}, ${pin.y})`}
                   className={`map-pin-group ${isSelected ? 'selected' : ''}`}
                   onClick={() => setSelectedPin(pin)}
                 >
                   {/* Pin Drop Shadow */}
                   <ellipse cx="0" cy="12" rx="10" ry="4" fill="rgba(46, 42, 40, 0.15)" />
-                  
+
                   {/* Pin teardrop body */}
-                  <path 
-                    d="M-18,-36 A 18 18 0 0 1 18,-36 C 18,-18 0,10 0,10 C 0,10 -18,-18 -18,-36 Z" 
-                    fill="white" 
+                  <path
+                    d="M-18,-36 A 18 18 0 0 1 18,-36 C 18,-18 0,10 0,10 C 0,10 -18,-18 -18,-36 Z"
+                    fill="white"
                     stroke={isSelected ? 'var(--color-tangerine)' : ringColor}
-                    strokeWidth={isSelected ? '3.5' : '2.5'} 
+                    strokeWidth={isSelected ? '3.5' : '2.5'}
                   />
 
                   {/* Image/Icon Inset */}
@@ -117,17 +102,17 @@ export default function GroupMap() {
                       <circle cx="0" cy="-36" r="14" />
                     </clipPath>
                   </defs>
-                  
-                  <image 
-                    href={pin.coverImage} 
-                    x="-14" 
-                    y="-50" 
-                    width="28" 
-                    height="28" 
+
+                  <image
+                    href={pin.coverImage}
+                    x="-14"
+                    y="-50"
+                    width="28"
+                    height="28"
                     clipPath={`url(#avatarClip-${pin.id})`}
                     preserveAspectRatio="xMidYMid slice"
                   />
-                  
+
                   {/* Pulse Ring for Selected */}
                   {isSelected && (
                     <circle cx="0" cy="-36" r="20" stroke="var(--color-tangerine)" strokeWidth="2" fill="none" className="pulse-ring" />
@@ -147,7 +132,7 @@ export default function GroupMap() {
                 </div>
                 <div className="preview-info-box">
                   <span className="preview-date">
-                    {new Date(selectedPin.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {formatDate(selectedPin.date)}
                   </span>
                   <h4>{selectedPin.title}</h4>
                   <div className="preview-location">
@@ -350,16 +335,6 @@ export default function GroupMap() {
           font-weight: 700;
           color: var(--color-sea);
           margin-top: 4px;
-        }
-
-        @keyframes pulse {
-          0% { r: 14; opacity: 1; }
-          100% { r: 24; opacity: 0; }
-        }
-
-        @keyframes slideUp {
-          from { transform: translateY(100%); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
         }
 
         /* Desktop specific layout rules */

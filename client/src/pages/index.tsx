@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import { Sparkles, Mail, Lock, User as UserIcon, ArrowLeft, Eye, EyeOff } from 'lucide-react'
+import { Sparkles, Mail, Lock, User as UserIcon, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../lib/api'
+import { Button, InlineAlert, PasswordInput, TextField } from '../components/ui'
 
 type AuthStep = 'welcome' | 'signup' | 'login'
 
@@ -14,7 +15,6 @@ export default function Onboarding() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -95,7 +95,7 @@ export default function Onboarding() {
                   </linearGradient>
                 </defs>
                 <rect width="400" height="240" rx="20" fill="url(#skyGrad)" />
-                
+
                 {/* String Lights */}
                 <path d="M-10,30 Q100,60 200,30 Q300,60 410,30" stroke="#ffd166" strokeWidth="2" strokeDasharray="1,6" />
                 <circle cx="50" cy="42" r="5" fill="#ffd166" className="glow-light" />
@@ -116,7 +116,7 @@ export default function Onboarding() {
                 {/* Person 1 (Left) */}
                 <circle cx="130" cy="180" r="14" fill="#6698cc" />
                 <rect x="115" y="194" width="30" height="35" rx="8" fill="#5587ba" />
-                
+
                 {/* Person 2 (Center) */}
                 <circle cx="200" cy="170" r="15" fill="#ffdcc2" />
                 <rect x="182" y="185" width="36" height="45" rx="10" fill="#e36888" />
@@ -141,20 +141,14 @@ export default function Onboarding() {
 
             {/* Action Buttons */}
             <div className="button-stack">
-              <button 
-                className="pill-button pill-button-primary"
-                onClick={handleGoogleDemo}
-              >
+              <Button onClick={handleGoogleDemo}>
                 <Sparkles size={18} />
                 Continue with Google
-              </button>
-              
-              <button 
-                className="pill-button pill-button-outline"
-                onClick={() => setStep('signup')}
-              >
+              </Button>
+
+              <Button variant="outline" onClick={() => setStep('signup')}>
                 Sign up with Email
-              </button>
+              </Button>
             </div>
 
             <div className="footer-link">
@@ -180,100 +174,55 @@ export default function Onboarding() {
               <p>Start a new memory space for your friends</p>
             </div>
 
-            {error && (
-              <div style={{
-                background: 'rgba(227, 104, 136, 0.15)',
-                border: '1px solid var(--color-blush, #e36888)',
-                color: '#e36888',
-                padding: '0.75rem 1rem',
-                borderRadius: '12px',
-                fontSize: '0.875rem',
-                marginBottom: '1rem',
-                textAlign: 'center'
-              }}>
-                {error}
-              </div>
-            )}
+            {error && <InlineAlert>{error}</InlineAlert>}
 
-            <div className="input-group">
-              <label><UserIcon size={16} /> Display Name</label>
-              <input 
-                type="text" 
-                required 
-                className="pill-input" 
-                placeholder="e.g. Mika"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
+            <TextField
+              label="Display Name"
+              icon={<UserIcon size={16} />}
+              required
+              placeholder="e.g. Mika"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
 
-            <div className="input-group">
-              <label><Mail size={16} /> Email Address</label>
-              <input 
-                type="email" 
-                required 
-                className="pill-input" 
-                placeholder="mika@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
+            <TextField
+              label="Email Address"
+              icon={<Mail size={16} />}
+              type="email"
+              required
+              placeholder="mika@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
 
-            <div className="input-group">
-              <label><Lock size={16} /> Password</label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  required 
-                  className="pill-input" 
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ width: '100%', paddingRight: '2.5rem' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute',
-                    right: '14px',
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--color-text-muted, #8e8e8e)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 0
-                  }}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+            <PasswordInput
+              label="Password"
+              icon={<Lock size={16} />}
+              required
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            >
               {password && (
                 <div className="strength-meter">
                   <div className="strength-bar" style={{ width: strength.width, backgroundColor: strength.color }}></div>
                   <span className="strength-label">Password strength: {strength.label}</span>
                 </div>
               )}
-            </div>
+            </PasswordInput>
 
-            <button type="submit" disabled={submitting} className="pill-button pill-button-primary full-width">
+            <Button type="submit" disabled={submitting} fullWidth>
               {submitting ? 'Creating Account...' : 'Create Account'}
-            </button>
+            </Button>
 
             <div className="form-divider">
               <span>or</span>
             </div>
 
-            <button 
-              type="button" 
-              className="pill-button pill-button-outline full-width"
-              onClick={handleGoogleDemo}
-            >
+            <Button variant="outline" fullWidth onClick={handleGoogleDemo}>
+              <Sparkles size={18} />
               Continue with Google
-            </button>
+            </Button>
 
             <div className="footer-link">
               Already have an account? <span onClick={() => { setError(null); setStep('login'); }}>Log in</span>
@@ -291,82 +240,39 @@ export default function Onboarding() {
               <p>Access your group's memory archive</p>
             </div>
 
-            {error && (
-              <div style={{
-                background: 'rgba(227, 104, 136, 0.15)',
-                border: '1px solid var(--color-blush, #e36888)',
-                color: '#e36888',
-                padding: '0.75rem 1rem',
-                borderRadius: '12px',
-                fontSize: '0.875rem',
-                marginBottom: '1rem',
-                textAlign: 'center'
-              }}>
-                {error}
-              </div>
-            )}
+            {error && <InlineAlert>{error}</InlineAlert>}
 
-            <div className="input-group">
-              <label><Mail size={16} /> Email Address</label>
-              <input 
-                type="email" 
-                required 
-                className="pill-input" 
-                placeholder="mika@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
+            <TextField
+              label="Email Address"
+              icon={<Mail size={16} />}
+              type="email"
+              required
+              placeholder="mika@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
 
-            <div className="input-group">
-              <label><Lock size={16} /> Password</label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  required 
-                  className="pill-input" 
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ width: '100%', paddingRight: '2.5rem' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute',
-                    right: '14px',
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--color-text-muted, #8e8e8e)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 0
-                  }}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
+            <PasswordInput
+              label="Password"
+              icon={<Lock size={16} />}
+              required
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
 
-            <button type="submit" disabled={submitting} className="pill-button pill-button-primary full-width">
+            <Button type="submit" disabled={submitting} fullWidth>
               {submitting ? 'Logging In...' : 'Log In'}
-            </button>
+            </Button>
 
             <div className="form-divider">
               <span>or</span>
             </div>
 
-            <button 
-              type="button" 
-              className="pill-button pill-button-outline full-width"
-              onClick={handleGoogleDemo}
-            >
+            <Button variant="outline" fullWidth onClick={handleGoogleDemo}>
+              <Sparkles size={18} />
               Continue with Google
-            </button>
+            </Button>
 
             <div className="footer-link">
               Don't have an account yet? <span onClick={() => { setError(null); setStep('signup'); }}>Sign up</span>
@@ -460,10 +366,6 @@ export default function Onboarding() {
           margin-bottom: 24px;
         }
 
-        .pill-button.full-width {
-          width: 100%;
-        }
-
         .footer-link {
           text-align: center;
           font-size: 14px;
@@ -537,22 +439,6 @@ export default function Onboarding() {
           margin-top: 4px;
         }
 
-        .input-group {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .input-group label {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 14px;
-          color: var(--color-text);
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-
         .strength-meter {
           margin-top: 6px;
         }
@@ -582,11 +468,6 @@ export default function Onboarding() {
           padding: 0 10px;
           color: var(--color-text-muted);
           font-size: 14px;
-        }
-
-        @keyframes glow {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 1; }
         }
 
         .glow-light {
