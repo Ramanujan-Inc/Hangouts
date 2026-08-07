@@ -45,6 +45,27 @@ def list_hangouts(
     )
 
 
+@router.get("/map", response_model=List[HangoutResponse])
+def get_hangouts_map(
+    group_id: Optional[str] = Query(None, description="Filter by group UUID"),
+    min_lat: Optional[float] = Query(None, description="Minimum latitude for bounding box"),
+    max_lat: Optional[float] = Query(None, description="Maximum latitude for bounding box"),
+    min_lng: Optional[float] = Query(None, description="Minimum longitude for bounding box"),
+    max_lng: Optional[float] = Query(None, description="Maximum longitude for bounding box"),
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """Spatial Map Query returning hangouts with non-null coordinates within optional bounding box."""
+    return hangout_service.get_hangouts_map(
+        db=db,
+        group_id=group_id,
+        min_lat=min_lat,
+        max_lat=max_lat,
+        min_lng=min_lng,
+        max_lng=max_lng,
+    )
+
+
 @router.get("/{id}", response_model=HangoutResponse)
 def get_hangout_details(
     id: str,

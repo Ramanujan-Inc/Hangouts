@@ -110,6 +110,40 @@ def get_hangouts(
     return hangouts
 
 
+def get_hangouts_map(
+    db: Client,
+    group_id: Optional[str] = None,
+    min_lat: Optional[float] = None,
+    max_lat: Optional[float] = None,
+    min_lng: Optional[float] = None,
+    max_lng: Optional[float] = None,
+) -> List[Dict[str, Any]]:
+    """Fetch hangouts with non-null latitude and longitude, optionally filtered by group_id and bounding box."""
+    query = db.table("hangouts").select("*").not_.is_("latitude", "null").not_.is_("longitude", "null")
+
+    if group_id:
+        query = query.eq("group_id", str(group_id))
+    if min_lat is not None:
+        query = query.gte("latitude", min_lat)
+    if max_lat is not None:
+        query = query.lte("latitude", max_lat)
+    if min_lng is not None:
+        query = query.gte("longitude", min_lng)
+    if max_lng is not None:
+        query = query.lte("longitude", max_lng)
+
+    response = query.order("hangout_date", desc=True).execute()
+    hangouts = response.data if response.data else []
+
+    for hangout in hangouts:
+        creator_res = db.table("profiles").select("*").eq("id", hangout["created_by"]).execute()
+        hangout["creator"] = creator_res.data[0] if creator_res.data else None
+        hangout["participants"] = get_hangout_participants(db=db, hangout_id=hangout["id"])
+
+    return hangouts
+
+
+
 def update_hangout(
     db: Client,
     hangout_id: str,
