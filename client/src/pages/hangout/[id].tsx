@@ -5,9 +5,10 @@ import { useRouter } from 'next/router'
 import Layout from '../../components/Layout'
 import {
   ArrowLeft, Share2, MapPin, Calendar, Heart, Trash2, Plus,
-  Smile, Image as ImageIcon, FileText, DollarSign, X, Check, ArrowRight
+  Smile, Image as ImageIcon, FileText, DollarSign, X, Check, ArrowRight,
+  Film, Video, Star, Play
 } from 'lucide-react'
-import { members, hangoutById, mockUploadOptions, HangoutPhoto } from '../../data/mock'
+import { members, hangoutById, mockUploadOptions, HangoutMedia } from '../../data/mock'
 import { formatDate } from '../../lib/format'
 import {
   AvatarStack, BottomSheet, Button, EmptyState, Modal, SegmentedTabs, TextArea, TextField
@@ -22,13 +23,14 @@ export default function HangoutDetail() {
   const hangoutId = (Array.isArray(id) ? id[0] : id) || '1'
   const data = hangoutById(hangoutId)
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'photos' | 'notes' | 'expenses'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'media' | 'photos' | 'notes' | 'expenses'>('overview')
   const [rating, setRating] = useState(data?.rating || 4)
 
-  // Photos states
-  const [photos, setPhotos] = useState<HangoutPhoto[]>(data?.photos || [])
-  const [activePhoto, setActivePhoto] = useState<HangoutPhoto | null>(null)
+  // Media (Photos & Videos) states
+  const [media, setMedia] = useState<HangoutMedia[]>(data?.media || data?.photos || [])
+  const [activeMedia, setActiveMedia] = useState<HangoutMedia | null>(null)
   const [showUploadMenu, setShowUploadMenu] = useState(false)
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'favorites' | 'videos'>('all')
 
   // Notes states
   const [notes, setNotes] = useState(data?.notes || [])
@@ -154,33 +156,59 @@ export default function HangoutDetail() {
     setShowAddExpense(false)
   }
 
-  const handleLikePhoto = (photoId: string) => {
-    setPhotos(photos.map(p => p.id === photoId ? { ...p, likes: p.likes + 1 } : p))
-    if (activePhoto?.id === photoId) {
-      setActivePhoto({ ...activePhoto, likes: activePhoto.likes + 1 })
+  const currentUserId = 'mika'
+
+  const handleToggleFavorite = (mediaId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    setMedia(media.map(m => {
+      if (m.id !== mediaId) return m
+      const favoritedByList = m.favoritedBy || []
+      const isAlreadyFavorited = favoritedByList.includes(currentUserId)
+      const newFavoritedBy = isAlreadyFavorited
+        ? favoritedByList.filter(uid => uid !== currentUserId)
+        : [...favoritedByList, currentUserId]
+      const newLikes = isAlreadyFavorited ? Math.max(0, m.likes - 1) : m.likes + 1
+      return { ...m, favoritedBy: newFavoritedBy, likes: newLikes }
+    }))
+    if (activeMedia?.id === mediaId) {
+      const favoritedByList = activeMedia.favoritedBy || []
+      const isAlreadyFavorited = favoritedByList.includes(currentUserId)
+      const newFavoritedBy = isAlreadyFavorited
+        ? favoritedByList.filter(uid => uid !== currentUserId)
+        : [...favoritedByList, currentUserId]
+      const newLikes = isAlreadyFavorited ? Math.max(0, activeMedia.likes - 1) : activeMedia.likes + 1
+      setActiveMedia({ ...activeMedia, favoritedBy: newFavoritedBy, likes: newLikes })
     }
   }
 
-  const handleDeletePhoto = (photoId: string) => {
-    setPhotos(photos.filter(p => p.id !== photoId))
-    setActivePhoto(null)
+  const handleDeleteMedia = (mediaId: string) => {
+    setMedia(media.filter(m => m.id !== mediaId))
+    setActiveMedia(null)
   }
 
-  const handleMockUpload = (url: string) => {
-    const newPhoto: HangoutPhoto = {
-      id: `p-${Date.now()}`,
+  const handleMockUpload = (url: string, type: 'photo' | 'video' = 'photo') => {
+    const newMediaItem: HangoutMedia = {
+      id: `m-${Date.now()}`,
       url,
       uploadedBy: 'mika',
       likes: 0,
-      span: Math.random() > 0.5 ? 2 : 1
+      span: Math.random() > 0.5 ? 2 : 1,
+      mediaType: type,
+      favoritedBy: []
     }
-    setPhotos([...photos, newPhoto])
+    setMedia([...media, newMediaItem])
     setShowUploadMenu(false)
   }
 
+  const filteredMedia = media.filter(item => {
+    if (mediaFilter === 'favorites') return (item.favoritedBy || []).includes(currentUserId) || item.likes > 0
+    if (mediaFilter === 'videos') return item.mediaType === 'video'
+    return true
+  })
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: <Smile size={16} /> },
-    { id: 'photos', label: 'Photos', icon: <ImageIcon size={16} /> },
+    { id: 'media', label: 'Media', icon: <Film size={16} /> },
     { id: 'notes', label: 'Notes', icon: <FileText size={16} /> },
     { id: 'expenses', label: 'Expenses', icon: <DollarSign size={16} /> },
   ]
@@ -290,35 +318,149 @@ export default function HangoutDetail() {
             </div>
           )}
 
-          {activeTab === 'photos' && (
+          {(activeTab === 'media' || activeTab === 'photos') && (
             <div className="photos-tab">
               <div className="tab-section-header">
-                <h3>Photo Stack ({photos.length})</h3>
-                <Button size="compact" onClick={() => setShowUploadMenu(true)}>
-                  <Plus size={16} /> Add Photos
-                </Button>
+                <h3>Media Stack ({filteredMedia.length})</h3>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <Button size="compact" onClick={() => setShowUploadMenu(true)}>
+                    <Plus size={16} /> Add Media
+                  </Button>
+                </div>
               </div>
 
-              {photos.length === 0 ? (
+              {/* Media Filter Pills */}
+              <div className="media-filter-bar" style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <button
+                  className={`btn-pill ${mediaFilter === 'all' ? 'active' : ''}`}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    background: mediaFilter === 'all' ? '#ff6b6b' : 'rgba(255,255,255,0.05)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                  onClick={() => setMediaFilter('all')}
+                >
+                  All ({media.length})
+                </button>
+                <button
+                  className={`btn-pill ${mediaFilter === 'favorites' ? 'active' : ''}`}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    background: mediaFilter === 'favorites' ? '#ff6b6b' : 'rgba(255,255,255,0.05)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  onClick={() => setMediaFilter('favorites')}
+                >
+                  <Heart size={14} fill="#ff6b6b" stroke="#ff6b6b" /> Favorites ({media.filter(m => (m.favoritedBy || []).includes(currentUserId) || m.likes > 0).length})
+                </button>
+                <button
+                  className={`btn-pill ${mediaFilter === 'videos' ? 'active' : ''}`}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    background: mediaFilter === 'videos' ? '#ff6b6b' : 'rgba(255,255,255,0.05)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  onClick={() => setMediaFilter('videos')}
+                >
+                  <Video size={14} /> Videos ({media.filter(m => m.mediaType === 'video').length})
+                </button>
+              </div>
+
+              {filteredMedia.length === 0 ? (
                 <EmptyState
-                  icon={<ImageIcon size={32} />}
-                  title="No photos uploaded yet. Drop a memory here!"
+                  icon={<Film size={32} />}
+                  title={mediaFilter === 'favorites' ? "No favorite media saved yet." : "No media uploaded yet. Drop a memory here!"}
                 />
               ) : (
                 <div className="masonry-gallery">
-                  {photos.map((photo) => (
+                  {filteredMedia.map((item) => (
                     <div
-                      key={photo.id}
-                      className={`gallery-item span-${photo.span}`}
-                      onClick={() => setActivePhoto(photo)}
+                      key={item.id}
+                      className={`gallery-item span-${item.span}`}
+                      onClick={() => setActiveMedia(item)}
+                      style={{ position: 'relative' }}
                     >
-                      <img src={photo.url} alt="Hangout memory" />
+                      {item.mediaType === 'video' ? (
+                        <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '160px', background: '#000' }}>
+                          <video
+                            src={item.url}
+                            poster={item.thumbnailUrl}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                          <div style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            background: 'rgba(0,0,0,0.6)',
+                            borderRadius: '50%',
+                            padding: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <Play size={24} fill="white" color="white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <img src={item.url} alt="Hangout memory" />
+                      )}
+
                       <div className="uploader-badge">
-                        <MemberAvatar memberId={photo.uploadedBy} size={24} />
+                        <MemberAvatar memberId={item.uploadedBy} size={24} />
                       </div>
-                      <div className="photo-likes-overlay">
-                        <Heart size={14} fill="white" />
-                        <span>{photo.likes}</span>
+
+                      {/* Media type badge */}
+                      {item.mediaType === 'video' && (
+                        <div style={{
+                          position: 'absolute',
+                          bottom: '8px',
+                          left: '8px',
+                          background: 'rgba(0, 0, 0, 0.6)',
+                          backdropFilter: 'blur(4px)',
+                          borderRadius: '12px',
+                          padding: '2px 8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '0.75rem',
+                          color: '#fff',
+                          zIndex: 2
+                        }}>
+                          <Video size={12} /> Video
+                        </div>
+                      )}
+
+                      <div
+                        className="photo-likes-overlay"
+                        onClick={(e) => handleToggleFavorite(item.id, e)}
+                        style={{ cursor: 'pointer', zIndex: 3 }}
+                        title="Favorite this memory"
+                      >
+                        <Heart
+                          size={14}
+                          fill={(item.favoritedBy || []).includes(currentUserId) ? '#ff6b6b' : 'white'}
+                          color={(item.favoritedBy || []).includes(currentUserId) ? '#ff6b6b' : 'white'}
+                        />
+                        <span>{item.likes}</span>
                       </div>
                     </div>
                   ))}
@@ -465,34 +607,48 @@ export default function HangoutDetail() {
         </div>
       </div>
 
-      {/* Lightbox Fullscreen Photo Viewer */}
-      {activePhoto && (
+      {/* Lightbox Fullscreen Media Viewer */}
+      {activeMedia && (
         <div className="lightbox-backdrop">
-          <button className="lightbox-close" onClick={() => setActivePhoto(null)}>
+          <button className="lightbox-close" onClick={() => setActiveMedia(null)}>
             <X size={24} />
           </button>
 
           <div className="lightbox-container">
-            <img src={activePhoto.url} alt="Lightbox View" className="lightbox-img" />
+            {activeMedia.mediaType === 'video' ? (
+              <video
+                src={activeMedia.url}
+                controls
+                autoPlay
+                className="lightbox-img"
+                style={{ maxHeight: '80vh', maxWidth: '90vw' }}
+              />
+            ) : (
+              <img src={activeMedia.url} alt="Lightbox View" className="lightbox-img" />
+            )}
 
             {/* Top info bar */}
             <div className="lightbox-top-bar">
-              <MemberAvatar memberId={activePhoto.uploadedBy} size={32} />
+              <MemberAvatar memberId={activeMedia.uploadedBy} size={32} />
               <div>
-                <div className="light-author">Uploaded by {members[activePhoto.uploadedBy].name}</div>
-                <div className="light-time">1 year ago</div>
+                <div className="light-author">Uploaded by {members[activeMedia.uploadedBy].name}</div>
+                <div className="light-time">1 year ago • {activeMedia.mediaType === 'video' ? 'Video' : 'Photo'}</div>
               </div>
             </div>
 
             {/* Bottom action bar */}
-            <div className="lightbox-bottom-bar">
-              <button className="light-action-btn" onClick={() => handleLikePhoto(activePhoto.id)}>
-                <Heart size={20} fill={activePhoto.likes > 4 ? 'white' : 'transparent'} />
-                <span>{activePhoto.likes} Likes</span>
+            <div className="lightbox-bottom-bar" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <button className="light-action-btn" onClick={() => handleToggleFavorite(activeMedia.id)}>
+                <Heart
+                  size={20}
+                  fill={(activeMedia.favoritedBy || []).includes(currentUserId) ? '#ff6b6b' : 'transparent'}
+                  color={(activeMedia.favoritedBy || []).includes(currentUserId) ? '#ff6b6b' : 'white'}
+                />
+                <span>{activeMedia.likes} {activeMedia.likes === 1 ? 'Favorite' : 'Favorites'}</span>
               </button>
 
-              {activePhoto.uploadedBy === 'mika' && (
-                <button className="light-action-btn delete-btn" onClick={() => handleDeletePhoto(activePhoto.id)}>
+              {activeMedia.uploadedBy === 'mika' && (
+                <button className="light-action-btn delete-btn" onClick={() => handleDeleteMedia(activeMedia.id)}>
                   <Trash2 size={20} />
                   <span>Delete</span>
                 </button>
@@ -505,18 +661,30 @@ export default function HangoutDetail() {
       {/* Mock Upload Menu (Bottom Sheet) */}
       {showUploadMenu && (
         <BottomSheet onClose={() => setShowUploadMenu(false)}>
-          <h3>Add Photos to Gallery</h3>
+          <h3>Add Media to Gallery</h3>
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', marginBottom: '12px' }}>
+            Select a photo or video to upload:
+          </p>
           <div className="sheet-options">
             {mockUploadOptions.map((opt) => (
               <div
                 key={opt.url}
                 className="sheet-option-card"
-                onClick={() => handleMockUpload(opt.url)}
+                onClick={() => handleMockUpload(opt.url, 'photo')}
               >
                 <img src={opt.url} alt={opt.label} />
-                <span>{opt.label}</span>
+                <span>📷 {opt.label}</span>
               </div>
             ))}
+            <div
+              className="sheet-option-card"
+              onClick={() => handleMockUpload('https://assets.mixkit.co/videos/preview/mixkit-chef-preparing-ramen-soup-42867-large.mp4', 'video')}
+            >
+              <div style={{ background: '#222', height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Video size={32} color="#ff6b6b" />
+              </div>
+              <span>🎥 Mock Ramen Video</span>
+            </div>
           </div>
           <Button variant="outline" fullWidth onClick={() => setShowUploadMenu(false)}>
             Cancel

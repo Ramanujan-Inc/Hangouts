@@ -60,16 +60,27 @@ CREATE TABLE IF NOT EXISTS hangout_participants (
     CONSTRAINT unique_hangout_participant UNIQUE (hangout_id, user_id)
 );
 
--- 6. Photos Table
-CREATE TABLE IF NOT EXISTS photos (
+-- 6. Media Table
+CREATE TABLE IF NOT EXISTS media (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     hangout_id UUID NOT NULL REFERENCES hangouts(id) ON DELETE CASCADE,
     uploaded_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     url TEXT NOT NULL,
     thumbnail_url TEXT NOT NULL,
     caption VARCHAR(500),
+    media_type VARCHAR(20) NOT NULL DEFAULT 'photo' CHECK (media_type IN ('photo', 'video')),
+    favorites_count INTEGER NOT NULL DEFAULT 0,
     is_shared BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 6b. Media Favorites Junction Table
+CREATE TABLE IF NOT EXISTS media_favorites (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    media_id UUID NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_media_user_favorite UNIQUE (media_id, user_id)
 );
 
 -- 7. Notes Table

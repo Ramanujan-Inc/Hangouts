@@ -23,14 +23,20 @@ export const profileAvatars = [
 ]
 
 export type NoteType = 'butter' | 'blush' | 'sea'
+export type MediaType = 'photo' | 'video'
 
-export interface HangoutPhoto {
+export interface HangoutMedia {
   id: string
   url: string
   uploadedBy: string
   likes: number
   span: 1 | 2
+  mediaType: MediaType
+  favoritedBy?: string[]
+  thumbnailUrl?: string
 }
+
+export type HangoutPhoto = HangoutMedia
 
 export interface HangoutNote {
   id: string
@@ -60,10 +66,18 @@ export interface Hangout {
   participants: string[]
   rating: number
   rotation: number
-  photos: HangoutPhoto[]
+  media: HangoutMedia[]
+  photos: HangoutMedia[]
   notes: HangoutNote[]
   expenses: HangoutExpense[]
 }
+
+const ramenMedia: HangoutMedia[] = [
+  { id: 'p1', url: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=600&q=80', uploadedBy: 'mika', likes: 12, span: 2, mediaType: 'photo', favoritedBy: ['mika', 'jam', 'dave'] },
+  { id: 'p2', url: 'https://images.unsplash.com/photo-1557872943-16a5ac26437e?auto=format&fit=crop&w=600&q=80', uploadedBy: 'jam', likes: 3, span: 1, mediaType: 'photo', favoritedBy: ['jam'] },
+  { id: 'v1', url: 'https://assets.mixkit.co/videos/preview/mixkit-chef-preparing-ramen-soup-42867-large.mp4', uploadedBy: 'dave', likes: 25, span: 1, mediaType: 'video', favoritedBy: ['mika', 'dave'], thumbnailUrl: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=600&q=80' },
+  { id: 'p4', url: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80', uploadedBy: 'mika', likes: 5, span: 2, mediaType: 'photo', favoritedBy: ['mika'] },
+]
 
 export const hangouts: Hangout[] = [
   {
@@ -77,12 +91,8 @@ export const hangouts: Hangout[] = [
     participants: ['mika', 'jam', 'dave'],
     rating: 4,
     rotation: -1,
-    photos: [
-      { id: 'p1', url: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=600&q=80', uploadedBy: 'mika', likes: 4, span: 2 },
-      { id: 'p2', url: 'https://images.unsplash.com/photo-1557872943-16a5ac26437e?auto=format&fit=crop&w=600&q=80', uploadedBy: 'jam', likes: 2, span: 1 },
-      { id: 'p3', url: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=600&q=80', uploadedBy: 'dave', likes: 3, span: 1 },
-      { id: 'p4', url: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80', uploadedBy: 'mika', likes: 5, span: 2 },
-    ],
+    media: ramenMedia,
+    photos: ramenMedia,
     notes: [
       { id: 'n1', author: 'mika', text: 'Jam ate 3 bowls of noodles! Certified black hole stomach.', time: '1 year ago', type: 'butter', rotation: -1.5 },
       { id: 'n2', author: 'dave', text: 'Note to self: The Red King ramen at Level 3 spice is actually spicy. Bring milk next time.', time: '1 year ago', type: 'blush', rotation: 1.2 },
@@ -103,6 +113,7 @@ export const hangouts: Hangout[] = [
     participants: ['mika', 'jam', 'dave', 'chloe'],
     rating: 5,
     rotation: 1.5,
+    media: [],
     photos: [],
     notes: [],
     expenses: [],
@@ -117,6 +128,7 @@ export const hangouts: Hangout[] = [
     participants: ['mika', 'dave'],
     rating: 4,
     rotation: -2,
+    media: [],
     photos: [],
     notes: [],
     expenses: [],
