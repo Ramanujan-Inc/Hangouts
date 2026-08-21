@@ -1,7 +1,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { Clock, Compass, Plus, Image, User, Sparkles } from 'lucide-react'
+import { Clock, Compass, Plus, User, Sparkles } from 'lucide-react'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -15,7 +15,6 @@ export default function Layout({ children }: LayoutProps) {
     { label: 'Timeline', path: '/timeline', icon: Clock },
     { label: 'Explore', path: '/map', icon: Compass },
     { label: 'Create', path: '/create', icon: Plus, isFab: true },
-    { label: 'Notes', path: '/notes', icon: Image },
     { label: 'Profile', path: '/profile', icon: User },
   ]
 

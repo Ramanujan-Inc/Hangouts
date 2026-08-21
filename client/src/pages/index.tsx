@@ -62,7 +62,7 @@ export default function Onboarding() {
       if (err instanceof ApiError) {
         setError(err.message)
       } else {
-        setError(err?.message || 'Authentication failed. Please check your credentials.')
+        setError(err?.message || 'Incorrect username or password.')
       }
     } finally {
       setSubmitting(false)
@@ -246,7 +246,7 @@ export default function Onboarding() {
               label="Username or Email"
               icon={<UserIcon size={16} />}
               required
-              placeholder="mika or mika@example.com"
+              placeholder="mika"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />

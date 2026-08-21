@@ -61,6 +61,7 @@ export default function MapComponent({
       center={mapCenter}
       zoom={zoom}
       scrollWheelZoom={true}
+      attributionControl={false}
       style={{ width: '100%', height: '100%', borderRadius: '28px' }}
     >
       <ChangeView center={mapCenter} />

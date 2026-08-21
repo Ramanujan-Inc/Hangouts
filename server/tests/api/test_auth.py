@@ -118,7 +118,7 @@ def test_login_wrong_password_returns_401(client: TestClient, create_test_user):
         },
     )
     assert response.status_code == 401
-    assert "Login failed" in response.json()["detail"]
+    assert "Incorrect username or password" in response.json()["detail"]
 
 
 def test_login_non_existent_email_returns_401(client: TestClient):
@@ -131,7 +131,7 @@ def test_login_non_existent_email_returns_401(client: TestClient):
         },
     )
     assert response.status_code == 401
-    assert "Login failed" in response.json()["detail"]
+    assert "Incorrect username or password" in response.json()["detail"]
 
 
 

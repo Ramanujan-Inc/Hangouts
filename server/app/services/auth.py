@@ -67,16 +67,16 @@ def login_user(db: Client, user_in: UserLogin) -> Dict[str, Any]:
                 "password": user_in.password,
             }
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Login failed: {str(e)}",
+            detail="Incorrect username or password.",
         )
 
     if not auth_response.user or not auth_response.session:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password.",
+            detail="Incorrect username or password.",
         )
 
     user_id = str(auth_response.user.id)

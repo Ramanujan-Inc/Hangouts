@@ -155,6 +155,28 @@ export default function ProfileSettings() {
           <LogOut size={18} />
           <span>Log Out of Hangout</span>
         </button>
+
+        {/* Legal & Map Attributions */}
+        <div className="attributions-footer">
+          <p>
+            Map data &copy;{' '}
+            <a
+              href="https://www.openstreetmap.org/copyright"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              OpenStreetMap
+            </a>{' '}
+            contributors, &copy;{' '}
+            <a
+              href="https://carto.com/attributions"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              CARTO
+            </a>
+          </p>
+        </div>
       </div>
 
       <style jsx>{`
@@ -382,6 +404,23 @@ export default function ProfileSettings() {
 
         .logout-btn-row:hover {
           background-color: var(--tint-blush);
+        }
+
+        .attributions-footer {
+          margin-top: 36px;
+          margin-bottom: 12px;
+          text-align: center;
+          font-size: 12px;
+          color: var(--color-text-muted);
+        }
+
+        .attributions-footer a {
+          color: var(--color-sea);
+          text-decoration: underline;
+        }
+
+        .attributions-footer a:hover {
+          color: var(--color-blush);
         }
       `}</style>
       </Layout>
