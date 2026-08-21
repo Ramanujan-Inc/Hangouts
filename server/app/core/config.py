@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import Optional, List, Union
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -8,11 +8,18 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
 
-    # Supabase Settings (Required in .env)
+    # Supabase & Storage Settings (Required in .env)
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
     SUPABASE_JWT_SECRET: str = ""
-    STORAGE_BUCKET: str = "hangout-photos"
+    STORAGE_BUCKET: str = "hangout-media"
+
+    # Cloudflare R2 Storage Settings (Optional override)
+    R2_ACCOUNT_ID: Optional[str] = None
+    R2_ACCESS_KEY_ID: Optional[str] = None
+    R2_SECRET_ACCESS_KEY: Optional[str] = None
+    R2_BUCKET_NAME: str = "hangout-media"
+    R2_PUBLIC_URL: Optional[str] = None
 
     # CORS Settings - Configurable via ENV (comma separated or JSON array)
     CORS_ORIGINS: Union[List[str], str] = [

@@ -1,5 +1,5 @@
 -- Hangouts Backend Database Schema (Consolidated reference file)
--- Last Updated: 2026-08-06
+-- Last Updated: 2026-08-11
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "postgis";
