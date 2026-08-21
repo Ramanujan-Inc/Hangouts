@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS media (
     caption VARCHAR(500),
     media_type VARCHAR(20) NOT NULL DEFAULT 'photo' CHECK (media_type IN ('photo', 'video')),
     favorites_count INTEGER NOT NULL DEFAULT 0,
+    file_size_bytes BIGINT NOT NULL DEFAULT 0,
     is_shared BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

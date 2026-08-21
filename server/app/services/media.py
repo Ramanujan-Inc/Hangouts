@@ -5,6 +5,7 @@ from fastapi import UploadFile
 from supabase import Client
 from app.core.config import settings
 from app.core.exceptions import NotFoundError, ForbiddenError, BadRequestError
+from app.services.storage import check_storage_quota
 
 ALLOWED_IMAGE_MIME_TYPES = {
     "image/jpeg",
@@ -91,6 +92,9 @@ def upload_media(
 
     # 4. Upload file object to storage
     file_bytes = file.file.read()
+    file_size = len(file_bytes)
+    check_storage_quota(db, user_id, file_size)
+
     url = _upload_to_storage(db, file_bytes, file.filename or "media", content_type)
     thumbnail_url = url  # Can be expanded for video/image thumbnail rendering
 
@@ -103,6 +107,7 @@ def upload_media(
         "caption": caption,
         "media_type": media_type,
         "favorites_count": 0,
+        "file_size_bytes": file_size,
         "is_shared": is_shared,
         "created_at": now,
     }

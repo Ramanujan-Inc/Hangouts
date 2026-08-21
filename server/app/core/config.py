@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str = ""
     SUPABASE_JWT_SECRET: str = ""
     STORAGE_BUCKET: str = "hangout-media"
+    MAX_USER_STORAGE_BYTES: int = 500 * 1024 * 1024  # 500 MB default per user quota
 
     # Cloudflare R2 Storage Settings (Optional override)
     R2_ACCOUNT_ID: Optional[str] = None

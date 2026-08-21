@@ -11,6 +11,7 @@ class MediaBase(BaseModel):
     caption: Optional[str] = None
     media_type: Literal["photo", "video"] = "photo"
     favorites_count: int = 0
+    file_size_bytes: int = 0
     is_shared: bool = True
 
 

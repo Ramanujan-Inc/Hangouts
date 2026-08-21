@@ -28,3 +28,10 @@ class ConflictError(AppException):
     """Raised when an operation conflicts with existing server state."""
     def __init__(self, detail: str = "Resource conflict"):
         super().__init__(detail=detail, status_code=409)
+
+
+class PayloadTooLargeError(AppException):
+    """Raised when request payload or storage quota limit is exceeded."""
+    def __init__(self, detail: str = "Payload too large"):
+        super().__init__(detail=detail, status_code=413)
+
