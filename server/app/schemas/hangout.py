@@ -55,3 +55,8 @@ class HangoutResponse(HangoutBase):
     participants: Optional[List[ParticipantResponse]] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MemoryResponse(HangoutResponse):
+    years_ago: int
+
