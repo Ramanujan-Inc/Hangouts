@@ -79,7 +79,7 @@ def test_invite_group_member_success(
 
     response = authenticated_client.post(
         f"/api/v1/groups/{group_id}/members",
-        json={"user_id": secondary_user["id"]},
+        json={"username": secondary_user["username"]},
     )
     assert response.status_code == 200
     data = response.json()
@@ -87,6 +87,24 @@ def test_invite_group_member_success(
     assert data["user_id"] == secondary_user["id"]
     assert data["status"] == "pending"
     assert data["invited_by"] == primary_user["id"]
+
+
+def test_invite_nonexistent_username_returns_404(
+    authenticated_client: TestClient,
+):
+    """Inviting a nonexistent username returns 404 Not Found."""
+    create_res = authenticated_client.post(
+        "/api/v1/groups",
+        json={"name": "Gaming Crew"},
+    )
+    group_id = create_res.json()["id"]
+
+    response = authenticated_client.post(
+        f"/api/v1/groups/{group_id}/members",
+        json={"username": "nonexistent_ghost_user_12345"},
+    )
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
 
 
 def test_respond_to_invite_accept(
@@ -104,7 +122,7 @@ def test_respond_to_invite_accept(
     # Invite secondary user
     authenticated_client.post(
         f"/api/v1/groups/{group_id}/members",
-        json={"user_id": secondary_user["id"]},
+        json={"username": secondary_user["username"]},
     )
 
     # Secondary user accepts invite
@@ -134,7 +152,7 @@ def test_respond_to_invite_decline(
     # Invite secondary user
     authenticated_client.post(
         f"/api/v1/groups/{group_id}/members",
-        json={"user_id": secondary_user["id"]},
+        json={"username": secondary_user["username"]},
     )
 
     # Secondary user declines invite
@@ -163,13 +181,13 @@ def test_invite_group_member_duplicate_returns_400(
     # First invite succeeds
     authenticated_client.post(
         f"/api/v1/groups/{group_id}/members",
-        json={"user_id": secondary_user["id"]},
+        json={"username": secondary_user["username"]},
     )
 
     # Second invite fails
     response = authenticated_client.post(
         f"/api/v1/groups/{group_id}/members",
-        json={"user_id": secondary_user["id"]},
+        json={"username": secondary_user["username"]},
     )
     assert response.status_code == 400
     assert "already been invited" in response.json()["detail"]
@@ -190,7 +208,7 @@ def test_remove_member_other_user_returns_403(
     # Invite secondary user
     authenticated_client.post(
         f"/api/v1/groups/{group_id}/members",
-        json={"user_id": secondary_user["id"]},
+        json={"username": secondary_user["username"]},
     )
 
     # Primary user tries to remove secondary user
@@ -216,7 +234,7 @@ def test_remove_member_self_success(
     # Primary user invites secondary_user
     authenticated_client.post(
         f"/api/v1/groups/{group_id}/members",
-        json={"user_id": secondary_user["id"]},
+        json={"username": secondary_user["username"]},
     )
 
     # Secondary user accepts
@@ -232,3 +250,20 @@ def test_remove_member_self_success(
         f"/api/v1/groups/{group_id}/members/{secondary_user['id']}"
     )
     assert response.status_code == 204
+
+
+def test_upload_group_cover_image(
+    authenticated_client: TestClient,
+):
+    """Authenticated user can upload a custom cover photo for groups."""
+    fake_image_bytes = b"\xff\xd8\xff\xe0\x00\x10JFIF" + b"\x00" * 50
+    files = {"file": ("cover.jpg", fake_image_bytes, "image/jpeg")}
+
+    response = authenticated_client.post(
+        "/api/v1/groups/cover",
+        files=files,
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert "url" in data
+    assert data["url"].startswith("http")

@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, File, UploadFile
 from supabase import Client
 from app.api.deps import (
     get_current_user,
@@ -17,6 +17,16 @@ from app.services import groups as group_service
 from app.core.exceptions import ForbiddenError
 
 router = APIRouter()
+
+
+@router.post("/cover", response_model=dict, status_code=status.HTTP_201_CREATED)
+def upload_group_cover(
+    file: UploadFile = File(...),
+    _: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """Upload a custom group cover photo to storage and return its public URL."""
+    return group_service.upload_group_cover_image(db=db, file=file)
 
 
 @router.post("", response_model=GroupResponse, status_code=status.HTTP_201_CREATED)
@@ -60,12 +70,12 @@ def invite_member_to_group(
     current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
 ):
-    """Invite a user to a group (Any active group member can invite)."""
+    """Invite a user to a group by their username (Any active group member can invite)."""
     return group_service.add_group_member(
         db=db,
         group_id=group_id,
         inviter_id=current_user["id"],
-        target_user_id=str(member_add.user_id),
+        username=member_add.username,
     )
 
 

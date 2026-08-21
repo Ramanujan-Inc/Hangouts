@@ -1,8 +1,22 @@
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
+from fastapi import UploadFile
 from supabase import Client
 from app.schemas.group import GroupCreate, GroupUpdate
-from app.core.exceptions import ForbiddenError, NotFoundError
+from app.core.exceptions import ForbiddenError, NotFoundError, BadRequestError
+from app.services.media import _upload_to_storage, ALLOWED_IMAGE_MIME_TYPES
+
+
+def upload_group_cover_image(db: Client, file: UploadFile) -> Dict[str, str]:
+    """Upload a custom group cover photo to storage and return its public URL."""
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_IMAGE_MIME_TYPES:
+        raise BadRequestError(
+            f"Invalid image type '{content_type}'. Allowed types are {', '.join(ALLOWED_IMAGE_MIME_TYPES)}."
+        )
+    file_bytes = file.file.read()
+    url = _upload_to_storage(db, file_bytes, file.filename or "group_cover.jpg", content_type)
+    return {"url": url}
 
 
 def create_group(db: Client, group_create: GroupCreate, user_id: str) -> Dict[str, Any]:
@@ -38,7 +52,7 @@ def create_group(db: Client, group_create: GroupCreate, user_id: str) -> Dict[st
 
 
 def get_user_groups(db: Client, user_id: str) -> List[Dict[str, Any]]:
-    """Retrieve all accepted groups that the specified user belongs to."""
+    """Retrieve all accepted groups that the specified user belongs to, including member list."""
     response = (
         db.table("group_members")
         .select("status, invited_by, joined_at, groups(*)")
@@ -53,6 +67,7 @@ def get_user_groups(db: Client, user_id: str) -> List[Dict[str, Any]]:
             group_info = item.get("groups")
             if group_info:
                 group_info["user_status"] = item.get("status")
+                group_info["members"] = get_group_members(db=db, group_id=group_info["id"])
                 groups.append(group_info)
     return groups
 
@@ -119,9 +134,18 @@ def add_group_member(
     db: Client,
     group_id: str,
     inviter_id: str,
-    target_user_id: str,
+    username: str,
 ) -> Dict[str, Any]:
-    """Invite a user to a group (sets status to 'pending')."""
+    """Invite a user to a group (sets status to 'pending') by their unique username."""
+    if not username or not username.strip():
+        raise ValueError("Username must be provided.")
+
+    profile_res = db.table("profiles").select("id").ilike("username", username.strip()).execute()
+    if not profile_res.data or len(profile_res.data) == 0:
+        raise NotFoundError(f"User with username '{username}' not found.")
+    
+    target_user_id = str(profile_res.data[0]["id"])
+
     existing_status = get_member_status(db, group_id, target_user_id)
     if existing_status == "accepted":
         raise ValueError("User is already a member of this group.")

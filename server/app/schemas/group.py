@@ -32,7 +32,7 @@ class GroupMemberResponse(BaseModel):
 
 
 class GroupMemberAdd(BaseModel):
-    user_id: UUID
+    username: str
 
 
 class GroupInviteRespond(BaseModel):
