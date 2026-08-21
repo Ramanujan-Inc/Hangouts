@@ -6,7 +6,16 @@ from app.schemas.auth import UserSignUp, UserLogin
 
 def sign_up_user(db: Client, user_in: UserSignUp) -> Dict[str, Any]:
     """Register user in Supabase Auth (profile is initialized via DB trigger)."""
-    username_val = user_in.username or user_in.email.split("@")[0]
+    username_val = (user_in.username or user_in.email.split("@")[0]).strip()
+
+    # Check if username is already taken (case-insensitive)
+    existing_profile = db.table("profiles").select("id").ilike("username", username_val).execute()
+    if existing_profile.data and len(existing_profile.data) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username is already taken.",
+        )
+
     try:
         auth_response = db.auth.sign_up(
             {

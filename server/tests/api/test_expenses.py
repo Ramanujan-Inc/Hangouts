@@ -61,8 +61,8 @@ def test_expense_equal_split_and_simplified_debts(
     """
     # 1. Setup users: Mika (primary), Jam (user_2), Dave (user_3)
     user_mika = primary_user
-    user_jam = create_test_user(username="Jam")
-    user_dave = create_test_user(username="Dave")
+    user_jam = create_test_user(username="Expense_Jam_1")
+    user_dave = create_test_user(username="Expense_Dave_1")
 
     hangout_id = _create_test_hangout(authenticated_client)
 
@@ -147,7 +147,7 @@ def test_personal_expense_isolation(
 ):
     """Personal expenses should not inflate equal-split share for other participants."""
     user_mika = primary_user
-    user_jam = create_test_user(username="Jam")
+    user_jam = create_test_user(username="Expense_Jam_2")
 
     hangout_id = _create_test_hangout(authenticated_client)
 

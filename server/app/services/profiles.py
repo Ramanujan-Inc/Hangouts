@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
+from fastapi import HTTPException, status
 from supabase import Client
 from app.schemas.profile import ProfileUpdate
 
@@ -23,16 +24,50 @@ def update_profile(
         existing = get_profile_by_id(db, profile_id)
         if existing:
             return existing
-        raise Exception("Profile not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found.",
+        )
+
+    if "username" in update_data and update_data["username"]:
+        username_val = update_data["username"].strip()
+        existing = (
+            db.table("profiles")
+            .select("id")
+            .ilike("username", username_val)
+            .neq("id", profile_id)
+            .execute()
+        )
+        if existing.data and len(existing.data) > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username is already taken.",
+            )
+        update_data["username"] = username_val
 
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    response = (
-        db.table("profiles")
-        .update(update_data)
-        .eq("id", profile_id)
-        .execute()
-    )
+    try:
+        response = (
+            db.table("profiles")
+            .update(update_data)
+            .eq("id", profile_id)
+            .execute()
+        )
+    except Exception as e:
+        if "unique" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username is already taken.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to update profile: {str(e)}",
+        )
+
     if response.data and len(response.data) > 0:
         return response.data[0]
-    raise Exception("Failed to update profile.")
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Failed to update profile.",
+    )

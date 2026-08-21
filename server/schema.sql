@@ -1,5 +1,5 @@
 -- Hangouts Backend Database Schema (Consolidated reference file)
--- Last Updated: 2026-08-11
+-- Last Updated: 2026-08-21
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "postgis";
@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "postgis";
 -- 1. Profiles Table (Extends Supabase Auth users)
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    username VARCHAR(255) NOT NULL,
+    username VARCHAR(255) NOT NULL UNIQUE,
     email VARCHAR(255) NOT NULL UNIQUE,
     avatar_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

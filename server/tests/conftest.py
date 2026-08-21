@@ -31,11 +31,11 @@ def create_test_user(db: Client) -> Generator[Callable[..., Dict[str, Any]], Non
     """Factory fixture to register a real user in local Supabase Auth and perform targeted cleanup."""
     created_users = []
 
-    def _create_user(email: str = None, password: str = "TestPassword123!", username: str = "Test User") -> Dict[str, Any]:
+    def _create_user(email: str = None, password: str = "TestPassword123!", username: str = None) -> Dict[str, Any]:
         if not email:
             email = f"test_{uuid.uuid4().hex[:8]}@example.com"
 
-        user_name = username
+        user_name = username or f"user_{uuid.uuid4().hex[:8]}"
 
         auth_res = db.auth.sign_up({
             "email": email,

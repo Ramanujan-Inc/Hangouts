@@ -134,4 +134,22 @@ def test_login_non_existent_email_returns_401(client: TestClient):
     assert "Incorrect username or password" in response.json()["detail"]
 
 
+def test_signup_duplicate_username_returns_400(client: TestClient, create_test_user):
+    """Signup must return 400 Bad Request when registering an existing username."""
+    unique_username = f"unique_user_{uuid.uuid4().hex[:6]}"
+    create_test_user(username=unique_username, password="ValidPassword123!")
+
+    response = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": f"new_email_{uuid.uuid4().hex[:8]}@example.com",
+            "password": "AnotherPassword123!",
+            "username": unique_username,
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Username is already taken."
+
+
+
 

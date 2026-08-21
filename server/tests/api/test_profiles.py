@@ -66,3 +66,17 @@ def test_update_profile_empty_body_returns_existing(authenticated_client: TestCl
     assert response.json()["id"] == primary_user["id"]
 
 
+def test_update_profile_duplicate_username_returns_400(
+    authenticated_client: TestClient,
+    secondary_user: Dict[str, Any],
+):
+    """Updating username to another user's username returns 400 Bad Request."""
+    response = authenticated_client.patch(
+        "/api/v1/profiles/me",
+        json={"username": secondary_user["username"]},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Username is already taken."
+
+
+
