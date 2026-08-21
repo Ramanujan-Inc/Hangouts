@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, profiles, groups, hangouts, media, memories, notes
+from app.api.v1 import auth, profiles, groups, hangouts, media, memories, notes, expenses
 
 api_router = APIRouter()
 
@@ -10,6 +10,7 @@ api_router.include_router(hangouts.router, prefix="/hangouts", tags=["Hangouts"]
 api_router.include_router(media.router, tags=["Media"])
 api_router.include_router(memories.router, prefix="/memories", tags=["Memories"])
 api_router.include_router(notes.router, tags=["Notes"])
+api_router.include_router(expenses.router, tags=["Expenses"])
 
 
 
