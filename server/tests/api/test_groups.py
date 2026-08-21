@@ -129,6 +129,13 @@ def test_respond_to_invite_accept(
     sec_client = client
     sec_client.headers.update(secondary_user["headers"])
 
+    # Check pending invites endpoint
+    invites_res = sec_client.get("/api/v1/groups/invites")
+    assert invites_res.status_code == 200
+    invites_data = invites_res.json()
+    assert len(invites_data) >= 1
+    assert any(inv["group_id"] == group_id for inv in invites_data)
+
     response = sec_client.post(
         f"/api/v1/groups/{group_id}/invites/respond",
         json={"action": "accept"},

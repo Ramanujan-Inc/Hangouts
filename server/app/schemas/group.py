@@ -42,9 +42,20 @@ class GroupInviteRespond(BaseModel):
 
 class GroupResponse(GroupBase):
     id: UUID
-    created_by: UUID
+    created_by: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
     members: Optional[List[GroupMemberResponse]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class GroupInviteResponse(BaseModel):
+    id: UUID
+    group_id: UUID
+    status: str = "pending"
+    joined_at: datetime
+    group: Optional[GroupResponse] = None
+    inviter: Optional[ProfileResponse] = None
 
     model_config = ConfigDict(from_attributes=True)

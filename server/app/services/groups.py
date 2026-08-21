@@ -72,6 +72,39 @@ def get_user_groups(db: Client, user_id: str) -> List[Dict[str, Any]]:
     return groups
 
 
+def get_user_group_invites(db: Client, user_id: str) -> List[Dict[str, Any]]:
+    """Retrieve all pending group invitations for the specified user."""
+    response = (
+        db.table("group_members")
+        .select("id, group_id, user_id, status, invited_by, joined_at")
+        .eq("user_id", user_id)
+        .eq("status", "pending")
+        .execute()
+    )
+    invites = []
+    if response.data:
+        for item in response.data:
+            group_res = db.table("groups").select("*").eq("id", item["group_id"]).execute()
+            group_info = group_res.data[0] if group_res.data and len(group_res.data) > 0 else None
+
+            inviter_id = item.get("invited_by")
+            inviter_profile = None
+            if inviter_id:
+                prof_res = db.table("profiles").select("*").eq("id", inviter_id).execute()
+                if prof_res.data and len(prof_res.data) > 0:
+                    inviter_profile = prof_res.data[0]
+
+            invites.append({
+                "id": item["id"],
+                "group_id": item["group_id"],
+                "status": item["status"],
+                "joined_at": item["joined_at"],
+                "group": group_info,
+                "inviter": inviter_profile,
+            })
+    return invites
+
+
 def get_group_by_id(db: Client, group_id: str) -> Optional[Dict[str, Any]]:
     """Fetch group details by group UUID."""
     response = db.table("groups").select("*").eq("id", group_id).execute()
@@ -95,7 +128,7 @@ def get_group_members(db: Client, group_id: str) -> List[Dict[str, Any]]:
     """Fetch all members of a group with profile information."""
     response = (
         db.table("group_members")
-        .select("id, group_id, user_id, status, invited_by, joined_at, profile:profiles!group_members_user_id_fkey(*)")
+        .select("id, group_id, user_id, status, invited_by, joined_at")
         .eq("group_id", group_id)
         .execute()
     )
@@ -103,6 +136,9 @@ def get_group_members(db: Client, group_id: str) -> List[Dict[str, Any]]:
     members = []
     if response.data:
         for item in response.data:
+            prof_res = db.table("profiles").select("*").eq("id", item["user_id"]).execute()
+            profile = prof_res.data[0] if prof_res.data and len(prof_res.data) > 0 else None
+
             member = {
                 "id": item["id"],
                 "group_id": item["group_id"],
@@ -110,7 +146,7 @@ def get_group_members(db: Client, group_id: str) -> List[Dict[str, Any]]:
                 "status": item.get("status", "accepted"),
                 "invited_by": item.get("invited_by"),
                 "joined_at": item["joined_at"],
-                "profile": item.get("profile"),
+                "profile": profile,
             }
             members.append(member)
     return members
@@ -162,7 +198,11 @@ def add_group_member(
     }
     response = db.table("group_members").insert(member_data).execute()
     if response.data and len(response.data) > 0:
-        return response.data[0]
+        new_member = response.data[0]
+        prof_res = db.table("profiles").select("*").eq("id", target_user_id).execute()
+        if prof_res.data and len(prof_res.data) > 0:
+            new_member["profile"] = prof_res.data[0]
+        return new_member
     raise Exception("Failed to invite member to group.")
 
 

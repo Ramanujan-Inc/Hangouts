@@ -12,6 +12,7 @@ from app.schemas.group import (
     GroupMemberAdd,
     GroupMemberResponse,
     GroupInviteRespond,
+    GroupInviteResponse,
 )
 from app.services import groups as group_service
 from app.core.exceptions import ForbiddenError
@@ -50,6 +51,18 @@ def list_my_groups(
 ):
     """List all groups the currently authenticated user is an accepted member of."""
     return group_service.get_user_groups(db=db, user_id=current_user["id"])
+
+
+@router.get("/invites", response_model=List[GroupInviteResponse])
+def list_my_group_invites(
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """List all pending group invitations for the current user."""
+    return group_service.get_user_group_invites(
+        db=db,
+        user_id=current_user["id"],
+    )
 
 
 @router.get("/{group_id}", response_model=GroupResponse)
