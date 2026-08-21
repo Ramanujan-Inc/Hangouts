@@ -108,21 +108,6 @@ export default function ProfileSettings() {
         <div className="settings-list-card">
           <div className="settings-row">
             <div className="settings-row-left">
-              <div className="settings-icon-box note-butter">
-                <User size={18} />
-              </div>
-              <div className="settings-text-box">
-                <div className="settings-title">My Groups</div>
-                <div className="settings-desc">College Barkada, Weekend Warriors</div>
-              </div>
-            </div>
-            <ChevronRight size={18} className="chevron-icon" />
-          </div>
-
-          <div className="settings-divider" />
-
-          <div className="settings-row">
-            <div className="settings-row-left">
               <div className="settings-icon-box note-blush">
                 <Bell size={18} />
               </div>
@@ -331,6 +316,15 @@ export default function ProfileSettings() {
           align-items: center;
           justify-content: space-between;
           padding: 16px 0;
+        }
+
+        .settings-row.clickable {
+          cursor: pointer;
+          transition: transform 0.15s ease;
+        }
+
+        .settings-row.clickable:hover {
+          transform: translateX(3px);
         }
 
         .settings-row-left {
