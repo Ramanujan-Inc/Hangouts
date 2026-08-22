@@ -3,19 +3,25 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import Layout from '../../components/Layout'
+import { Smile, Film, FileText, DollarSign } from 'lucide-react'
+import { hangoutById } from '../../data/mock'
+import { SegmentedTabs } from '../../components/ui'
 import {
-  ArrowLeft, Share2, MapPin, Calendar, Heart, Trash2, Plus,
-  Smile, Image as ImageIcon, FileText, DollarSign, X, Check, ArrowRight,
-  Film, Video, Star, Play
-} from 'lucide-react'
-import { members, hangoutById, mockUploadOptions, HangoutMedia } from '../../data/mock'
-import { formatDate } from '../../lib/format'
-import {
-  AvatarStack, BottomSheet, Button, EmptyState, Modal, SegmentedTabs, TextArea, TextField
-} from '../../components/ui'
-import MemberAvatar from '../../components/MemberAvatar'
-
-const emojis = ['😴', '😐', '🙂', '😊', '😍']
+  HangoutTab,
+  HangoutMedia,
+  HangoutNote,
+  HangoutExpense,
+  DebtSettlement,
+  HangoutHeroHeader,
+  OverviewTab,
+  MediaGalleryTab,
+  MediaLightboxModal,
+  MediaUploadSheet,
+  NotesTab,
+  AddNoteModal,
+  ExpensesTab,
+  AddExpenseModal,
+} from '../../components/hangout'
 
 export default function HangoutDetail() {
   const router = useRouter()
@@ -23,28 +29,22 @@ export default function HangoutDetail() {
   const hangoutId = (Array.isArray(id) ? id[0] : id) || '1'
   const data = hangoutById(hangoutId)
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'media' | 'photos' | 'notes' | 'expenses'>('overview')
+  const [activeTab, setActiveTab] = useState<HangoutTab>('overview')
   const [rating, setRating] = useState(data?.rating || 4)
 
-  // Media (Photos & Videos) states
+  // Media states
   const [media, setMedia] = useState<HangoutMedia[]>(data?.media || data?.photos || [])
   const [activeMedia, setActiveMedia] = useState<HangoutMedia | null>(null)
   const [showUploadMenu, setShowUploadMenu] = useState(false)
   const [mediaFilter, setMediaFilter] = useState<'all' | 'favorites' | 'videos'>('all')
 
   // Notes states
-  const [notes, setNotes] = useState(data?.notes || [])
+  const [notes, setNotes] = useState<HangoutNote[]>(data?.notes || [])
   const [showAddNote, setShowAddNote] = useState(false)
-  const [newNoteText, setNewNoteText] = useState('')
-  const [newNoteType, setNewNoteType] = useState<'butter' | 'blush' | 'sea'>('butter')
 
   // Expenses states
-  const [expenses, setExpenses] = useState(data?.expenses || [])
+  const [expenses, setExpenses] = useState<HangoutExpense[]>(data?.expenses || [])
   const [showAddExpense, setShowAddExpense] = useState(false)
-  const [expAmount, setExpAmount] = useState('')
-  const [expDesc, setExpDesc] = useState('')
-  const [expPaidBy, setExpPaidBy] = useState('mika')
-  const [expSplitWith, setExpSplitWith] = useState<string[]>(data?.participants || [])
 
   if (!data) {
     return (
@@ -59,24 +59,27 @@ export default function HangoutDetail() {
     )
   }
 
+  const currentUserId = 'mika'
+
   // Expense calculations
   const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0)
 
-  // Calculate individual balances
-  const computeBalances = () => {
+  const computeBalances = (): Record<string, number> => {
     const spends: Record<string, number> = {}
-    data.participants.forEach(p => { spends[p] = 0 })
+    data.participants.forEach((p) => {
+      spends[p] = 0
+    })
 
-    expenses.forEach(exp => {
+    expenses.forEach((exp) => {
       const payer = exp.paidBy
       const splitCount = exp.splitWith.length
       if (splitCount === 0) return
 
       const share = exp.amount / splitCount
-      data.participants.forEach(p => {
+      data.participants.forEach((p) => {
         if (exp.splitWith.includes(p)) {
           if (p === payer) {
-            spends[p] += (exp.amount - share)
+            spends[p] += exp.amount - share
           } else {
             spends[p] -= share
           }
@@ -88,13 +91,15 @@ export default function HangoutDetail() {
   }
 
   const balances = computeBalances()
-  const getOwesWhomList = () => {
-    const list: Array<{ from: string, to: string, amount: number }> = []
+
+  const getOwesWhomList = (): DebtSettlement[] => {
+    const list: DebtSettlement[] = []
     const sortedBalances = Object.entries(balances).map(([user, bal]) => ({ user, bal }))
 
-    // Simple greedy matching for simplified debts
-    const debtors = sortedBalances.filter(x => x.bal < 0).map(x => ({ ...x, bal: Math.abs(x.bal) }))
-    const creditors = sortedBalances.filter(x => x.bal > 0)
+    const debtors = sortedBalances
+      .filter((x) => x.bal < 0)
+      .map((x) => ({ ...x, bal: Math.abs(x.bal) }))
+    const creditors = sortedBalances.filter((x) => x.bal > 0)
 
     let dIdx = 0
     let cIdx = 0
@@ -120,69 +125,36 @@ export default function HangoutDetail() {
 
   const debtsList = getOwesWhomList()
 
-  const handleAddNoteSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newNoteText.trim()) return
-    const newNote = {
-      id: `n-${Date.now()}`,
-      author: 'mika',
-      text: newNoteText,
-      time: 'Just now',
-      type: newNoteType,
-      rotation: Math.random() * 3 - 1.5
-    }
-    setNotes([newNote, ...notes])
-    setNewNoteText('')
-    setShowAddNote(false)
-  }
-
-  const handleAddExpenseSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const amt = parseFloat(expAmount)
-    if (isNaN(amt) || amt <= 0 || !expDesc.trim()) return
-
-    const newExp = {
-      id: `e-${Date.now()}`,
-      desc: expDesc,
-      amount: amt,
-      paidBy: expPaidBy,
-      splitWith: expSplitWith,
-      category: 'General'
-    }
-
-    setExpenses([...expenses, newExp])
-    setExpAmount('')
-    setExpDesc('')
-    setShowAddExpense(false)
-  }
-
-  const currentUserId = 'mika'
-
+  // Media handlers
   const handleToggleFavorite = (mediaId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
-    setMedia(media.map(m => {
-      if (m.id !== mediaId) return m
-      const favoritedByList = m.favoritedBy || []
-      const isAlreadyFavorited = favoritedByList.includes(currentUserId)
-      const newFavoritedBy = isAlreadyFavorited
-        ? favoritedByList.filter(uid => uid !== currentUserId)
-        : [...favoritedByList, currentUserId]
-      const newLikes = isAlreadyFavorited ? Math.max(0, m.likes - 1) : m.likes + 1
-      return { ...m, favoritedBy: newFavoritedBy, likes: newLikes }
-    }))
+    setMedia(
+      media.map((m) => {
+        if (m.id !== mediaId) return m
+        const favoritedByList = m.favoritedBy || []
+        const isAlreadyFavorited = favoritedByList.includes(currentUserId)
+        const newFavoritedBy = isAlreadyFavorited
+          ? favoritedByList.filter((uid) => uid !== currentUserId)
+          : [...favoritedByList, currentUserId]
+        const newLikes = isAlreadyFavorited ? Math.max(0, m.likes - 1) : m.likes + 1
+        return { ...m, favoritedBy: newFavoritedBy, likes: newLikes }
+      })
+    )
     if (activeMedia?.id === mediaId) {
       const favoritedByList = activeMedia.favoritedBy || []
       const isAlreadyFavorited = favoritedByList.includes(currentUserId)
       const newFavoritedBy = isAlreadyFavorited
-        ? favoritedByList.filter(uid => uid !== currentUserId)
+        ? favoritedByList.filter((uid) => uid !== currentUserId)
         : [...favoritedByList, currentUserId]
-      const newLikes = isAlreadyFavorited ? Math.max(0, activeMedia.likes - 1) : activeMedia.likes + 1
+      const newLikes = isAlreadyFavorited
+        ? Math.max(0, activeMedia.likes - 1)
+        : activeMedia.likes + 1
       setActiveMedia({ ...activeMedia, favoritedBy: newFavoritedBy, likes: newLikes })
     }
   }
 
   const handleDeleteMedia = (mediaId: string) => {
-    setMedia(media.filter(m => m.id !== mediaId))
+    setMedia(media.filter((m) => m.id !== mediaId))
     setActiveMedia(null)
   }
 
@@ -194,17 +166,42 @@ export default function HangoutDetail() {
       likes: 0,
       span: Math.random() > 0.5 ? 2 : 1,
       mediaType: type,
-      favoritedBy: []
+      favoritedBy: [],
     }
     setMedia([...media, newMediaItem])
     setShowUploadMenu(false)
   }
 
-  const filteredMedia = media.filter(item => {
-    if (mediaFilter === 'favorites') return (item.favoritedBy || []).includes(currentUserId) || item.likes > 0
-    if (mediaFilter === 'videos') return item.mediaType === 'video'
-    return true
-  })
+  // Note handlers
+  const handleAddNote = (text: string, type: 'butter' | 'blush' | 'sea') => {
+    const newNote: HangoutNote = {
+      id: `n-${Date.now()}`,
+      author: 'mika',
+      text,
+      time: 'Just now',
+      type,
+      rotation: Math.random() * 3 - 1.5,
+    }
+    setNotes([newNote, ...notes])
+  }
+
+  // Expense handlers
+  const handleAddExpense = (
+    amount: number,
+    desc: string,
+    paidBy: string,
+    splitWith: string[]
+  ) => {
+    const newExp: HangoutExpense = {
+      id: `e-${Date.now()}`,
+      desc,
+      amount,
+      paidBy,
+      splitWith,
+      category: 'General',
+    }
+    setExpenses([...expenses, newExp])
+  }
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: <Smile size={16} /> },
@@ -220,1315 +217,109 @@ export default function HangoutDetail() {
       </Head>
 
       <div className="hangout-detail-page">
-        {/* Cover Image Banner */}
-        <div className="detail-cover-container">
-          <img src={data.coverImage} alt={data.title} className="detail-cover-img" />
-          <div className="cover-floating-btns">
-            <button className="frosted-btn" onClick={() => router.push('/timeline')}>
-              <ArrowLeft size={18} />
-            </button>
-            <button className="frosted-btn">
-              <Share2 size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Title Block */}
-        <section className="title-section">
-          <div className="title-row">
-            <h2>{data.title}</h2>
-          </div>
-
-          <div className="metadata-row">
-            <div className="meta-item">
-              <Calendar size={16} />
-              <span>{formatDate(data.date, 'long')}</span>
-            </div>
-            <div className="meta-item">
-              <MapPin size={16} className="loc-pin" />
-              <span>{data.location}</span>
-            </div>
-          </div>
-
-          <div className="participants-row">
-            <span className="participants-label">Joined:</span>
-            <AvatarStack
-              size={36}
-              overlap={12}
-              avatars={data.participants.map((p) => ({
-                src: members[p].avatar,
-                alt: members[p].name,
-                title: members[p].name,
-              }))}
-            />
-            <span className="avatar-count-badge" style={{ transform: `translateX(-${(data.participants.length - 1) * 12}px)` }}>
-              {data.participants.length} {data.participants.length === 1 ? 'member' : 'members'}
-            </span>
-          </div>
-        </section>
+        {/* Cover Image Banner & Title Block */}
+        <HangoutHeroHeader
+          title={data.title}
+          coverImage={data.coverImage}
+          date={data.date}
+          location={data.location}
+          participants={data.participants}
+          onBack={() => router.push('/timeline')}
+        />
 
         {/* Segmented Pill Tab Bar */}
         <div className="tab-bar-container">
-          <SegmentedTabs tabs={tabs} active={activeTab} onChange={(t) => setActiveTab(t as typeof activeTab)} />
+          <SegmentedTabs
+            tabs={tabs}
+            active={activeTab}
+            onChange={(t) => setActiveTab(t as HangoutTab)}
+          />
         </div>
 
         {/* Tab Contents */}
         <div className="tab-content-panel">
           {activeTab === 'overview' && (
-            <div className="overview-tab">
-              <div className="content-card description-card">
-                <h3>About the Meetup</h3>
-                <p>{data.description}</p>
-              </div>
-
-              {/* Mini Map Preview */}
-              <div className="content-card map-preview-card">
-                <h3>Location Details</h3>
-                <div className="mini-map-container">
-                  <div className="mini-map-pin">
-                    <MapPin size={24} fill="var(--color-blush)" color="white" />
-                  </div>
-                  <span className="mini-map-label">{data.location}</span>
-                </div>
-              </div>
-
-              {/* Memory Rating Emoji Slider */}
-              <div className="content-card rating-card">
-                <h3>Memory Rating</h3>
-                <p className="rating-subtitle">How did this hangout feel?</p>
-                <div className="emoji-slider-wrapper">
-                  <div className="emoji-display">{emojis[rating]}</div>
-                  <div className="slider-container-box">
-                    <input
-                      type="range"
-                      min="0"
-                      max="4"
-                      value={rating}
-                      onChange={(e) => setRating(parseInt(e.target.value))}
-                      className="emoji-range-input"
-                    />
-                    <div className="slider-labels">
-                      <span>Cozy</span>
-                      <span>Great</span>
-                      <span>Unforgettable!</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <OverviewTab
+              description={data.description}
+              location={data.location}
+              rating={rating}
+              onRatingChange={setRating}
+            />
           )}
 
           {(activeTab === 'media' || activeTab === 'photos') && (
-            <div className="photos-tab">
-              <div className="tab-section-header">
-                <h3>Media Stack ({filteredMedia.length})</h3>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <Button size="compact" onClick={() => setShowUploadMenu(true)}>
-                    <Plus size={16} /> Add Media
-                  </Button>
-                </div>
-              </div>
-
-              {/* Media Filter Pills */}
-              <div className="media-filter-bar" style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                <button
-                  className={`btn-pill ${mediaFilter === 'all' ? 'active' : ''}`}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '20px',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    background: mediaFilter === 'all' ? '#ff6b6b' : 'rgba(255,255,255,0.05)',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem'
-                  }}
-                  onClick={() => setMediaFilter('all')}
-                >
-                  All ({media.length})
-                </button>
-                <button
-                  className={`btn-pill ${mediaFilter === 'favorites' ? 'active' : ''}`}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '20px',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    background: mediaFilter === 'favorites' ? '#ff6b6b' : 'rgba(255,255,255,0.05)',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                  onClick={() => setMediaFilter('favorites')}
-                >
-                  <Heart size={14} fill="#ff6b6b" stroke="#ff6b6b" /> Favorites ({media.filter(m => (m.favoritedBy || []).includes(currentUserId) || m.likes > 0).length})
-                </button>
-                <button
-                  className={`btn-pill ${mediaFilter === 'videos' ? 'active' : ''}`}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '20px',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    background: mediaFilter === 'videos' ? '#ff6b6b' : 'rgba(255,255,255,0.05)',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                  onClick={() => setMediaFilter('videos')}
-                >
-                  <Video size={14} /> Videos ({media.filter(m => m.mediaType === 'video').length})
-                </button>
-              </div>
-
-              {filteredMedia.length === 0 ? (
-                <EmptyState
-                  icon={<Film size={32} />}
-                  title={mediaFilter === 'favorites' ? "No favorite media saved yet." : "No media uploaded yet. Drop a memory here!"}
-                />
-              ) : (
-                <div className="masonry-gallery">
-                  {filteredMedia.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`gallery-item span-${item.span}`}
-                      onClick={() => setActiveMedia(item)}
-                      style={{ position: 'relative' }}
-                    >
-                      {item.mediaType === 'video' ? (
-                        <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '160px', background: '#000' }}>
-                          <video
-                            src={item.url}
-                            poster={item.thumbnailUrl}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                          <div style={{
-                            position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            background: 'rgba(0,0,0,0.6)',
-                            borderRadius: '50%',
-                            padding: '10px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            <Play size={24} fill="white" color="white" />
-                          </div>
-                        </div>
-                      ) : (
-                        <img src={item.url} alt="Hangout memory" />
-                      )}
-
-                      <div className="uploader-badge">
-                        <MemberAvatar memberId={item.uploadedBy} size={24} />
-                      </div>
-
-                      {/* Media type badge */}
-                      {item.mediaType === 'video' && (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: '8px',
-                          left: '8px',
-                          background: 'rgba(0, 0, 0, 0.6)',
-                          backdropFilter: 'blur(4px)',
-                          borderRadius: '12px',
-                          padding: '2px 8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '0.75rem',
-                          color: '#fff',
-                          zIndex: 2
-                        }}>
-                          <Video size={12} /> Video
-                        </div>
-                      )}
-
-                      <div
-                        className="photo-likes-overlay"
-                        onClick={(e) => handleToggleFavorite(item.id, e)}
-                        style={{ cursor: 'pointer', zIndex: 3 }}
-                        title="Favorite this memory"
-                      >
-                        <Heart
-                          size={14}
-                          fill={(item.favoritedBy || []).includes(currentUserId) ? '#ff6b6b' : 'white'}
-                          color={(item.favoritedBy || []).includes(currentUserId) ? '#ff6b6b' : 'white'}
-                        />
-                        <span>{item.likes}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <MediaGalleryTab
+              media={media}
+              currentUserId={currentUserId}
+              mediaFilter={mediaFilter}
+              onSetFilter={setMediaFilter}
+              onOpenUploadMenu={() => setShowUploadMenu(true)}
+              onSelectMedia={setActiveMedia}
+              onToggleFavorite={handleToggleFavorite}
+            />
           )}
 
           {activeTab === 'notes' && (
-            <div className="notes-tab">
-              <div className="tab-section-header">
-                <h3>Collaborative Sticky Notes</h3>
-                <Button size="compact" onClick={() => setShowAddNote(true)}>
-                  <Plus size={16} /> Add Note
-                </Button>
-              </div>
-
-              {notes.length === 0 ? (
-                <EmptyState
-                  icon={<FileText size={32} />}
-                  title="No notes written yet. Jot down funny quotes or memories!"
-                />
-              ) : (
-                <div className="sticky-notes-board">
-                  {notes.map((note) => (
-                    <div
-                      key={note.id}
-                      className={`sticky-note sticky-note-${note.type}`}
-                      style={{ transform: `rotate(${note.rotation}deg)` }}
-                    >
-                      <p className="note-text">"{note.text}"</p>
-                      <div className="note-meta-footer">
-                        <div className="note-author">
-                          <MemberAvatar memberId={note.author} size={20} />
-                          <span>{members[note.author].name}</span>
-                        </div>
-                        <span className="note-time">{note.time}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <NotesTab notes={notes} onOpenAddNote={() => setShowAddNote(true)} />
           )}
 
           {activeTab === 'expenses' && (
-            <div className="expenses-tab">
-              {/* Summary card */}
-              <div className="expense-summary-card">
-                <div className="summary-left">
-                  <span className="summary-lbl">Total Spent</span>
-                  <h3>₱{totalSpent.toLocaleString()}</h3>
-                  <span className="summary-sub">across {expenses.length} payments</span>
-                </div>
-                <Button onClick={() => setShowAddExpense(true)}>
-                  <Plus size={18} /> Log Expense
-                </Button>
-              </div>
-
-              {/* Spend Chart breakdown */}
-              {expenses.length > 0 && (
-                <div className="spend-chart-section">
-                  <h4>Member Spending Breakdown</h4>
-                  <div className="chart-bars-list">
-                    {Object.entries(balances).map(([user, bal]) => {
-                      const totalPaid = expenses
-                        .filter(e => e.paidBy === user)
-                        .reduce((s, e) => s + e.amount, 0)
-                      const pct = totalSpent > 0 ? (totalPaid / totalSpent) * 100 : 0
-
-                      return (
-                        <div key={user} className="chart-row">
-                          <div className="chart-member-label">
-                            <MemberAvatar memberId={user} size={24} />
-                            <span>{members[user].name}</span>
-                          </div>
-                          <div className="chart-bar-track">
-                            <div
-                              className="chart-bar-fill"
-                              style={{ width: `${Math.max(pct, 5)}%`, backgroundColor: user === 'mika' ? 'var(--color-blush)' : user === 'jam' ? 'var(--color-tangerine)' : 'var(--color-sea)' }}
-                            />
-                            <span className="bar-val">₱{totalPaid.toLocaleString()}</span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Simplified Debts Sheet */}
-              {debtsList.length > 0 && (
-                <div className="debts-section">
-                  <h4>Simplified Balances (Who Owes Whom)</h4>
-                  <div className="debts-list">
-                    {debtsList.map((debt, index) => (
-                      <div key={index} className="debt-row-card">
-                        <div className="debt-avatars">
-                          <MemberAvatar memberId={debt.from} size={28} />
-                          <ArrowRight size={16} className="arrow-icon" />
-                          <MemberAvatar memberId={debt.to} size={28} />
-                        </div>
-                        <div className="debt-message">
-                          <strong>{members[debt.from].name}</strong> owes <strong>{members[debt.to].name}</strong>
-                        </div>
-                        <div className="debt-badge">
-                          ₱{debt.amount}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Expense History List */}
-              <div className="expense-history-list">
-                <h4>Expense History</h4>
-                {expenses.length === 0 ? (
-                  <EmptyState
-                    icon={<DollarSign size={32} />}
-                    title="No expenses logged yet. Keep track of group splits here!"
-                  />
-                ) : (
-                  <div className="expenses-grid">
-                    {expenses.map((exp) => (
-                      <div key={exp.id} className="expense-row-item">
-                        <div className="payer-col">
-                          <MemberAvatar memberId={exp.paidBy} size={36} />
-                          <div>
-                            <div className="exp-desc">{exp.desc}</div>
-                            <div className="exp-meta">Paid by {members[exp.paidBy].name} • Split among {exp.splitWith.length}</div>
-                          </div>
-                        </div>
-                        <div className="amount-col">
-                          <span>₱{exp.amount.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <ExpensesTab
+              expenses={expenses}
+              balances={balances}
+              debtsList={debtsList}
+              totalSpent={totalSpent}
+              onOpenAddExpense={() => setShowAddExpense(true)}
+            />
           )}
         </div>
+
+        {/* Lightbox Fullscreen Media Viewer */}
+        <MediaLightboxModal
+          activeMedia={activeMedia}
+          currentUserId={currentUserId}
+          onClose={() => setActiveMedia(null)}
+          onToggleFavorite={handleToggleFavorite}
+          onDeleteMedia={handleDeleteMedia}
+        />
+
+        {/* Mock Upload Menu */}
+        <MediaUploadSheet
+          isOpen={showUploadMenu}
+          onClose={() => setShowUploadMenu(false)}
+          onMockUpload={handleMockUpload}
+        />
+
+        {/* Add Note Modal */}
+        <AddNoteModal
+          isOpen={showAddNote}
+          onClose={() => setShowAddNote(false)}
+          onAddNote={handleAddNote}
+        />
+
+        {/* Add Expense Modal */}
+        <AddExpenseModal
+          isOpen={showAddExpense}
+          onClose={() => setShowAddExpense(false)}
+          participants={data.participants}
+          onAddExpense={handleAddExpense}
+        />
       </div>
-
-      {/* Lightbox Fullscreen Media Viewer */}
-      {activeMedia && (
-        <div className="lightbox-backdrop">
-          <button className="lightbox-close" onClick={() => setActiveMedia(null)}>
-            <X size={24} />
-          </button>
-
-          <div className="lightbox-container">
-            {activeMedia.mediaType === 'video' ? (
-              <video
-                src={activeMedia.url}
-                controls
-                autoPlay
-                className="lightbox-img"
-                style={{ maxHeight: '80vh', maxWidth: '90vw' }}
-              />
-            ) : (
-              <img src={activeMedia.url} alt="Lightbox View" className="lightbox-img" />
-            )}
-
-            {/* Top info bar */}
-            <div className="lightbox-top-bar">
-              <MemberAvatar memberId={activeMedia.uploadedBy} size={32} />
-              <div>
-                <div className="light-author">Uploaded by {members[activeMedia.uploadedBy].name}</div>
-                <div className="light-time">1 year ago • {activeMedia.mediaType === 'video' ? 'Video' : 'Photo'}</div>
-              </div>
-            </div>
-
-            {/* Bottom action bar */}
-            <div className="lightbox-bottom-bar" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <button className="light-action-btn" onClick={() => handleToggleFavorite(activeMedia.id)}>
-                <Heart
-                  size={20}
-                  fill={(activeMedia.favoritedBy || []).includes(currentUserId) ? '#ff6b6b' : 'transparent'}
-                  color={(activeMedia.favoritedBy || []).includes(currentUserId) ? '#ff6b6b' : 'white'}
-                />
-                <span>{activeMedia.likes} {activeMedia.likes === 1 ? 'Favorite' : 'Favorites'}</span>
-              </button>
-
-              {activeMedia.uploadedBy === 'mika' && (
-                <button className="light-action-btn delete-btn" onClick={() => handleDeleteMedia(activeMedia.id)}>
-                  <Trash2 size={20} />
-                  <span>Delete</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mock Upload Menu (Bottom Sheet) */}
-      {showUploadMenu && (
-        <BottomSheet onClose={() => setShowUploadMenu(false)}>
-          <h3>Add Media to Gallery</h3>
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', marginBottom: '12px' }}>
-            Select a photo or video to upload:
-          </p>
-          <div className="sheet-options">
-            {mockUploadOptions.map((opt) => (
-              <div
-                key={opt.url}
-                className="sheet-option-card"
-                onClick={() => handleMockUpload(opt.url, 'photo')}
-              >
-                <img src={opt.url} alt={opt.label} />
-                <span>📷 {opt.label}</span>
-              </div>
-            ))}
-            <div
-              className="sheet-option-card"
-              onClick={() => handleMockUpload('https://assets.mixkit.co/videos/preview/mixkit-chef-preparing-ramen-soup-42867-large.mp4', 'video')}
-            >
-              <div style={{ background: '#222', height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Video size={32} color="#ff6b6b" />
-              </div>
-              <span>🎥 Mock Ramen Video</span>
-            </div>
-          </div>
-          <Button variant="outline" fullWidth onClick={() => setShowUploadMenu(false)}>
-            Cancel
-          </Button>
-        </BottomSheet>
-      )}
-
-      {/* Add Note Modal */}
-      {showAddNote && (
-        <Modal onClose={() => setShowAddNote(false)} title="Write a Sticky Note">
-          <form onSubmit={handleAddNoteSubmit}>
-            <TextArea
-              required
-              height={120}
-              placeholder="Write down funny quotes, inside jokes, or anything memorable..."
-              value={newNoteText}
-              onChange={(e) => setNewNoteText(e.target.value)}
-            />
-
-            <div className="color-picker-row">
-              <span className="picker-lbl">Note Style:</span>
-              <div className="color-options">
-                {(['butter', 'blush', 'sea'] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    className={`color-dot note-${type} ${newNoteType === type ? 'active' : ''}`}
-                    onClick={() => setNewNoteType(type)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="modal-btn-row">
-              <Button type="submit">Post Note</Button>
-              <Button variant="outline" onClick={() => setShowAddNote(false)}>Cancel</Button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* Add Expense Drawer */}
-      {showAddExpense && (
-        <Modal onClose={() => setShowAddExpense(false)} title="Log a Group Expense">
-          <form onSubmit={handleAddExpenseSubmit}>
-            {/* Oversized Amount Field */}
-            <div className="amount-input-wrapper">
-              <span className="currency-lbl">₱</span>
-              <input
-                type="number"
-                required
-                placeholder="0.00"
-                value={expAmount}
-                onChange={(e) => setExpAmount(e.target.value)}
-                className="giant-amount-input"
-                autoFocus
-              />
-            </div>
-
-            <TextField
-              label="What was this for?"
-              required
-              placeholder="e.g. Ramen Bowls"
-              value={expDesc}
-              onChange={(e) => setExpDesc(e.target.value)}
-            />
-
-            <div className="payer-field">
-              <label className="field-label">Paid by:</label>
-              <div className="payer-chips">
-                {data.participants.map((p) => (
-                  <div
-                    key={p}
-                    className={`payer-chip ${expPaidBy === p ? 'active' : ''}`}
-                    onClick={() => setExpPaidBy(p)}
-                  >
-                    <MemberAvatar memberId={p} size={20} />
-                    <span>{members[p].name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Dynamic Splits Indicator */}
-            {expAmount && parseFloat(expAmount) > 0 && (
-              <div className="split-summary-badge">
-                Split equally — ₱{Math.round(parseFloat(expAmount) / expSplitWith.length)} each
-              </div>
-            )}
-
-            <div className="modal-btn-row">
-              <Button type="submit">Save Expense</Button>
-              <Button variant="outline" onClick={() => setShowAddExpense(false)}>Cancel</Button>
-            </div>
-          </form>
-        </Modal>
-      )}
 
       <style jsx>{`
         .hangout-detail-page {
           max-width: 800px;
           margin: 0 auto;
+          padding-bottom: 80px;
         }
 
-        .detail-cover-container {
-          position: relative;
-          width: 100%;
-          height: 280px;
-          border-radius: 0 0 28px 28px;
-          overflow: hidden;
-          box-shadow: var(--shadow-ambient);
-        }
-
-        .detail-cover-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .cover-floating-btns {
-          position: absolute;
-          top: 20px;
-          left: 20px;
-          right: 20px;
-          display: flex;
-          justify-content: space-between;
-        }
-
-        .frosted-btn {
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          background: rgba(255, 248, 245, 0.7);
-          backdrop-filter: blur(8px);
-          border: none;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--color-text);
-          cursor: pointer;
-          transition: background 0.2s;
-        }
-
-        .frosted-btn:hover {
-          background: rgba(255, 248, 245, 0.9);
-        }
-
-        .title-section {
-          margin-top: 28px;
-          margin-bottom: 24px;
-        }
-
-        .title-section h2 {
-          font-size: 32px;
-          font-family: var(--font-display);
-        }
-
-        .metadata-row {
-          display: flex;
-          gap: 20px;
-          margin-top: 8px;
-          color: var(--color-text-muted);
-          font-size: 14px;
-        }
-
-        .meta-item {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-
-        .loc-pin {
-          color: var(--color-sea);
-        }
-
-        .participants-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-top: 16px;
-          border-top: 1px dashed var(--color-outline-variant);
-          padding-top: 16px;
-        }
-
-        .participants-label {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 14px;
-          color: var(--color-text-muted);
-        }
-
-        .avatar-count-badge {
-          font-size: 13px;
-          font-weight: 700;
-          color: var(--color-text-muted);
-          margin-left: 8px;
-        }
-
-        /* Segmented tab bar */
         .tab-bar-container {
-          margin-bottom: 28px;
-        }
-
-        /* Content cards */
-        .content-card {
-          background-color: var(--color-surface-container-lowest);
-          border-radius: 24px;
-          padding: 24px;
+          padding: 0 20px;
           margin-bottom: 24px;
-          box-shadow: var(--shadow-ambient);
-          border: 1px solid var(--color-surface-container-high);
         }
 
-        .content-card h3 {
-          font-size: 20px;
-          margin-bottom: 12px;
-          font-family: var(--font-display);
-        }
-
-        .description-card p {
-          color: var(--color-text-muted);
-          line-height: 1.6;
-        }
-
-        /* Map Preview */
-        .mini-map-container {
-          height: 160px;
-          background-color: #e5ecd6; /* Sage/cream land styling */
-          border-radius: 16px;
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-          border: 1px solid var(--color-outline-variant);
-        }
-
-        .mini-map-pin {
-          animation: float 2s ease-in-out infinite;
-          z-index: 2;
-        }
-
-        .mini-map-label {
-          position: absolute;
-          bottom: 12px;
-          background-color: rgba(46, 42, 40, 0.85);
-          color: white;
-          padding: 6px 12px;
-          border-radius: 9999px;
-          font-size: 12px;
-          font-weight: 700;
-        }
-
-        /* Rating card & emoji slider */
-        .rating-subtitle {
-          color: var(--color-text-muted);
-          font-size: 14px;
-          margin-bottom: 16px;
-        }
-
-        .emoji-slider-wrapper {
-          display: flex;
-          align-items: center;
-          gap: 24px;
-        }
-
-        .emoji-display {
-          font-size: 48px;
-          width: 64px;
-          height: 64px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background-color: var(--color-surface-container-low);
-          border-radius: 50%;
-        }
-
-        .slider-container-box {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .emoji-range-input {
-          -webkit-appearance: none;
-          width: 100%;
-          height: 8px;
-          border-radius: 9999px;
-          background: var(--color-surface-container-high);
-          outline: none;
-        }
-
-        .emoji-range-input::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          background: var(--color-blush);
-          cursor: pointer;
-          border: 2px solid white;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-        }
-
-        .slider-labels {
-          display: flex;
-          justify-content: space-between;
-          font-size: 12px;
-          color: var(--color-text-muted);
-          font-weight: 600;
-        }
-
-        /* Photos gallery tab */
-        .tab-section-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-        }
-
-        .tab-section-header h3 {
-          font-size: 22px;
-          font-family: var(--font-display);
-        }
-
-        .masonry-gallery {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 16px;
-        }
-
-        .gallery-item {
-          position: relative;
-          aspect-ratio: 1;
-          border-radius: 16px;
-          overflow: hidden;
-          cursor: pointer;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-          transition: transform 0.2s;
-        }
-
-        .gallery-item.span-2 {
-          grid-column: span 2;
-          aspect-ratio: 2/1;
-        }
-
-        .gallery-item:hover {
-          transform: scale(1.02);
-        }
-
-        .gallery-item img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .uploader-badge {
-          position: absolute;
-          top: 10px;
-          left: 10px;
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          border: 1.5px solid white;
-          overflow: hidden;
-        }
-
-        .photo-likes-overlay {
-          position: absolute;
-          bottom: 10px;
-          right: 10px;
-          background: rgba(46, 42, 40, 0.6);
-          color: white;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          padding: 4px 8px;
-          border-radius: 9999px;
-          font-size: 11px;
-          font-weight: 700;
-        }
-
-        /* Notes board */
-        .sticky-notes-board {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-          gap: 20px;
-          padding: 10px 0;
-        }
-
-        .note-text {
-          font-family: var(--font-body);
-          font-size: 15px;
-          margin-bottom: 16px;
-          line-height: 1.4;
-          font-style: italic;
-        }
-
-        .note-meta-footer {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-top: 1px dashed rgba(46,42,40,0.1);
-          padding-top: 10px;
-          font-size: 11px;
-        }
-
-        .note-author {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-weight: 700;
-        }
-
-        .note-time {
-          color: var(--color-text-muted);
-        }
-
-        /* Expenses tab */
-        .expense-summary-card {
-          background-color: var(--tint-butter); /* Butter fill */
-          border-radius: 24px;
-          padding: 24px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 28px;
-          box-shadow: var(--shadow-ambient);
-        }
-
-        .summary-left h3 {
-          font-size: 32px;
-          color: var(--color-text);
-          margin: 4px 0;
-        }
-
-        .summary-lbl {
-          font-family: var(--font-display);
-          font-weight: 700;
-          font-size: 13px;
-          text-transform: uppercase;
-          color: var(--color-text-muted);
-        }
-
-        .summary-sub {
-          font-size: 13px;
-          color: var(--color-text-muted);
-        }
-
-        .spend-chart-section {
-          margin-bottom: 28px;
-        }
-
-        .spend-chart-section h4 {
-          margin-bottom: 14px;
-          font-family: var(--font-display);
-        }
-
-        .chart-bars-list {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .chart-row {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .chart-member-label {
-          width: 90px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-weight: 700;
-          font-size: 14px;
-        }
-
-        .chart-bar-track {
-          flex: 1;
-          height: 32px;
-          background-color: var(--color-surface-container-low);
-          border-radius: 16px;
-          position: relative;
-          overflow: hidden;
-          display: flex;
-          align-items: center;
-        }
-
-        .chart-bar-fill {
-          height: 100%;
-          border-radius: 16px;
-          transition: width 0.3s;
-        }
-
-        .bar-val {
-          position: absolute;
-          right: 12px;
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-        /* Debts */
-        .debts-section {
-          margin-bottom: 28px;
-          background: var(--color-surface-container-low);
-          border-radius: 20px;
-          padding: 20px;
-        }
-
-        .debts-section h4 {
-          margin-bottom: 12px;
-        }
-
-        .debts-list {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .debt-row-card {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          background: white;
-          padding: 10px 16px;
-          border-radius: 14px;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-        }
-
-        .debt-avatars {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .arrow-icon {
-          color: var(--color-text-muted);
-        }
-
-        .debt-message {
-          font-size: 13px;
-          flex: 1;
-          margin-left: 12px;
-        }
-
-        .debt-badge {
-          background-color: var(--tint-blush);
-          color: var(--color-blush);
-          padding: 4px 12px;
-          border-radius: 9999px;
-          font-weight: 700;
-          font-size: 13px;
-        }
-
-        /* Expense list */
-        .expense-history-list h4 {
-          margin-bottom: 14px;
-        }
-
-        .expenses-grid {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .expense-row-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 12px 16px;
-          border-radius: 16px;
-          background-color: var(--color-surface-container-lowest);
-          border: 1px solid var(--color-surface-container-high);
-        }
-
-        .payer-col {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .exp-desc {
-          font-weight: 700;
-          font-size: 15px;
-        }
-
-        .exp-meta {
-          font-size: 12px;
-          color: var(--color-text-muted);
-        }
-
-        .amount-col {
-          font-weight: 700;
-          font-size: 16px;
-          color: var(--color-text);
-        }
-
-        /* Lightbox Fullscreen Viewer */
-        .lightbox-backdrop {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: rgba(46, 42, 40, 0.95);
-          z-index: 3000;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .lightbox-close {
-          position: absolute;
-          top: 20px;
-          right: 20px;
-          background: none;
-          border: none;
-          color: white;
-          cursor: pointer;
-        }
-
-        .lightbox-container {
-          position: relative;
-          max-width: 90vw;
-          max-height: 80vh;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-
-        .lightbox-img {
-          max-width: 100%;
-          max-height: 70vh;
-          object-fit: contain;
-          border-radius: 12px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .lightbox-top-bar {
-          position: absolute;
-          top: -60px;
-          left: 0;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          color: white;
-        }
-
-        .light-author {
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-        .light-time {
-          font-size: 11px;
-          opacity: 0.7;
-        }
-
-        .lightbox-bottom-bar {
-          margin-top: 16px;
-          display: flex;
-          gap: 20px;
-        }
-
-        .light-action-btn {
-          background: rgba(255, 255, 255, 0.15);
-          border: none;
-          color: white;
-          padding: 8px 16px;
-          border-radius: 9999px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          cursor: pointer;
-          font-weight: 700;
-          font-size: 13px;
-          font-family: var(--font-display);
-        }
-
-        .light-action-btn:hover {
-          background: rgba(255, 255, 255, 0.25);
-        }
-
-        .light-action-btn.delete-btn {
-          color: #ffb1c1;
-        }
-
-        /* Add Note Modal Custom styles */
-        .color-picker-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-top: 14px;
-        }
-
-        .picker-lbl {
-          font-size: 14px;
-          font-weight: 700;
-        }
-
-        .color-options {
-          display: flex;
-          gap: 8px;
-        }
-
-        .color-dot {
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          border: 2px solid transparent;
-          cursor: pointer;
-        }
-
-        .color-dot.note-butter { background-color: var(--tint-butter); }
-        .color-dot.note-blush { background-color: var(--tint-blush); }
-        .color-dot.note-sea { background-color: var(--tint-sea); }
-
-        .color-dot.active {
-          border-color: var(--color-text);
-        }
-
-        .modal-btn-row {
-          display: flex;
-          gap: 12px;
-          margin-top: 20px;
-        }
-
-        /* Add Expense Custom Styles */
-        .amount-input-wrapper {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          margin-bottom: 20px;
-          border-bottom: 2px solid var(--color-blush);
-          padding-bottom: 8px;
-        }
-
-        .currency-lbl {
-          font-size: 32px;
-          font-weight: 700;
-          color: var(--color-blush);
-        }
-
-        .giant-amount-input {
-          font-size: 40px;
-          font-weight: 700;
-          border: none;
-          background: transparent;
-          width: 150px;
-          text-align: center;
-          outline: none;
-          font-family: var(--font-display);
-        }
-
-        .payer-field {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          margin-bottom: 16px;
-        }
-
-        .payer-chips {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        .payer-chip {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          background-color: var(--color-surface-container-low);
-          padding: 6px 12px;
-          border-radius: 9999px;
-          cursor: pointer;
-          font-size: 13px;
-          font-weight: 700;
-          border: 1.5px solid transparent;
-        }
-
-        .payer-chip.active {
-          border-color: var(--color-blush);
-          background-color: var(--tint-blush);
-        }
-
-        .split-summary-badge {
-          background-color: #e5ecd6;
-          color: var(--color-matcha);
-          padding: 8px 12px;
-          border-radius: 12px;
-          font-size: 13px;
-          font-weight: 700;
-          text-align: center;
-          margin: 12px 0;
-        }
-
-        /* Bottom sheet mock upload */
-        .sheet-options {
-          display: flex;
-          gap: 16px;
-          margin: 20px 0;
-        }
-
-        .sheet-option-card {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-          background-color: var(--color-surface-container-low);
-          border-radius: 12px;
-          padding: 12px;
-          cursor: pointer;
-          transition: background 0.2s;
-        }
-
-        .sheet-option-card:hover {
-          background-color: var(--color-surface-container);
-        }
-
-        .sheet-option-card img {
-          width: 60px;
-          height: 60px;
-          object-fit: cover;
-          border-radius: 8px;
-        }
-
-        .sheet-option-card span {
-          font-size: 12px;
-          font-weight: 700;
-        }
-
-        @media (max-width: 650px) {
-          .masonry-gallery {
-            grid-template-columns: repeat(2, 1fr);
-          }
-
-          .gallery-item.span-2 {
-            grid-column: span 2;
-          }
+        .tab-content-panel {
+          padding: 0 20px;
         }
       `}</style>
     </Layout>
