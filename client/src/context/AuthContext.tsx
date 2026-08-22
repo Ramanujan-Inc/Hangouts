@@ -58,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [fetchProfile]);
 
-  const login = async (usernameOrEmail: string, password: string) => {
+  const login = useCallback(async (usernameOrEmail: string, password: string) => {
     const res = await api.post<TokenResponse>('/auth/login', {
       username_or_email: usernameOrEmail,
       password,
@@ -66,9 +66,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('hangout_token', res.access_token);
     setToken(res.access_token);
     await fetchProfile();
-  };
+  }, [fetchProfile]);
 
-  const signup = async (username: string, email: string, password: string) => {
+  const signup = useCallback(async (username: string, email: string, password: string) => {
     const res = await api.post<TokenResponse>('/auth/signup', {
       username,
       email,
@@ -77,27 +77,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('hangout_token', res.access_token);
     setToken(res.access_token);
     await fetchProfile();
-  };
+  }, [fetchProfile]);
 
-  const loginDemoUser = async () => {
+  const loginDemoUser = useCallback(async () => {
     try {
       await login('mika@example.com', 'demo123456');
     } catch {
       await signup('Mika', 'mika@example.com', 'demo123456');
     }
-  };
+  }, [login, signup]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('hangout_token');
     setToken(null);
     setUser(null);
-  };
+  }, []);
 
-  const refreshUser = async () => {
-    if (token) {
+  const refreshUser = useCallback(async () => {
+    if (localStorage.getItem('hangout_token')) {
       await fetchProfile();
     }
-  };
+  }, [fetchProfile]);
 
   return (
     <AuthContext.Provider value={{ user, token, loading, login, signup, loginDemoUser, logout, refreshUser }}>

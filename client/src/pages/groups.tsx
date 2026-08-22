@@ -249,7 +249,7 @@ export default function GroupsPage() {
                 <p className="page-subtitle">Organize hangouts with your friend circles</p>
               </div>
             </div>
-            <Button size="medium" onClick={() => setIsCreateOpen(true)}>
+            <Button size="default" onClick={() => setIsCreateOpen(true)}>
               <Plus size={18} />
               <span>Create Group</span>
             </Button>
@@ -327,13 +327,17 @@ export default function GroupsPage() {
               <Button size="small" onClick={fetchGroups}>Try Again</Button>
             </div>
           ) : groups.length === 0 ? (
-            <EmptyState
-              icon={<Users size={48} color="var(--color-tangerine)" />}
-              title="No Groups Yet"
-              description="Create a group to organize hangouts with your friend circle, share notes, and plan memories together."
-              actionLabel="Create a Group"
-              onAction={() => setIsCreateOpen(true)}
-            />
+            <div className="empty-groups-wrapper">
+              <EmptyState
+                icon={<Users size={48} color="var(--color-tangerine)" />}
+                title="No Groups Yet"
+                description="Create a group to organize hangouts with your friend circle, share notes, and plan memories together."
+                variant="card"
+              />
+              <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                <Button onClick={() => setIsCreateOpen(true)}>Create a Group</Button>
+              </div>
+            </div>
           ) : (
             <div className="groups-grid">
               {groups.map((group) => {
@@ -470,7 +474,7 @@ export default function GroupsPage() {
                     <LogOut size={16} />
                     <span>Leave Group</span>
                   </button>
-                  <Button size="medium" onClick={() => setActiveGroupDetail(null)}>
+                  <Button size="default" onClick={() => setActiveGroupDetail(null)}>
                     Done
                   </Button>
                 </div>
@@ -545,10 +549,10 @@ export default function GroupsPage() {
                 </div>
 
                 <div className="modal-actions">
-                  <Button variant="outline" size="medium" onClick={() => setIsCreateOpen(false)}>
+                  <Button variant="outline" size="default" onClick={() => setIsCreateOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" size="medium" disabled={creating || !newGroupName.trim()}>
+                  <Button type="submit" size="default" disabled={creating || !newGroupName.trim()}>
                     {creating ? 'Creating...' : 'Create Group'}
                   </Button>
                 </div>
@@ -579,7 +583,7 @@ export default function GroupsPage() {
                 <div className="modal-actions">
                   <Button
                     variant="outline"
-                    size="medium"
+                    size="default"
                     onClick={() => {
                       setIsInviteOpen(false)
                       setSelectedGroup(null)
@@ -587,7 +591,7 @@ export default function GroupsPage() {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" size="medium" disabled={inviting || !inviteUsername.trim()}>
+                  <Button type="submit" size="default" disabled={inviting || !inviteUsername.trim()}>
                     {inviting ? 'Inviting...' : 'Send Invite'}
                   </Button>
                 </div>
