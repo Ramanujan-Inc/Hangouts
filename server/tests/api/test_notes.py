@@ -234,3 +234,33 @@ def test_note_not_found_and_invalid_hangout(authenticated_client: TestClient):
     # Delete nonexistent note
     res = authenticated_client.delete(f"/api/v1/notes/{fake_uuid}")
     assert res.status_code == 404
+
+
+def test_create_and_update_note_color(
+    authenticated_client: TestClient,
+    primary_user: Dict[str, Any],
+):
+    """Test specifying note color on creation and updating it."""
+    hangout_id = _create_test_hangout(authenticated_client)
+
+    # 1. Create with matcha color
+    create_res = authenticated_client.post(
+        f"/api/v1/hangouts/{hangout_id}/notes",
+        json={
+            "content": "Green matcha note",
+            "color": "matcha",
+            "is_shared": True,
+        },
+    )
+    assert create_res.status_code == 201
+    note_data = create_res.json()
+    assert note_data["color"] == "matcha"
+    note_id = note_data["id"]
+
+    # 2. Update color to sea
+    update_res = authenticated_client.patch(
+        f"/api/v1/notes/{note_id}",
+        json={"color": "sea"},
+    )
+    assert update_res.status_code == 200
+    assert update_res.json()["color"] == "sea"

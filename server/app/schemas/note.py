@@ -7,6 +7,7 @@ from app.schemas.profile import ProfileResponse
 
 class NoteBase(BaseModel):
     content: str
+    color: str = "butter"
     is_shared: bool = True
 
 
@@ -16,6 +17,7 @@ class NoteCreate(NoteBase):
 
 class NoteUpdate(BaseModel):
     content: Optional[str] = None
+    color: Optional[str] = None
     is_shared: Optional[bool] = None
 
 

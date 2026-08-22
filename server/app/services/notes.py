@@ -22,6 +22,7 @@ def create_note(
         "hangout_id": hangout_id,
         "created_by": user_id,
         "content": note_create.content,
+        "color": note_create.color or "butter",
         "is_shared": note_create.is_shared,
         "created_at": now,
         "updated_at": now,
@@ -111,6 +112,8 @@ def update_note(
     update_dict: Dict[str, Any] = {}
     if note_update.content is not None:
         update_dict["content"] = note_update.content
+    if note_update.color is not None:
+        update_dict["color"] = note_update.color
     if note_update.is_shared is not None:
         update_dict["is_shared"] = note_update.is_shared
 
