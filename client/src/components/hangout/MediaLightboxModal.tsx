@@ -21,8 +21,9 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
 }) => {
   if (!activeMedia) return null
 
-  const isFavorited = (activeMedia.favoritedBy || []).includes(currentUserId)
-  const isUploader = activeMedia.uploadedBy === currentUserId
+  const isFavorited = Boolean(activeMedia.is_favorited)
+  const isUploader = String(activeMedia.uploaded_by) === String(currentUserId)
+  const uploaderName = activeMedia.uploader?.username || activeMedia.uploaded_by || 'Member'
 
   return (
     <div className="lightbox-backdrop" role="dialog" aria-modal="true">
@@ -36,7 +37,7 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
       </button>
 
       <div className="lightbox-container">
-        {activeMedia.mediaType === 'video' ? (
+        {activeMedia.media_type === 'video' ? (
           <video
             src={activeMedia.url}
             controls
@@ -44,18 +45,20 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
             className="lightbox-img"
           />
         ) : (
-          <img src={activeMedia.url} alt="Lightbox View" className="lightbox-img" />
+          <img src={activeMedia.url} alt={activeMedia.caption || 'Lightbox View'} className="lightbox-img" />
         )}
 
         {/* Top Info Bar */}
         <div className="lightbox-top-bar">
-          <MemberAvatar memberId={activeMedia.uploadedBy} size={32} />
+          <MemberAvatar profile={activeMedia.uploader} memberId={activeMedia.uploaded_by} size={32} />
           <div>
             <div className="light-author">
-              Uploaded by {members[activeMedia.uploadedBy]?.name || activeMedia.uploadedBy}
+              Uploaded by {uploaderName}
             </div>
             <div className="light-time">
-              {activeMedia.mediaType === 'video' ? 'Video' : 'Photo'}
+              {activeMedia.media_type === 'video' ? 'Video' : 'Photo'}
+              {activeMedia.caption ? ` • ${activeMedia.caption}` : ''}
+              {!activeMedia.is_shared ? ' • 🔒 Private' : ''}
             </div>
           </div>
         </div>
@@ -73,7 +76,7 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
               color={isFavorited ? '#ff6b6b' : 'white'}
             />
             <span>
-              {activeMedia.likes} {activeMedia.likes === 1 ? 'Favorite' : 'Favorites'}
+              {activeMedia.favorites_count || 0} {(activeMedia.favorites_count === 1) ? 'Favorite' : 'Favorites'}
             </span>
           </button>
 

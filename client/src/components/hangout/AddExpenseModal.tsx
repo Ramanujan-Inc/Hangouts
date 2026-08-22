@@ -1,52 +1,61 @@
 import React, { useState } from 'react'
 import { Modal, TextField, Button, Badge } from '../ui'
 import MemberAvatar from '../MemberAvatar'
-import { members } from '../../data/mock'
+import { HangoutParticipant } from './types'
 
 interface AddExpenseModalProps {
   isOpen: boolean
+  isSubmitting?: boolean
   onClose: () => void
-  participants: string[]
+  participants: (HangoutParticipant | { user_id: string; profile?: any })[]
+  currentUserId?: string
   onAddExpense: (
     amount: number,
-    desc: string,
+    description: string,
     paidBy: string,
-    splitWith: string[]
-  ) => void
+    splitType: 'equal' | 'personal'
+  ) => Promise<void> | void
 }
 
 export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   isOpen,
+  isSubmitting = false,
   onClose,
   participants,
+  currentUserId,
   onAddExpense,
 }) => {
+  const defaultPayer =
+    currentUserId || (participants[0] ? participants[0].user_id : '')
+
   const [expAmount, setExpAmount] = useState('')
   const [expDesc, setExpDesc] = useState('')
-  const [expPaidBy, setExpPaidBy] = useState(participants[0] || 'mika')
-  const [expSplitWith, setExpSplitWith] = useState<string[]>(participants)
+  const [expPaidBy, setExpPaidBy] = useState(defaultPayer)
+  const [splitType, setSplitType] = useState<'equal' | 'personal'>('equal')
 
   if (!isOpen) return null
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const amt = parseFloat(expAmount)
-    if (isNaN(amt) || amt <= 0 || !expDesc.trim()) return
+    if (isNaN(amt) || amt <= 0 || !expDesc.trim() || !expPaidBy) return
 
-    onAddExpense(amt, expDesc.trim(), expPaidBy, expSplitWith)
+    await onAddExpense(amt, expDesc.trim(), expPaidBy, splitType)
     setExpAmount('')
     setExpDesc('')
+    setSplitType('equal')
     onClose()
   }
 
   const parsedAmount = parseFloat(expAmount)
+  const participantCount = Math.max(participants.length, 1)
   const perPersonShare =
-    !isNaN(parsedAmount) && parsedAmount > 0 && expSplitWith.length > 0
-      ? Math.round(parsedAmount / expSplitWith.length)
+    !isNaN(parsedAmount) && parsedAmount > 0
+      ? Math.round((parsedAmount / participantCount) * 100) / 100
       : null
 
   return (
-    <Modal onClose={onClose} title="Log a Group Expense">
+    <Modal onClose={onClose} title="Log a Hangout Expense">
       <form onSubmit={handleSubmit} className="expense-modal-form">
         {/* Oversized Amount Field */}
         <div className="amount-input-wrapper">
@@ -66,7 +75,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         <TextField
           label="What was this for?"
           required
-          placeholder="e.g. Ramen Bowls"
+          placeholder="e.g. Ramen Bowls, Drinks, Groceries"
           value={expDesc}
           onChange={(e) => setExpDesc(e.target.value)}
         />
@@ -74,35 +83,63 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         <div className="payer-field">
           <label className="field-label">Paid by:</label>
           <div className="payer-chips">
-            {participants.map((p) => (
-              <div
-                key={p}
-                className={`payer-chip ${expPaidBy === p ? 'active' : ''}`}
-                onClick={() => setExpPaidBy(p)}
-                role="button"
-                tabIndex={0}
-              >
-                <MemberAvatar memberId={p} size={20} />
-                <span>{members[p]?.name || p}</span>
-              </div>
-            ))}
+            {participants.map((p) => {
+              const uid = p.user_id
+              const uname = p.profile?.username || uid
+              const isSelected = expPaidBy === uid
+
+              return (
+                <div
+                  key={uid}
+                  className={`payer-chip ${isSelected ? 'active' : ''}`}
+                  onClick={() => setExpPaidBy(uid)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <MemberAvatar profile={p.profile} memberId={uid} size={20} />
+                  <span>{uname}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="split-type-field">
+          <label className="field-label">Split Type:</label>
+          <div className="split-buttons">
+            <button
+              type="button"
+              className={`split-pill-btn ${splitType === 'equal' ? 'active' : ''}`}
+              onClick={() => setSplitType('equal')}
+            >
+              Equal Split ({participantCount} people)
+            </button>
+            <button
+              type="button"
+              className={`split-pill-btn ${splitType === 'personal' ? 'active' : ''}`}
+              onClick={() => setSplitType('personal')}
+            >
+              Personal Expense
+            </button>
           </div>
         </div>
 
         {/* Dynamic Splits Indicator */}
-        {perPersonShare !== null && (
+        {splitType === 'equal' && perPersonShare !== null && (
           <div className="split-badge-wrapper">
             <Badge variant="surface" size="md">
-              Split equally — ₱{perPersonShare} each
+              Split equally — ₱{perPersonShare.toLocaleString()} each ({participantCount} members)
             </Badge>
           </div>
         )}
 
         <div className="modal-btn-row">
-          <Button variant="outline" onClick={onClose} type="button">
+          <Button variant="outline" onClick={onClose} type="button" disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit">Save Expense</Button>
+          <Button type="submit" disabled={!expAmount || !expDesc.trim() || isSubmitting}>
+            {isSubmitting ? 'Saving...' : 'Save Expense'}
+          </Button>
         </div>
       </form>
 
@@ -181,6 +218,36 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
         .payer-chip.active {
           background-color: var(--tint-blush);
+          border-color: var(--color-blush);
+          color: var(--color-blush);
+        }
+
+        .split-type-field {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .split-buttons {
+          display: flex;
+          gap: 8px;
+        }
+
+        .split-pill-btn {
+          flex: 1;
+          padding: 8px 12px;
+          border-radius: 10px;
+          border: 1px solid var(--color-surface-container-high);
+          background-color: var(--color-surface-container-low);
+          color: var(--color-text-muted);
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        .split-pill-btn.active {
+          background-color: var(--color-surface-container);
           border-color: var(--color-blush);
           color: var(--color-blush);
         }

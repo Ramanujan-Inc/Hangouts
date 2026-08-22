@@ -1,18 +1,20 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import Layout from '../../components/Layout'
+import { ProtectedRoute } from '../../components/ProtectedRoute'
+import { useAuth } from '../../context/AuthContext'
 import { Smile, Film, FileText, DollarSign } from 'lucide-react'
-import { hangoutById } from '../../data/mock'
 import { api } from '../../lib/api'
-import { SegmentedTabs } from '../../components/ui'
+import { SegmentedTabs, Spinner } from '../../components/ui'
 import {
   HangoutTab,
+  HangoutDetailData,
   HangoutMedia,
   HangoutNote,
   HangoutExpense,
-  DebtSettlement,
+  ExpenseSummary,
   HangoutHeroHeader,
   OverviewTab,
   MediaGalleryTab,
@@ -22,223 +24,302 @@ import {
   AddNoteModal,
   ExpensesTab,
   AddExpenseModal,
+  NoteType,
 } from '../../components/hangout'
 
-export default function HangoutDetail() {
+export default function HangoutDetailPage() {
+  return (
+    <ProtectedRoute>
+      <HangoutDetailContent />
+    </ProtectedRoute>
+  )
+}
+
+function HangoutDetailContent() {
   const router = useRouter()
   const { id } = router.query
-  const hangoutId = (Array.isArray(id) ? id[0] : id) || '1'
-  const mockData = hangoutById(hangoutId)
+  const hangoutId = Array.isArray(id) ? id[0] : id
+  const { user } = useAuth()
 
   const [activeTab, setActiveTab] = useState<HangoutTab>('overview')
-  const [data, setData] = useState<any>(mockData)
-  const [rating, setRating] = useState(mockData?.rating || 4)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function loadHangout() {
-      if (!hangoutId) return
-      try {
-        const res = await api.get<any>(`/hangouts/${hangoutId}`)
-        if (res) {
-          const participantNames = res.participants && res.participants.length > 0
-            ? res.participants.map((p: any) => p.profile?.username || p.user_id)
-            : mockData?.participants || ['mika']
-
-          setData({
-            id: res.id,
-            title: res.title,
-            description: res.description || mockData?.description || '',
-            date: res.hangout_date || mockData?.date || '2026-08-22',
-            location: res.location_name || mockData?.location || 'No location set',
-            formattedAddress: res.formatted_address,
-            placeId: res.place_id,
-            latitude: res.latitude,
-            longitude: res.longitude,
-            coverImage: res.cover_photo_url || mockData?.coverImage || 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=500&auto=format&fit=crop&q=60',
-            participants: participantNames,
-            rating: mockData?.rating || 4,
-            media: mockData?.media || [],
-            notes: mockData?.notes || [],
-            expenses: mockData?.expenses || [],
-          })
-        }
-      } catch (err) {
-        console.warn('Failed to load API hangout, falling back to mock:', err)
-      }
-    }
-    loadHangout()
-  }, [hangoutId])
+  // Live Data States
+  const [hangout, setHangout] = useState<HangoutDetailData | null>(null)
+  const [rating, setRating] = useState<number>(4)
 
   // Media states
-  const [media, setMedia] = useState<HangoutMedia[]>(data?.media || data?.photos || [])
+  const [media, setMedia] = useState<HangoutMedia[]>([])
   const [activeMedia, setActiveMedia] = useState<HangoutMedia | null>(null)
   const [showUploadMenu, setShowUploadMenu] = useState(false)
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false)
   const [mediaFilter, setMediaFilter] = useState<'all' | 'favorites' | 'videos'>('all')
 
   // Notes states
-  const [notes, setNotes] = useState<HangoutNote[]>(data?.notes || [])
+  const [notes, setNotes] = useState<HangoutNote[]>([])
   const [showAddNote, setShowAddNote] = useState(false)
+  const [isSubmittingNote, setIsSubmittingNote] = useState(false)
 
   // Expenses states
-  const [expenses, setExpenses] = useState<HangoutExpense[]>(data?.expenses || [])
+  const [expenses, setExpenses] = useState<HangoutExpense[]>([])
+  const [expenseSummary, setExpenseSummary] = useState<ExpenseSummary | null>(null)
   const [showAddExpense, setShowAddExpense] = useState(false)
+  const [isSubmittingExpense, setIsSubmittingExpense] = useState(false)
 
-  if (!data) {
+  // Fetch all live data for hangout
+  const loadHangoutData = useCallback(async () => {
+    if (!hangoutId) return
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Fetch hangout details
+      const hangoutRes = await api.get<HangoutDetailData>(`/hangouts/${hangoutId}`)
+      setHangout(hangoutRes)
+
+      // Parallel fetch for tabs: ratings, media, notes, expenses, summary
+      const [ratingRes, mediaRes, notesRes, expensesRes, summaryRes] = await Promise.allSettled([
+        api.get<{ rating: number } | null>(`/hangouts/${hangoutId}/ratings`),
+        api.get<HangoutMedia[]>(`/hangouts/${hangoutId}/media`),
+        api.get<HangoutNote[]>(`/hangouts/${hangoutId}/notes`),
+        api.get<HangoutExpense[]>(`/hangouts/${hangoutId}/expenses`),
+        api.get<ExpenseSummary>(`/hangouts/${hangoutId}/expenses/summary`),
+      ])
+
+      if (ratingRes.status === 'fulfilled' && ratingRes.value) {
+        setRating(ratingRes.value.rating || 4)
+      }
+
+      if (mediaRes.status === 'fulfilled' && mediaRes.value) {
+        setMedia(mediaRes.value)
+      }
+
+      if (notesRes.status === 'fulfilled' && notesRes.value) {
+        setNotes(notesRes.value)
+      }
+
+      if (expensesRes.status === 'fulfilled' && expensesRes.value) {
+        setExpenses(expensesRes.value)
+      }
+
+      if (summaryRes.status === 'fulfilled' && summaryRes.value) {
+        setExpenseSummary(summaryRes.value)
+      }
+    } catch (err: any) {
+      console.error('Failed to load hangout details:', err)
+      setError(err.message || 'Failed to load hangout.')
+    } finally {
+      setLoading(false)
+    }
+  }, [hangoutId])
+
+  useEffect(() => {
+    loadHangoutData()
+  }, [loadHangoutData])
+
+  // Overview Tab Rating Handler
+  const handleRatingChange = async (newRating: number) => {
+    setRating(newRating)
+    if (!hangoutId) return
+    try {
+      await api.post(`/hangouts/${hangoutId}/ratings`, { rating: newRating })
+    } catch (err) {
+      console.error('Failed to save rating:', err)
+    }
+  }
+
+  // Media Tab Handlers
+  const handleUploadMedia = async (
+    items: { file: File; caption?: string }[],
+    isShared: boolean = true
+  ) => {
+    if (!hangoutId || items.length === 0) return
+    try {
+      setIsUploadingMedia(true)
+      const formData = new FormData()
+      items.forEach((item) => {
+        formData.append('files', item.file)
+      })
+      const captionsList = items.map((item) => item.caption || '')
+      formData.append('captions_json', JSON.stringify(captionsList))
+      formData.append('is_shared', String(isShared))
+
+      const uploadedItems = await api.upload<HangoutMedia[]>(`/hangouts/${hangoutId}/media/bulk`, formData)
+      const newItems = Array.isArray(uploadedItems) ? uploadedItems : [uploadedItems]
+      setMedia((prev) => [...newItems, ...prev])
+      setShowUploadMenu(false)
+    } catch (err: any) {
+      console.error('Failed to upload media:', err)
+      throw err
+    } finally {
+      setIsUploadingMedia(false)
+    }
+  }
+
+  const handleToggleFavorite = async (mediaId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    const target = media.find((m) => m.id === mediaId)
+    if (!target) return
+
+    const wasFavorited = Boolean(target.is_favorited)
+    const newFavorited = !wasFavorited
+    const newCount = newFavorited
+      ? (target.favorites_count || 0) + 1
+      : Math.max((target.favorites_count || 0) - 1, 0)
+
+    // Optimistic UI update
+    setMedia((prev) =>
+      prev.map((m) =>
+        m.id === mediaId
+          ? { ...m, is_favorited: newFavorited, favorites_count: newCount }
+          : m
+      )
+    )
+
+    if (activeMedia?.id === mediaId) {
+      setActiveMedia((prev) =>
+        prev
+          ? { ...prev, is_favorited: newFavorited, favorites_count: newCount }
+          : null
+      )
+    }
+
+    try {
+      if (newFavorited) {
+        await api.post(`/media/${mediaId}/favorite`)
+      } else {
+        await api.delete(`/media/${mediaId}/favorite`)
+      }
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err)
+      // Revert on error
+      setMedia((prev) =>
+        prev.map((m) =>
+          m.id === mediaId
+            ? { ...m, is_favorited: wasFavorited, favorites_count: target.favorites_count }
+            : m
+        )
+      )
+    }
+  }
+
+  const handleDeleteMedia = async (mediaId: string) => {
+    try {
+      await api.delete(`/media/${mediaId}`)
+      setMedia((prev) => prev.filter((m) => m.id !== mediaId))
+      setActiveMedia(null)
+    } catch (err) {
+      console.error('Failed to delete media:', err)
+    }
+  }
+
+  // Notes Tab Handlers
+  const handleAddNote = async (text: string, isShared: boolean, type: NoteType) => {
+    if (!hangoutId) return
+    try {
+      setIsSubmittingNote(true)
+      const newNote = await api.post<HangoutNote>(`/hangouts/${hangoutId}/notes`, {
+        content: text,
+        color: type,
+        is_shared: isShared,
+      })
+      newNote.color = newNote.color || type
+      setNotes((prev) => [newNote, ...prev])
+      setShowAddNote(false)
+    } catch (err) {
+      console.error('Failed to add note:', err)
+    } finally {
+      setIsSubmittingNote(false)
+    }
+  }
+
+  const handleDeleteNote = async (noteId: string) => {
+    try {
+      await api.delete(`/notes/${noteId}`)
+      setNotes((prev) => prev.filter((n) => n.id !== noteId))
+    } catch (err) {
+      console.error('Failed to delete note:', err)
+    }
+  }
+
+  // Expenses Tab Handlers
+  const handleAddExpense = async (
+    amount: number,
+    description: string,
+    paidBy: string,
+    splitType: 'equal' | 'personal'
+  ) => {
+    if (!hangoutId) return
+    try {
+      setIsSubmittingExpense(true)
+      const newExp = await api.post<HangoutExpense>(`/hangouts/${hangoutId}/expenses`, {
+        description,
+        total_amount: amount,
+        split_type: splitType,
+        paid_by: paidBy,
+      })
+
+      // Refresh expenses and settlement summary
+      const [updatedExpenses, updatedSummary] = await Promise.all([
+        api.get<HangoutExpense[]>(`/hangouts/${hangoutId}/expenses`),
+        api.get<ExpenseSummary>(`/hangouts/${hangoutId}/expenses/summary`),
+      ])
+
+      setExpenses(updatedExpenses || [newExp, ...expenses])
+      if (updatedSummary) {
+        setExpenseSummary(updatedSummary)
+      }
+      setShowAddExpense(false)
+    } catch (err) {
+      console.error('Failed to create expense:', err)
+    } finally {
+      setIsSubmittingExpense(false)
+    }
+  }
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    if (!hangoutId) return
+    try {
+      await api.delete(`/expenses/${expenseId}`)
+      setExpenses((prev) => prev.filter((e) => e.id !== expenseId))
+      const updatedSummary = await api.get<ExpenseSummary>(`/hangouts/${hangoutId}/expenses/summary`)
+      if (updatedSummary) {
+        setExpenseSummary(updatedSummary)
+      }
+    } catch (err) {
+      console.error('Failed to delete expense:', err)
+    }
+  }
+
+  if (loading) {
     return (
       <Layout>
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <h3>Hangout not found</h3>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+          <Spinner size="lg" />
+        </div>
+      </Layout>
+    )
+  }
+
+  if (error || !hangout) {
+    return (
+      <Layout>
+        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <h3>{error || 'Hangout not found'}</h3>
+          <p style={{ color: 'var(--color-text-muted)', marginBottom: '20px' }}>
+            We could not find the hangout you were looking for.
+          </p>
           <Link href="/timeline" style={{ color: 'var(--color-blush)', fontWeight: 700 }}>
-            Go back to Timeline
+            ← Go back to Timeline
           </Link>
         </div>
       </Layout>
     )
   }
 
-  const currentUserId = 'mika'
-
-  // Expense calculations
-  const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0)
-
-  const computeBalances = (): Record<string, number> => {
-    const spends: Record<string, number> = {}
-    data.participants.forEach((p) => {
-      spends[p] = 0
-    })
-
-    expenses.forEach((exp) => {
-      const payer = exp.paidBy
-      const splitCount = exp.splitWith.length
-      if (splitCount === 0) return
-
-      const share = exp.amount / splitCount
-      data.participants.forEach((p) => {
-        if (exp.splitWith.includes(p)) {
-          if (p === payer) {
-            spends[p] += exp.amount - share
-          } else {
-            spends[p] -= share
-          }
-        }
-      })
-    })
-
-    return spends
-  }
-
-  const balances = computeBalances()
-
-  const getOwesWhomList = (): DebtSettlement[] => {
-    const list: DebtSettlement[] = []
-    const sortedBalances = Object.entries(balances).map(([user, bal]) => ({ user, bal }))
-
-    const debtors = sortedBalances
-      .filter((x) => x.bal < 0)
-      .map((x) => ({ ...x, bal: Math.abs(x.bal) }))
-    const creditors = sortedBalances.filter((x) => x.bal > 0)
-
-    let dIdx = 0
-    let cIdx = 0
-
-    while (dIdx < debtors.length && cIdx < creditors.length) {
-      const debtor = debtors[dIdx]
-      const creditor = creditors[cIdx]
-      const min = Math.min(debtor.bal, creditor.bal)
-
-      if (min > 1) {
-        list.push({ from: debtor.user, to: creditor.user, amount: Math.round(min) })
-      }
-
-      debtor.bal -= min
-      creditor.bal -= min
-
-      if (debtor.bal < 1) dIdx++
-      if (creditor.bal < 1) cIdx++
-    }
-
-    return list
-  }
-
-  const debtsList = getOwesWhomList()
-
-  // Media handlers
-  const handleToggleFavorite = (mediaId: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation()
-    setMedia(
-      media.map((m) => {
-        if (m.id !== mediaId) return m
-        const favoritedByList = m.favoritedBy || []
-        const isAlreadyFavorited = favoritedByList.includes(currentUserId)
-        const newFavoritedBy = isAlreadyFavorited
-          ? favoritedByList.filter((uid) => uid !== currentUserId)
-          : [...favoritedByList, currentUserId]
-        const newLikes = isAlreadyFavorited ? Math.max(0, m.likes - 1) : m.likes + 1
-        return { ...m, favoritedBy: newFavoritedBy, likes: newLikes }
-      })
-    )
-    if (activeMedia?.id === mediaId) {
-      const favoritedByList = activeMedia.favoritedBy || []
-      const isAlreadyFavorited = favoritedByList.includes(currentUserId)
-      const newFavoritedBy = isAlreadyFavorited
-        ? favoritedByList.filter((uid) => uid !== currentUserId)
-        : [...favoritedByList, currentUserId]
-      const newLikes = isAlreadyFavorited
-        ? Math.max(0, activeMedia.likes - 1)
-        : activeMedia.likes + 1
-      setActiveMedia({ ...activeMedia, favoritedBy: newFavoritedBy, likes: newLikes })
-    }
-  }
-
-  const handleDeleteMedia = (mediaId: string) => {
-    setMedia(media.filter((m) => m.id !== mediaId))
-    setActiveMedia(null)
-  }
-
-  const handleMockUpload = (url: string, type: 'photo' | 'video' = 'photo') => {
-    const newMediaItem: HangoutMedia = {
-      id: `m-${Date.now()}`,
-      url,
-      uploadedBy: 'mika',
-      likes: 0,
-      span: Math.random() > 0.5 ? 2 : 1,
-      mediaType: type,
-      favoritedBy: [],
-    }
-    setMedia([...media, newMediaItem])
-    setShowUploadMenu(false)
-  }
-
-  // Note handlers
-  const handleAddNote = (text: string, type: 'butter' | 'blush' | 'sea') => {
-    const newNote: HangoutNote = {
-      id: `n-${Date.now()}`,
-      author: 'mika',
-      text,
-      time: 'Just now',
-      type,
-      rotation: Math.random() * 3 - 1.5,
-    }
-    setNotes([newNote, ...notes])
-  }
-
-  // Expense handlers
-  const handleAddExpense = (
-    amount: number,
-    desc: string,
-    paidBy: string,
-    splitWith: string[]
-  ) => {
-    const newExp: HangoutExpense = {
-      id: `e-${Date.now()}`,
-      desc,
-      amount,
-      paidBy,
-      splitWith,
-      category: 'General',
-    }
-    setExpenses([...expenses, newExp])
-  }
+  const currentUserId = user?.id || ''
+  const participantsList = hangout.participants || []
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: <Smile size={16} /> },
@@ -250,21 +331,21 @@ export default function HangoutDetail() {
   return (
     <Layout>
       <Head>
-        <title>{data.title} | Hangout</title>
+        <title>{hangout.title} | Hangout</title>
       </Head>
 
       <div className="hangout-detail-page">
         {/* Cover Image Banner & Title Block */}
         <HangoutHeroHeader
-          title={data.title}
-          coverImage={data.coverImage}
-          date={data.date}
-          location={data.location}
-          formattedAddress={data.formattedAddress}
-          latitude={data.latitude}
-          longitude={data.longitude}
-          placeId={data.placeId}
-          participants={data.participants}
+          title={hangout.title}
+          coverImage={hangout.cover_photo_url || 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=500&auto=format&fit=crop&q=60'}
+          date={hangout.hangout_date}
+          location={hangout.location_name || 'No location set'}
+          formattedAddress={hangout.formatted_address || undefined}
+          latitude={hangout.latitude ?? undefined}
+          longitude={hangout.longitude ?? undefined}
+          placeId={hangout.place_id || undefined}
+          participants={participantsList}
           onBack={() => router.push('/timeline')}
         />
 
@@ -281,10 +362,16 @@ export default function HangoutDetail() {
         <div className="tab-content-panel">
           {activeTab === 'overview' && (
             <OverviewTab
-              description={data.description}
-              location={data.location}
+              title={hangout.title}
+              description={hangout.description}
+              location={hangout.location_name || 'No location set'}
+              formattedAddress={hangout.formatted_address}
+              latitude={hangout.latitude}
+              longitude={hangout.longitude}
+              placeId={hangout.place_id}
+              coverPhotoUrl={hangout.cover_photo_url}
               rating={rating}
-              onRatingChange={setRating}
+              onRatingChange={handleRatingChange}
             />
           )}
 
@@ -301,16 +388,22 @@ export default function HangoutDetail() {
           )}
 
           {activeTab === 'notes' && (
-            <NotesTab notes={notes} onOpenAddNote={() => setShowAddNote(true)} />
+            <NotesTab
+              notes={notes}
+              currentUserId={currentUserId}
+              onOpenAddNote={() => setShowAddNote(true)}
+              onDeleteNote={handleDeleteNote}
+            />
           )}
 
           {activeTab === 'expenses' && (
             <ExpensesTab
               expenses={expenses}
-              balances={balances}
-              debtsList={debtsList}
-              totalSpent={totalSpent}
+              summary={expenseSummary}
+              currentUserId={currentUserId}
+              creatorId={hangout.created_by}
               onOpenAddExpense={() => setShowAddExpense(true)}
+              onDeleteExpense={handleDeleteExpense}
             />
           )}
         </div>
@@ -324,16 +417,18 @@ export default function HangoutDetail() {
           onDeleteMedia={handleDeleteMedia}
         />
 
-        {/* Mock Upload Menu */}
+        {/* Dropzone Media Upload Menu */}
         <MediaUploadSheet
           isOpen={showUploadMenu}
+          isUploading={isUploadingMedia}
           onClose={() => setShowUploadMenu(false)}
-          onMockUpload={handleMockUpload}
+          onUpload={handleUploadMedia}
         />
 
         {/* Add Note Modal */}
         <AddNoteModal
           isOpen={showAddNote}
+          isSubmitting={isSubmittingNote}
           onClose={() => setShowAddNote(false)}
           onAddNote={handleAddNote}
         />
@@ -341,8 +436,10 @@ export default function HangoutDetail() {
         {/* Add Expense Modal */}
         <AddExpenseModal
           isOpen={showAddExpense}
+          isSubmitting={isSubmittingExpense}
           onClose={() => setShowAddExpense(false)}
-          participants={data.participants}
+          participants={participantsList}
+          currentUserId={currentUserId}
           onAddExpense={handleAddExpense}
         />
       </div>

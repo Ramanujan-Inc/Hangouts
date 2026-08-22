@@ -9,6 +9,7 @@ interface PhotoUploaderSectionProps {
   onPhotoSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
   onSelectCover: (index: number) => void
   onRemovePhoto: (index: number, e: React.MouseEvent) => void
+  onCaptionChange?: (index: number, caption: string) => void
 }
 
 export const PhotoUploaderSection: React.FC<PhotoUploaderSectionProps> = ({
@@ -17,6 +18,7 @@ export const PhotoUploaderSection: React.FC<PhotoUploaderSectionProps> = ({
   onPhotoSelect,
   onSelectCover,
   onRemovePhoto,
+  onCaptionChange,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -124,6 +126,19 @@ export const PhotoUploaderSection: React.FC<PhotoUploaderSectionProps> = ({
               <span>Add</span>
             </div>
           </div>
+
+          {/* Caption Input for Selected Picture */}
+          {selectedCoverIndex >= 0 && uploadedPhotos[selectedCoverIndex] && onCaptionChange && (
+            <div className="photo-caption-row">
+              <input
+                type="text"
+                className="photo-caption-input"
+                placeholder={`Add caption for photo #${selectedCoverIndex + 1} (optional)...`}
+                value={uploadedPhotos[selectedCoverIndex].caption || ''}
+                onChange={(e) => onCaptionChange(selectedCoverIndex, e.target.value)}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -307,6 +322,33 @@ export const PhotoUploaderSection: React.FC<PhotoUploaderSectionProps> = ({
         .add-more-card:hover {
           border-color: var(--color-blush);
           color: var(--color-blush);
+        }
+
+        .photo-caption-row {
+          margin-top: 10px;
+        }
+
+        .photo-caption-input {
+          width: 100%;
+          padding: 8px 14px;
+          border-radius: 12px;
+          border: 1px solid var(--color-surface-container-high);
+          background-color: var(--color-surface-container-low);
+          color: var(--color-text);
+          font-size: 13px;
+          outline: none;
+          transition: border-color 0.15s, background-color 0.15s;
+          box-sizing: border-box;
+        }
+
+        .photo-caption-input:focus {
+          border-color: var(--color-blush);
+          background-color: var(--color-surface-container);
+        }
+
+        .photo-caption-input::placeholder {
+          color: var(--color-text-muted);
+          font-size: 12px;
         }
       `}</style>
     </div>

@@ -7,16 +7,7 @@ import { MapPin, Calendar, ArrowRight, ChevronDown, RefreshCw } from 'lucide-rea
 import { mapPins, hangoutById } from '../data/mock'
 import { formatDate } from '../lib/format'
 import { api } from '../lib/api'
-
-interface HangoutPin {
-  id: string
-  title: string
-  location_name?: string
-  latitude: number
-  longitude: number
-  hangout_date: string
-  cover_photo_url?: string
-}
+import { HangoutPin } from '../components/MapComponent'
 
 // Dynamically import OpenStreetMap Leaflet component (No SSR for Leaflet)
 const MapComponent = dynamic(() => import('../components/MapComponent'), {

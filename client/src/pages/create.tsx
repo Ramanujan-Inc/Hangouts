@@ -159,6 +159,12 @@ export default function CreateHangout() {
     })
   }
 
+  const handleCaptionChange = (index: number, caption: string) => {
+    setUploadedPhotos((prev) =>
+      prev.map((photo, idx) => (idx === index ? { ...photo, caption } : photo))
+    )
+  }
+
   // Attendees handlers
   const activeMembersList = selectedGroupId
     ? groupMembers
@@ -254,15 +260,15 @@ export default function CreateHangout() {
 
       // 3. Upload attached photos into hangout media album
       if (uploadedPhotos.length > 0) {
-        for (const photo of uploadedPhotos) {
-          try {
-            const mediaForm = new FormData()
-            mediaForm.append('file', photo.file)
-            mediaForm.append('is_shared', 'true')
-            await api.post(`/hangouts/${hangoutId}/media`, mediaForm)
-          } catch (uploadErr) {
-            console.warn('Failed to upload media item:', uploadErr)
-          }
+        try {
+          const mediaForm = new FormData()
+          uploadedPhotos.forEach((photo) => mediaForm.append('files', photo.file))
+          const captionsList = uploadedPhotos.map((p) => p.caption || '')
+          mediaForm.append('captions_json', JSON.stringify(captionsList))
+          mediaForm.append('is_shared', 'true')
+          await api.post(`/hangouts/${hangoutId}/media/bulk`, mediaForm)
+        } catch (uploadErr) {
+          console.warn('Failed to bulk upload media items:', uploadErr)
         }
       }
 
@@ -317,6 +323,7 @@ export default function CreateHangout() {
               onPhotoSelect={handlePhotoSelect}
               onSelectCover={(idx) => setSelectedCoverIndex(idx)}
               onRemovePhoto={handleRemovePhoto}
+              onCaptionChange={handleCaptionChange}
             />
 
             {/* Form Fields */}

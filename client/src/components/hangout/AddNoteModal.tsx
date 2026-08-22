@@ -1,20 +1,24 @@
 import React, { useState } from 'react'
+import { Globe, Lock } from 'lucide-react'
 import { Modal, TextArea, Button } from '../ui'
 import { NoteType } from './types'
 
 interface AddNoteModalProps {
   isOpen: boolean
+  isSubmitting?: boolean
   onClose: () => void
-  onAddNote: (text: string, type: NoteType) => void
+  onAddNote: (text: string, isShared: boolean, type: NoteType) => void
 }
 
 export const AddNoteModal: React.FC<AddNoteModalProps> = ({
   isOpen,
+  isSubmitting = false,
   onClose,
   onAddNote,
 }) => {
   const [newNoteText, setNewNoteText] = useState('')
   const [newNoteType, setNewNoteType] = useState<NoteType>('butter')
+  const [isShared, setIsShared] = useState(true)
 
   if (!isOpen) return null
 
@@ -22,9 +26,10 @@ export const AddNoteModal: React.FC<AddNoteModalProps> = ({
     e.preventDefault()
     if (!newNoteText.trim()) return
 
-    onAddNote(newNoteText.trim(), newNoteType)
+    onAddNote(newNoteText.trim(), isShared, newNoteType)
     setNewNoteText('')
     setNewNoteType('butter')
+    setIsShared(true)
     onClose()
   }
 
@@ -42,7 +47,7 @@ export const AddNoteModal: React.FC<AddNoteModalProps> = ({
         <div className="color-picker-row">
           <span className="picker-lbl">Note Style:</span>
           <div className="color-options">
-            {(['butter', 'blush', 'sea'] as const).map((type) => (
+            {(['butter', 'blush', 'sea', 'matcha'] as const).map((type) => (
               <button
                 key={type}
                 type="button"
@@ -54,11 +59,33 @@ export const AddNoteModal: React.FC<AddNoteModalProps> = ({
           </div>
         </div>
 
+        <div className="privacy-picker-row">
+          <span className="picker-lbl">Privacy:</span>
+          <div className="privacy-buttons">
+            <button
+              type="button"
+              className={`privacy-pill-btn ${isShared ? 'active' : ''}`}
+              onClick={() => setIsShared(true)}
+            >
+              <Globe size={14} /> Shared with Group
+            </button>
+            <button
+              type="button"
+              className={`privacy-pill-btn ${!isShared ? 'active' : ''}`}
+              onClick={() => setIsShared(false)}
+            >
+              <Lock size={14} /> Private to Me
+            </button>
+          </div>
+        </div>
+
         <div className="modal-btn-row">
-          <Button variant="outline" onClick={onClose} type="button">
+          <Button variant="outline" onClick={onClose} type="button" disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit">Post Note</Button>
+          <Button type="submit" disabled={!newNoteText.trim() || isSubmitting}>
+            {isSubmitting ? 'Posting...' : 'Post Note'}
+          </Button>
         </div>
       </form>
 
@@ -85,6 +112,41 @@ export const AddNoteModal: React.FC<AddNoteModalProps> = ({
         .color-options {
           display: flex;
           gap: 10px;
+        }
+
+        .privacy-picker-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .privacy-buttons {
+          display: flex;
+          gap: 8px;
+          flex: 1;
+        }
+
+        .privacy-pill-btn {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          padding: 8px 10px;
+          border-radius: 10px;
+          border: 1px solid var(--color-surface-container-high);
+          background-color: var(--color-surface-container-low);
+          color: var(--color-text-muted);
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        .privacy-pill-btn.active {
+          background-color: var(--color-surface-container);
+          border-color: var(--color-blush);
+          color: var(--color-blush);
         }
 
         .color-dot {
@@ -115,6 +177,10 @@ export const AddNoteModal: React.FC<AddNoteModalProps> = ({
 
         .note-sea {
           background-color: var(--color-sea);
+        }
+
+        .note-matcha {
+          background-color: #cbe8ba;
         }
 
         .modal-btn-row {

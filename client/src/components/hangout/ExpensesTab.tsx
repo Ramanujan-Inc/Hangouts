@@ -1,33 +1,55 @@
 import React from 'react'
-import { Plus, DollarSign, ArrowRight } from 'lucide-react'
+import { Plus, DollarSign, ArrowRight, Trash2 } from 'lucide-react'
 import { Button, Card, EmptyState, Badge } from '../ui'
 import MemberAvatar from '../MemberAvatar'
-import { members } from '../../data/mock'
-import { HangoutExpense, DebtSettlement } from './types'
+import { formatDate } from '../../lib/format'
+import { HangoutExpense, ExpenseSummary, DebtSettlement, MemberBalance } from './types'
 
 interface ExpensesTabProps {
   expenses: HangoutExpense[]
-  balances: Record<string, number>
-  debtsList: DebtSettlement[]
-  totalSpent: number
+  summary?: ExpenseSummary | null
+  balances?: Record<string, number>
+  debtsList?: DebtSettlement[]
+  totalSpent?: number
+  currentUserId: string
+  creatorId?: string
   onOpenAddExpense: () => void
+  onDeleteExpense?: (expenseId: string) => void
 }
 
 export const ExpensesTab: React.FC<ExpensesTabProps> = ({
   expenses,
-  balances,
-  debtsList,
-  totalSpent,
+  summary,
+  balances = {},
+  debtsList = [],
+  totalSpent = 0,
+  currentUserId,
+  creatorId,
   onOpenAddExpense,
+  onDeleteExpense,
 }) => {
+  const displayTotal = summary?.total_expenses ?? totalSpent
+  const displayDebts = summary?.simplified_debts && summary.simplified_debts.length > 0
+    ? summary.simplified_debts
+    : debtsList
+  const memberBalances = summary?.member_balances || []
+
   return (
     <div className="expenses-tab">
       {/* Summary Card */}
       <Card variant="default" padding="md" className="expense-summary-card">
         <div className="summary-left">
           <span className="summary-lbl">Total Spent</span>
-          <h3>₱{totalSpent.toLocaleString()}</h3>
-          <span className="summary-sub">across {expenses.length} payments</span>
+          <h3>₱{displayTotal.toLocaleString()}</h3>
+          <span className="summary-sub">
+            {summary?.per_person_share !== undefined && summary.per_person_share > 0 ? (
+              <>
+                ₱{summary.per_person_share.toLocaleString()} / person • across {expenses.length} payments
+              </>
+            ) : (
+              `across ${expenses.length} payment${expenses.length === 1 ? '' : 's'}`
+            )}
+          </span>
         </div>
         <Button onClick={onOpenAddExpense}>
           <Plus size={18} /> Log Expense
@@ -35,38 +57,106 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
       </Card>
 
       {/* Spend Chart Breakdown */}
-      {expenses.length > 0 && (
+      {(memberBalances.length > 0 || Object.keys(balances).length > 0) && (
         <Card variant="default" padding="md" className="spend-chart-section">
-          <h4>Member Spending Breakdown</h4>
+          <h4>Member Spending & Net Balances</h4>
           <div className="chart-bars-list">
-            {Object.entries(balances).map(([user]) => {
-              const totalPaid = expenses
-                .filter((e) => e.paidBy === user)
-                .reduce((s, e) => s + e.amount, 0)
-              const pct = totalSpent > 0 ? (totalPaid / totalSpent) * 100 : 0
+            {memberBalances.length > 0
+              ? memberBalances.map((mb) => {
+                  const pct = displayTotal > 0 ? (mb.total_paid / displayTotal) * 100 : 0
+                  const isPositive = mb.net_balance > 0
+                  const isNegative = mb.net_balance < 0
+                  const username = mb.profile?.username || mb.user_id
 
-              const getBarColor = (uid: string) => {
-                if (uid === 'mika') return 'var(--color-blush)'
-                if (uid === 'jam') return 'var(--color-tangerine)'
-                return 'var(--color-sea)'
-              }
+                  return (
+                    <div key={mb.user_id} className="chart-row">
+                      <div className="chart-member-label">
+                        <MemberAvatar profile={mb.profile} memberId={mb.user_id} size={24} />
+                        <span className="member-name-ellipsis">{username}</span>
+                      </div>
+                      <div className="chart-bar-track">
+                        <div
+                          className="chart-bar-fill"
+                          style={{
+                            width: `${Math.max(pct, 4)}%`,
+                            backgroundColor: isPositive ? 'var(--color-sea)' : 'var(--color-blush)',
+                          }}
+                        />
+                        <span className="bar-val">₱{mb.total_paid.toLocaleString()}</span>
+                      </div>
+                      <div className="net-balance-tag">
+                        {isPositive && (
+                          <Badge variant="surface" size="sm">
+                            +₱{Math.round(mb.net_balance).toLocaleString()}
+                          </Badge>
+                        )}
+                        {isNegative && (
+                          <Badge variant="blush" size="sm">
+                            -₱{Math.round(Math.abs(mb.net_balance)).toLocaleString()}
+                          </Badge>
+                        )}
+                        {!isPositive && !isNegative && (
+                          <Badge variant="surface" size="sm">
+                            Settled
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })
+              : Object.entries(balances).map(([user, bal]) => {
+                  const totalPaid = expenses
+                    .filter((e) => e.paid_by === user)
+                    .reduce((s, e) => s + e.total_amount, 0)
+                  const pct = displayTotal > 0 ? (totalPaid / displayTotal) * 100 : 0
+
+                  return (
+                    <div key={user} className="chart-row">
+                      <div className="chart-member-label">
+                        <MemberAvatar memberId={user} size={24} />
+                        <span className="member-name-ellipsis">{user}</span>
+                      </div>
+                      <div className="chart-bar-track">
+                        <div
+                          className="chart-bar-fill"
+                          style={{
+                            width: `${Math.max(pct, 4)}%`,
+                            backgroundColor: bal >= 0 ? 'var(--color-sea)' : 'var(--color-blush)',
+                          }}
+                        />
+                        <span className="bar-val">₱{totalPaid.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+          </div>
+        </Card>
+      )}
+
+      {/* Simplified Debts Sheet */}
+      {displayDebts.length > 0 && (
+        <Card variant="default" padding="md" className="debts-section">
+          <h4>Simplified Balances (Who Owes Whom)</h4>
+          <div className="debts-list">
+            {displayDebts.map((debt, index) => {
+              const fromName = debt.from_user?.username || debt.from || 'Member'
+              const toName = debt.to_user?.username || debt.to || 'Member'
+              const fromId = debt.from_user_id || debt.from
+              const toId = debt.to_user_id || debt.to
 
               return (
-                <div key={user} className="chart-row">
-                  <div className="chart-member-label">
-                    <MemberAvatar memberId={user} size={24} />
-                    <span>{members[user]?.name || user}</span>
+                <div key={index} className="debt-row-card">
+                  <div className="debt-avatars">
+                    <MemberAvatar profile={debt.from_user} memberId={fromId} size={28} />
+                    <ArrowRight size={16} className="arrow-icon" />
+                    <MemberAvatar profile={debt.to_user} memberId={toId} size={28} />
                   </div>
-                  <div className="chart-bar-track">
-                    <div
-                      className="chart-bar-fill"
-                      style={{
-                        width: `${Math.max(pct, 5)}%`,
-                        backgroundColor: getBarColor(user),
-                      }}
-                    />
-                    <span className="bar-val">₱{totalPaid.toLocaleString()}</span>
+                  <div className="debt-message">
+                    <strong>{fromName}</strong> owes <strong>{toName}</strong>
                   </div>
+                  <Badge variant="blush" size="md">
+                    ₱{Math.round(debt.amount).toLocaleString()}
+                  </Badge>
                 </div>
               )
             })}
@@ -74,34 +164,9 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
         </Card>
       )}
 
-      {/* Simplified Debts Sheet */}
-      {debtsList.length > 0 && (
-        <Card variant="default" padding="md" className="debts-section">
-          <h4>Simplified Balances (Who Owes Whom)</h4>
-          <div className="debts-list">
-            {debtsList.map((debt, index) => (
-              <div key={index} className="debt-row-card">
-                <div className="debt-avatars">
-                  <MemberAvatar memberId={debt.from} size={28} />
-                  <ArrowRight size={16} className="arrow-icon" />
-                  <MemberAvatar memberId={debt.to} size={28} />
-                </div>
-                <div className="debt-message">
-                  <strong>{members[debt.from]?.name || debt.from}</strong> owes{' '}
-                  <strong>{members[debt.to]?.name || debt.to}</strong>
-                </div>
-                <Badge variant="blush" size="md">
-                  ₱{debt.amount}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
       {/* Expense History List */}
       <Card variant="default" padding="md" className="expense-history-section">
-        <h4>Expense History</h4>
+        <h4>Expense History ({expenses.length})</h4>
         {expenses.length === 0 ? (
           <EmptyState
             icon={<DollarSign size={32} />}
@@ -109,23 +174,43 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
           />
         ) : (
           <div className="expenses-grid">
-            {expenses.map((exp) => (
-              <div key={exp.id} className="expense-row-item">
-                <div className="payer-col">
-                  <MemberAvatar memberId={exp.paidBy} size={36} />
-                  <div>
-                    <div className="exp-desc">{exp.desc}</div>
-                    <div className="exp-meta">
-                      Paid by {members[exp.paidBy]?.name || exp.paidBy} • Split among{' '}
-                      {exp.splitWith.length}
+            {expenses.map((exp) => {
+              const payerName = exp.payer?.username || exp.paid_by || 'Member'
+              const isPayerOrCreator =
+                String(exp.paid_by) === String(currentUserId) ||
+                String(creatorId) === String(currentUserId)
+              const dateLabel = exp.created_at ? formatDate(exp.created_at, 'short') : ''
+
+              return (
+                <div key={exp.id} className="expense-row-item">
+                  <div className="payer-col">
+                    <MemberAvatar profile={exp.payer} memberId={exp.paid_by} size={36} />
+                    <div>
+                      <div className="exp-desc">{exp.description}</div>
+                      <div className="exp-meta">
+                        Paid by {payerName}
+                        {exp.split_type === 'equal' ? ' • Equal Split' : ' • Personal'}
+                        {dateLabel ? ` • ${dateLabel}` : ''}
+                      </div>
                     </div>
                   </div>
+                  <div className="amount-col">
+                    <span className="exp-amt-val">₱{exp.total_amount.toLocaleString()}</span>
+                    {isPayerOrCreator && onDeleteExpense && (
+                      <button
+                        type="button"
+                        className="delete-expense-btn"
+                        onClick={() => onDeleteExpense(exp.id)}
+                        title="Delete expense"
+                        aria-label="Delete expense"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="amount-col">
-                  <span>₱{exp.amount.toLocaleString()}</span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </Card>
@@ -291,11 +376,44 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
           margin-top: 2px;
         }
 
-        .amount-col span {
+        .member-name-ellipsis {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .net-balance-tag {
+          margin-left: 8px;
+        }
+
+        .amount-col {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .exp-amt-val {
           font-family: var(--font-display);
           font-size: 16px;
           font-weight: 700;
           color: var(--color-text);
+        }
+
+        .delete-expense-btn {
+          background: transparent;
+          border: none;
+          color: var(--color-text-muted);
+          cursor: pointer;
+          padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 4px;
+          transition: color 0.15s;
+        }
+
+        .delete-expense-btn:hover {
+          color: #ff6b6b;
         }
       `}</style>
     </div>

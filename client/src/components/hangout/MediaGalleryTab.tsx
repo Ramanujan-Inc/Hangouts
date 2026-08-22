@@ -25,19 +25,19 @@ export const MediaGalleryTab: React.FC<MediaGalleryTabProps> = ({
 }) => {
   const filteredMedia = media.filter((item) => {
     if (mediaFilter === 'favorites') {
-      return (item.favoritedBy || []).includes(currentUserId) || item.likes > 0
+      return Boolean(item.is_favorited || item.favorites_count > 0)
     }
     if (mediaFilter === 'videos') {
-      return item.mediaType === 'video'
+      return item.media_type === 'video'
     }
     return true
   })
 
   const favoritesCount = media.filter(
-    (m) => (m.favoritedBy || []).includes(currentUserId) || m.likes > 0
+    (m) => Boolean(m.is_favorited || m.favorites_count > 0)
   ).length
 
-  const videosCount = media.filter((m) => m.mediaType === 'video').length
+  const videosCount = media.filter((m) => m.media_type === 'video').length
 
   return (
     <div className="photos-tab">
@@ -89,21 +89,21 @@ export const MediaGalleryTab: React.FC<MediaGalleryTabProps> = ({
       ) : (
         <div className="masonry-gallery">
           {filteredMedia.map((item) => {
-            const isFavorited = (item.favoritedBy || []).includes(currentUserId)
+            const isFavorited = Boolean(item.is_favorited)
 
             return (
               <div
                 key={item.id}
-                className={`gallery-item span-${item.span}`}
+                className={`gallery-item span-${item.span || 1}`}
                 onClick={() => onSelectMedia(item)}
                 role="button"
                 tabIndex={0}
               >
-                {item.mediaType === 'video' ? (
+                {item.media_type === 'video' ? (
                   <div className="video-thumb-container">
                     <video
                       src={item.url}
-                      poster={item.thumbnailUrl}
+                      poster={item.thumbnail_url}
                       className="media-asset"
                     />
                     <div className="play-overlay-badge">
@@ -111,17 +111,25 @@ export const MediaGalleryTab: React.FC<MediaGalleryTabProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <img src={item.url} alt="Hangout memory" className="media-asset" />
+                  <img src={item.url} alt={item.caption || 'Hangout memory'} className="media-asset" />
                 )}
 
                 <div className="uploader-badge">
-                  <MemberAvatar memberId={item.uploadedBy} size={24} />
+                  <MemberAvatar profile={item.uploader} memberId={item.uploaded_by} size={24} />
                 </div>
 
-                {item.mediaType === 'video' && (
+                {item.media_type === 'video' && (
                   <div className="video-type-tag">
                     <Badge variant="surface" size="sm" icon={<Video size={12} />}>
                       Video
+                    </Badge>
+                  </div>
+                )}
+
+                {!item.is_shared && (
+                  <div className="private-type-tag">
+                    <Badge variant="surface" size="sm">
+                      🔒 Private
                     </Badge>
                   </div>
                 )}
@@ -138,7 +146,7 @@ export const MediaGalleryTab: React.FC<MediaGalleryTabProps> = ({
                     fill={isFavorited ? '#ff6b6b' : 'white'}
                     color={isFavorited ? '#ff6b6b' : 'white'}
                   />
-                  <span>{item.likes}</span>
+                  <span>{item.favorites_count || 0}</span>
                 </div>
               </div>
             )
@@ -263,6 +271,13 @@ export const MediaGalleryTab: React.FC<MediaGalleryTabProps> = ({
           position: absolute;
           bottom: 8px;
           left: 8px;
+          z-index: 2;
+        }
+
+        .private-type-tag {
+          position: absolute;
+          top: 8px;
+          right: 8px;
           z-index: 2;
         }
 

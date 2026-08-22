@@ -13,7 +13,7 @@ interface HangoutHeroHeaderProps {
   latitude?: number
   longitude?: number
   placeId?: string
-  participants: string[]
+  participants: (string | { id?: string; user_id?: string; profile?: { username?: string; avatar_url?: string | null } | null })[]
   onBack: () => void
 }
 
@@ -29,11 +29,25 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
   participants,
   onBack,
 }) => {
-  const avatarList = participants.map((p) => ({
-    src: members[p]?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${p}`,
-    alt: members[p]?.name || p,
-    title: members[p]?.name || p,
-  }))
+  const avatarList = participants.map((p) => {
+    if (typeof p === 'string') {
+      const mem = members[p]
+      return {
+        src: mem?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(p)}`,
+        alt: mem?.name || p,
+        title: mem?.name || p,
+      }
+    }
+    const username = p.profile?.username || p.user_id || 'Member'
+    const avatar =
+      p.profile?.avatar_url ||
+      `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(username)}`
+    return {
+      src: avatar,
+      alt: username,
+      title: username,
+    }
+  })
 
   const mapsUrl = placeId
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}&query_place_id=${placeId}`

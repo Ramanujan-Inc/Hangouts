@@ -29,5 +29,6 @@ export interface UploadedPhoto {
   id: string
   file: File
   previewUrl: string
+  caption?: string
 }
 
