@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, File, UploadFile
 from supabase import Client
 from app.api.deps import get_current_user, get_db
 from app.schemas.hangout import (
@@ -12,6 +12,16 @@ from app.schemas.hangout import (
 from app.services import hangouts as hangout_service
 
 router = APIRouter()
+
+
+@router.post("/cover", response_model=dict, status_code=status.HTTP_201_CREATED)
+def upload_hangout_cover(
+    file: UploadFile = File(...),
+    _: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """Upload a custom hangout cover photo to storage and return its public URL."""
+    return hangout_service.upload_hangout_cover_image(db=db, file=file)
 
 
 @router.post("", response_model=HangoutResponse, status_code=status.HTTP_201_CREATED)

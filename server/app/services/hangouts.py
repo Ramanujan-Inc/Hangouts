@@ -1,8 +1,22 @@
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
+from fastapi import UploadFile
 from supabase import Client
 from app.schemas.hangout import HangoutCreate, HangoutUpdate
-from app.core.exceptions import NotFoundError, ForbiddenError
+from app.core.exceptions import NotFoundError, ForbiddenError, BadRequestError
+from app.services.media import _upload_to_storage, ALLOWED_IMAGE_MIME_TYPES
+
+
+def upload_hangout_cover_image(db: Client, file: UploadFile) -> Dict[str, str]:
+    """Upload a custom hangout cover photo to storage and return its public URL."""
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_IMAGE_MIME_TYPES:
+        raise BadRequestError(
+            f"Invalid image type '{content_type}'. Allowed types are {', '.join(ALLOWED_IMAGE_MIME_TYPES)}."
+        )
+    file_bytes = file.file.read()
+    url = _upload_to_storage(db, file_bytes, file.filename or "hangout_cover.jpg", content_type)
+    return {"url": url}
 
 
 def create_hangout(db: Client, hangout_create: HangoutCreate, user_id: str) -> Dict[str, Any]:

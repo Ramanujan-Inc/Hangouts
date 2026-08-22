@@ -45,6 +45,22 @@ def test_get_profile_by_id_not_found(authenticated_client: TestClient):
     assert response.json()["detail"] == "User profile not found."
 
 
+def test_get_profile_by_username_success(authenticated_client: TestClient, secondary_user: Dict[str, Any]):
+    """Fetch public profile by exact username from real database."""
+    response = authenticated_client.get(f"/api/v1/profiles/{secondary_user['username']}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == secondary_user["id"]
+    assert data["username"] == secondary_user["username"]
+
+
+def test_get_profile_by_username_not_found(authenticated_client: TestClient):
+    """Fetch non-existent username returns 404."""
+    response = authenticated_client.get("/api/v1/profiles/nonexistentuser123987")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "User profile not found."
+
+
 def test_update_current_user_profile_avatar_url(authenticated_client: TestClient):
     """Update profile avatar_url in real database."""
     avatar_url = "https://example.com/avatar.png"

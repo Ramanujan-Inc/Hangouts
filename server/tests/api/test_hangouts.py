@@ -260,3 +260,15 @@ def test_add_and_remove_participant(
         f"/api/v1/hangouts/{hangout_id}/participants/{secondary_user['id']}"
     )
     assert kick_res.status_code == 204
+
+
+def test_upload_hangout_cover(authenticated_client: TestClient):
+    """Test uploading a hangout cover photo."""
+    file_content = b"fake-jpeg-image-bytes"
+    res = authenticated_client.post(
+        "/api/v1/hangouts/cover",
+        files={"file": ("cover.jpg", file_content, "image/jpeg")},
+    )
+    assert res.status_code == 201
+    assert "url" in res.json()
+    assert res.json()["url"].startswith("http")

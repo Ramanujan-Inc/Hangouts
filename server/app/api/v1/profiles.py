@@ -52,14 +52,14 @@ def update_current_user_profile(
 
 
 
-@router.get("/{profile_id}", response_model=ProfileResponse)
-def read_user_profile_by_id(
-    profile_id: str,
+@router.get("/{identifier}", response_model=ProfileResponse)
+def read_user_profile(
+    identifier: str,
     db: Client = Depends(get_db),
     _: dict = Depends(get_current_user),
 ):
-    """Fetch public user profile by UUID."""
-    profile = profile_service.get_profile_by_id(db=db, profile_id=profile_id)
+    """Fetch public user profile by UUID or exact username."""
+    profile = profile_service.get_profile_by_identifier(db=db, identifier=identifier)
     if not profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -33,6 +33,37 @@ def get_profile_by_id(db: Client, profile_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def get_profile_by_username(db: Client, username: str) -> Optional[Dict[str, Any]]:
+    """Fetch a profile record by exact username (case-insensitive)."""
+    if not username or not username.strip():
+        return None
+    response = db.table("profiles").select("*").ilike("username", username.strip()).execute()
+    if response.data and len(response.data) > 0:
+        return response.data[0]
+    return None
+
+
+def get_profile_by_identifier(db: Client, identifier: str) -> Optional[Dict[str, Any]]:
+    """Fetch a profile record by UUID or exact username (case-insensitive)."""
+    if not identifier or not identifier.strip():
+        return None
+
+    trimmed = identifier.strip()
+
+    # If identifier looks like a UUID, check ID first
+    try:
+        import uuid
+        uuid.UUID(trimmed)
+        by_id = get_profile_by_id(db, trimmed)
+        if by_id:
+            return by_id
+    except (ValueError, AttributeError):
+        pass
+
+    # Check by exact username
+    return get_profile_by_username(db, trimmed)
+
+
 def update_profile(
     db: Client,
     profile_id: str,
