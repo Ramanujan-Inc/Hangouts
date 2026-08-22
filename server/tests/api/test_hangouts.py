@@ -353,3 +353,42 @@ def test_list_hangouts_user_isolation(
     b_updated_ids = [h["id"] for h in list_b_updated.json()]
     assert hangout_a_id in b_updated_ids
     assert hangout_b_id in b_updated_ids
+
+
+def test_rate_hangout_and_get_rating(authenticated_client: TestClient, primary_user: Dict[str, Any]):
+    """Test user rating submission and retrieval for a hangout."""
+    # Create a hangout
+    h_res = authenticated_client.post(
+        "/api/v1/hangouts",
+        json={
+            "title": "Rating Test Hangout",
+            "hangout_date": "2026-08-22",
+        },
+    )
+    assert h_res.status_code == 201
+    hangout_id = h_res.json()["id"]
+
+    # Submit rating (e.g. 5)
+    rate_res = authenticated_client.post(
+        f"/api/v1/hangouts/{hangout_id}/ratings",
+        json={"rating": 5},
+    )
+    assert rate_res.status_code == 200
+    rate_data = rate_res.json()
+    assert rate_data["hangout_id"] == hangout_id
+    assert rate_data["user_id"] == primary_user["id"]
+    assert rate_data["rating"] == 5
+
+    # Retrieve user's rating
+    get_rate_res = authenticated_client.get(f"/api/v1/hangouts/{hangout_id}/ratings")
+    assert get_rate_res.status_code == 200
+    get_data = get_rate_res.json()
+    assert get_data["rating"] == 5
+
+    # Update rating (e.g. 4)
+    update_rate_res = authenticated_client.post(
+        f"/api/v1/hangouts/{hangout_id}/ratings",
+        json={"rating": 4},
+    )
+    assert update_rate_res.status_code == 200
+    assert update_rate_res.json()["rating"] == 4

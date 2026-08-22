@@ -341,3 +341,43 @@ def remove_participant(
         raise ForbiddenError("You do not have permission to remove this participant.")
 
     db.table("hangout_participants").delete().eq("hangout_id", hangout_id).eq("user_id", str(target_user_id)).execute()
+
+
+def upsert_hangout_rating(
+    db: Client,
+    hangout_id: str,
+    user_id: str,
+    rating: int,
+) -> Dict[str, Any]:
+    """Upsert individual rating for a hangout."""
+    if not (1 <= rating <= 5):
+        raise BadRequestError("Rating must be between 1 and 5.")
+    get_hangout_by_id(db=db, hangout_id=hangout_id, user_id=user_id)
+    now = datetime.now(timezone.utc).isoformat()
+    data = {
+        "hangout_id": str(hangout_id),
+        "user_id": str(user_id),
+        "rating": rating,
+        "updated_at": now,
+    }
+    res = db.table("hangout_ratings").upsert(data, on_conflict="hangout_id,user_id").execute()
+    if not res.data or len(res.data) == 0:
+        raise Exception("Failed to save rating.")
+    return res.data[0]
+
+
+def get_user_hangout_rating(
+    db: Client,
+    hangout_id: str,
+    user_id: str,
+) -> Optional[Dict[str, Any]]:
+    """Get the current user's individual rating for a hangout."""
+    get_hangout_by_id(db=db, hangout_id=hangout_id, user_id=user_id)
+    res = (
+        db.table("hangout_ratings")
+        .select("*")
+        .eq("hangout_id", str(hangout_id))
+        .eq("user_id", str(user_id))
+        .execute()
+    )
+    return res.data[0] if res.data and len(res.data) > 0 else None

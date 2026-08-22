@@ -64,3 +64,18 @@ class HangoutResponse(HangoutBase):
 class MemoryResponse(HangoutResponse):
     years_ago: int
 
+
+class RatingCreate(BaseModel):
+    rating: int
+
+
+class RatingResponse(BaseModel):
+    id: UUID
+    hangout_id: UUID
+    user_id: UUID
+    rating: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+

@@ -8,6 +8,8 @@ from app.schemas.hangout import (
     HangoutResponse,
     ParticipantCreate,
     ParticipantResponse,
+    RatingCreate,
+    RatingResponse,
 )
 from app.services import hangouts as hangout_service
 
@@ -151,4 +153,34 @@ def remove_participant(
         hangout_id=id,
         target_user_id=user_id,
         requesting_user_id=current_user["id"],
+    )
+
+
+@router.post("/{id}/ratings", response_model=RatingResponse, status_code=status.HTTP_200_OK)
+def rate_hangout(
+    id: str,
+    rating_data: RatingCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """Set or update user's individual rating (1-5) for a hangout."""
+    return hangout_service.upsert_hangout_rating(
+        db=db,
+        hangout_id=id,
+        user_id=current_user["id"],
+        rating=rating_data.rating,
+    )
+
+
+@router.get("/{id}/ratings", response_model=Optional[RatingResponse])
+def get_hangout_rating(
+    id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """Get the current user's rating for a hangout."""
+    return hangout_service.get_user_hangout_rating(
+        db=db,
+        hangout_id=id,
+        user_id=current_user["id"],
     )
