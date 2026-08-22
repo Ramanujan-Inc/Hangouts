@@ -84,18 +84,60 @@ def get_hangout_participants(db: Client, hangout_id: str) -> List[Dict[str, Any]
 def get_hangouts(
     db: Client,
     q: Optional[str] = None,
+    hangout_name: Optional[str] = None,
+    location_name: Optional[str] = None,
     date: Optional[str] = None,
-    group_id: Optional[str] = None,
+    group_name: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Search & filter hangouts using ILIKE match on title/location_name, exact date, and group_id."""
+    """Search & filter hangouts using hangout_name, location_name, date, group_name, or comprehensive omnisearch q."""
     query = db.table("hangouts").select("*")
 
-    if q:
-        query = query.or_(f"title.ilike.%{q}%,location_name.ilike.%{q}%")
+    if hangout_name:
+        query = query.ilike("title", f"%{hangout_name}%")
+    if location_name:
+        query = query.ilike("location_name", f"%{location_name}%")
+    if q and not (hangout_name or location_name):
+        clean_q = q.strip()
+        or_parts = [
+            f"title.ilike.%{clean_q}%",
+            f"description.ilike.%{clean_q}%",
+            f"location_name.ilike.%{clean_q}%",
+        ]
+
+        # Search matching groups
+        groups_res = db.table("groups").select("id").ilike("name", f"%{clean_q}%").execute()
+        if groups_res.data:
+            for g in groups_res.data:
+                or_parts.append(f"group_id.eq.{g['id']}")
+
+        # Search matching participants/creator usernames
+        profiles_res = db.table("profiles").select("id").ilike("username", f"%{clean_q}%").execute()
+        if profiles_res.data:
+            user_ids = [p["id"] for p in profiles_res.data]
+            part_res = db.table("hangout_participants").select("hangout_id").in_("user_id", user_ids).execute()
+            if part_res.data:
+                for p in part_res.data:
+                    or_parts.append(f"id.eq.{p['hangout_id']}")
+
+        query = query.or_(",".join(or_parts))
+
     if date:
-        query = query.eq("hangout_date", str(date))
-    if group_id:
-        query = query.eq("group_id", str(group_id))
+        date_str = str(date).strip()
+        if len(date_str) == 10 and date_str.count("-") == 2:
+            query = query.eq("hangout_date", date_str)
+        elif len(date_str) == 7 and date_str.count("-") == 1:
+            query = query.gte("hangout_date", f"{date_str}-01").lte("hangout_date", f"{date_str}-31")
+        elif len(date_str) == 4 and date_str.isdigit():
+            query = query.gte("hangout_date", f"{date_str}-01-01").lte("hangout_date", f"{date_str}-12-31")
+        else:
+            query = query.eq("hangout_date", date_str)
+    if group_name:
+        groups_res = db.table("groups").select("id").ilike("name", f"%{group_name}%").execute()
+        group_ids = [g["id"] for g in groups_res.data] if groups_res.data else []
+        if group_ids:
+            query = query.in_("group_id", group_ids)
+        else:
+            return []
 
     response = query.order("hangout_date", desc=True).execute()
 

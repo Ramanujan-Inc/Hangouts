@@ -30,18 +30,22 @@ def create_hangout(
 
 @router.get("", response_model=List[HangoutResponse])
 def list_hangouts(
-    q: Optional[str] = Query(None, description="ILIKE search string for title or location_name"),
-    date: Optional[str] = Query(None, description="Filter by exact date (YYYY-MM-DD)"),
-    group_id: Optional[str] = Query(None, description="Filter by group UUID"),
+    q: Optional[str] = Query(None, description="General search string for title or location_name"),
+    hangout_name: Optional[str] = Query(None, description="Filter by hangout title/name"),
+    location_name: Optional[str] = Query(None, description="Filter by location name"),
+    date: Optional[str] = Query(None, description="Filter by exact or partial date (YYYY, YYYY-MM, YYYY-MM-DD)"),
+    group_name: Optional[str] = Query(None, description="Filter by group name"),
     current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
 ):
-    """Search & filter hangouts matching title/location, date, or group."""
+    """Search & filter hangouts matching hangout_name, location_name, date, group_name, or general q."""
     return hangout_service.get_hangouts(
         db=db,
         q=q,
+        hangout_name=hangout_name,
+        location_name=location_name,
         date=date,
-        group_id=group_id,
+        group_name=group_name,
     )
 
 

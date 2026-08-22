@@ -61,7 +61,7 @@ def test_list_hangouts_filter(authenticated_client: TestClient):
     assert create_res2.status_code == 201
     h2_id = create_res2.json()["id"]
 
-    # Filter by q matching title
+    # Filter by q matching title & description
     res_q = authenticated_client.get(f"/api/v1/hangouts?q={unique_str}")
     assert res_q.status_code == 200
     q_data = res_q.json()
@@ -69,13 +69,44 @@ def test_list_hangouts_filter(authenticated_client: TestClient):
     assert h1_id in q_ids
     assert h2_id in q_ids
 
-    # Filter by date
-    res_date = authenticated_client.get(f"/api/v1/hangouts?date={date1}")
-    assert res_date.status_code == 200
-    date_data = res_date.json()
-    date_ids = [h["id"] for h in date_data]
-    assert h1_id in date_ids
-    assert h2_id not in date_ids
+    # Filter by hangout_name
+    res_name = authenticated_client.get(f"/api/v1/hangouts?hangout_name=Coffee Catchup {unique_str}")
+    assert res_name.status_code == 200
+    name_ids = [h["id"] for h in res_name.json()]
+    assert h1_id in name_ids
+    assert h2_id not in name_ids
+
+    # Filter by location_name
+    res_loc = authenticated_client.get(f"/api/v1/hangouts?location_name=Cinema Plaza {unique_str}")
+    assert res_loc.status_code == 200
+    loc_ids = [h["id"] for h in res_loc.json()]
+    assert h2_id in loc_ids
+    assert h1_id not in loc_ids
+
+    # Filter by group_name
+    group_res = authenticated_client.post(
+        "/api/v1/groups",
+        json={"name": f"Cool Pals {unique_str}"},
+    )
+    assert group_res.status_code == 201
+    created_group_id = group_res.json()["id"]
+
+    group_hangout_res = authenticated_client.post(
+        "/api/v1/hangouts",
+        json={
+            "title": f"Group Outing {unique_str}",
+            "hangout_date": "2026-09-10",
+            "group_id": created_group_id,
+        },
+    )
+    assert group_hangout_res.status_code == 201
+    group_h_id = group_hangout_res.json()["id"]
+
+    res_group_name = authenticated_client.get(f"/api/v1/hangouts?group_name=Cool Pals {unique_str}")
+    assert res_group_name.status_code == 200
+    grp_ids = [h["id"] for h in res_group_name.json()]
+    assert group_h_id in grp_ids
+    assert h1_id not in grp_ids
 
 
 def test_get_hangout_details(authenticated_client: TestClient, primary_user: Dict[str, Any]):
