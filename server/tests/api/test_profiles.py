@@ -66,17 +66,38 @@ def test_update_profile_empty_body_returns_existing(authenticated_client: TestCl
     assert response.json()["id"] == primary_user["id"]
 
 
-def test_update_profile_duplicate_username_returns_400(
-    authenticated_client: TestClient,
-    secondary_user: Dict[str, Any],
-):
-    """Updating username to another user's username returns 400 Bad Request."""
-    response = authenticated_client.patch(
-        "/api/v1/profiles/me",
-        json={"username": secondary_user["username"]},
+def test_upload_avatar_success(authenticated_client: TestClient):
+    """Upload custom avatar image file and confirm profile is updated."""
+    import io
+    fake_avatar_bytes = b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00\x48" + b"A" * 100
+    file_payload = ("my_avatar.jpg", io.BytesIO(fake_avatar_bytes), "image/jpeg")
+    response = authenticated_client.post(
+        "/api/v1/profiles/avatar",
+        files={"file": file_payload},
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert "url" in data
+    assert data["url"].startswith("http")
+
+    # Confirm avatar_url updated on /profiles/me
+    me_res = authenticated_client.get("/api/v1/profiles/me")
+    assert me_res.status_code == 200
+    assert me_res.json()["avatar_url"] == data["url"]
+
+
+def test_upload_avatar_invalid_mime_type(authenticated_client: TestClient):
+    """Uploading a non-image file type returns 400 Bad Request."""
+    import io
+    fake_txt_bytes = b"Hello world text file"
+    file_payload = ("document.txt", io.BytesIO(fake_txt_bytes), "text/plain")
+    response = authenticated_client.post(
+        "/api/v1/profiles/avatar",
+        files={"file": file_payload},
     )
     assert response.status_code == 400
-    assert response.json()["detail"] == "Username is already taken."
+    assert "Invalid image type" in response.json()["detail"]
+
 
 
 

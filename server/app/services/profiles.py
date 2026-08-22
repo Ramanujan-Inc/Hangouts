@@ -1,8 +1,28 @@
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, UploadFile
 from supabase import Client
 from app.schemas.profile import ProfileUpdate
+from app.core.exceptions import BadRequestError
+from app.services.media import _upload_to_storage, ALLOWED_IMAGE_MIME_TYPES
+
+
+def upload_user_avatar(db: Client, user_id: str, file: UploadFile) -> Dict[str, str]:
+    """Upload custom avatar image to storage and update user profile avatar_url."""
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_IMAGE_MIME_TYPES:
+        raise BadRequestError(
+            f"Invalid image type '{content_type}'. Allowed types are {', '.join(ALLOWED_IMAGE_MIME_TYPES)}."
+        )
+    file_bytes = file.file.read()
+    url = _upload_to_storage(db, file_bytes, file.filename or "avatar.jpg", content_type)
+    update_profile(
+        db=db,
+        profile_id=user_id,
+        profile_update=ProfileUpdate(avatar_url=url),
+    )
+    return {"url": url}
+
 
 
 def get_profile_by_id(db: Client, profile_id: str) -> Optional[Dict[str, Any]]:

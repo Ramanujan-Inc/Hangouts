@@ -1,10 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from supabase import Client
 from app.api.deps import get_current_user, get_db
 from app.schemas.profile import ProfileResponse, ProfileUpdate
 from app.services import profiles as profile_service
 
 router = APIRouter()
+
+
+@router.post("/avatar", response_model=dict, status_code=status.HTTP_201_CREATED)
+def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """Upload a custom user avatar photo to storage, update the profile, and return the new avatar URL."""
+    return profile_service.upload_user_avatar(
+        db=db,
+        user_id=current_user["id"],
+        file=file,
+    )
 
 
 @router.get("/me", response_model=ProfileResponse)
@@ -35,6 +49,7 @@ def update_current_user_profile(
         profile_update=profile_update,
     )
     return updated_profile
+
 
 
 @router.get("/{profile_id}", response_model=ProfileResponse)
