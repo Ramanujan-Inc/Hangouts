@@ -109,8 +109,13 @@ def test_list_hangouts_filter(authenticated_client: TestClient):
     assert h1_id not in grp_ids
 
 
-def test_get_hangout_details(authenticated_client: TestClient, primary_user: Dict[str, Any]):
-    """Fetch detailed hangout by ID with creator profile and participants."""
+def test_get_hangout_details(
+    client: TestClient,
+    authenticated_client: TestClient,
+    primary_user: Dict[str, Any],
+    secondary_user: Dict[str, Any],
+):
+    """Fetch detailed hangout by ID with creator profile and participants (enforcing access control)."""
     create_res = authenticated_client.post(
         "/api/v1/hangouts",
         json={
@@ -120,12 +125,27 @@ def test_get_hangout_details(authenticated_client: TestClient, primary_user: Dic
     )
     hangout_id = create_res.json()["id"]
 
+    # Creator (participant) fetches hangout details -> 200 OK
     response = authenticated_client.get(f"/api/v1/hangouts/{hangout_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == hangout_id
     assert data["creator"]["id"] == primary_user["id"]
     assert len(data["participants"]) >= 1
+
+    # Non-participant attempts to fetch hangout details -> 403 Forbidden
+    non_part_res = client.get(f"/api/v1/hangouts/{hangout_id}", headers=secondary_user["headers"])
+    assert non_part_res.status_code == 403
+
+    # Add secondary user as participant -> now 200 OK
+    invite_res = authenticated_client.post(
+        f"/api/v1/hangouts/{hangout_id}/participants",
+        json={"user_id": secondary_user["id"]},
+    )
+    assert invite_res.status_code == 201
+
+    sec_res = client.get(f"/api/v1/hangouts/{hangout_id}", headers=secondary_user["headers"])
+    assert sec_res.status_code == 200
 
 
 def test_get_hangout_not_found(authenticated_client: TestClient):
@@ -272,3 +292,64 @@ def test_upload_hangout_cover(authenticated_client: TestClient):
     assert res.status_code == 201
     assert "url" in res.json()
     assert res.json()["url"].startswith("http")
+
+
+def test_list_hangouts_user_isolation(
+    client: TestClient,
+    authenticated_client: TestClient,
+    primary_user: Dict[str, Any],
+    secondary_user: Dict[str, Any],
+):
+    """Ensure timeline/hangouts list only returns hangouts of the specific user."""
+    unique_str = uuid.uuid4().hex[:6]
+
+    # Primary user creates Hangout A
+    res_a = authenticated_client.post(
+        "/api/v1/hangouts",
+        json={
+            "title": f"Primary Hangout {unique_str}",
+            "hangout_date": "2026-09-01",
+        },
+    )
+    assert res_a.status_code == 201
+    hangout_a_id = res_a.json()["id"]
+
+    # Secondary user creates Hangout B
+    res_b = client.post(
+        "/api/v1/hangouts",
+        json={
+            "title": f"Secondary Hangout {unique_str}",
+            "hangout_date": "2026-09-02",
+        },
+        headers=secondary_user["headers"],
+    )
+    assert res_b.status_code == 201
+    hangout_b_id = res_b.json()["id"]
+
+    # Primary user lists hangouts: sees Hangout A, does NOT see Hangout B
+    list_a = authenticated_client.get(f"/api/v1/hangouts?q={unique_str}")
+    assert list_a.status_code == 200
+    a_ids = [h["id"] for h in list_a.json()]
+    assert hangout_a_id in a_ids
+    assert hangout_b_id not in a_ids
+
+    # Secondary user lists hangouts: sees Hangout B, does NOT see Hangout A
+    list_b = client.get(f"/api/v1/hangouts?q={unique_str}", headers=secondary_user["headers"])
+    assert list_b.status_code == 200
+    b_ids = [h["id"] for h in list_b.json()]
+    assert hangout_b_id in b_ids
+    assert hangout_a_id not in b_ids
+
+    # Primary user adds secondary user to Hangout A
+    invite_res = authenticated_client.post(
+        f"/api/v1/hangouts/{hangout_a_id}/participants",
+        json={"user_id": secondary_user["id"]},
+    )
+    assert invite_res.status_code == 201
+
+    # Secondary user now sees both Hangout A and Hangout B
+    list_b_updated = client.get(f"/api/v1/hangouts?q={unique_str}", headers=secondary_user["headers"])
+    assert list_b_updated.status_code == 200
+    b_updated_ids = [h["id"] for h in list_b_updated.json()]
+    assert hangout_a_id in b_updated_ids
+    assert hangout_b_id in b_updated_ids

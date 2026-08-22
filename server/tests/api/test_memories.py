@@ -160,3 +160,56 @@ def test_get_memories_empty(authenticated_client: TestClient):
     res = authenticated_client.get("/api/v1/memories/on-this-day?date=2026-12-31")
     assert res.status_code == 200
     assert isinstance(res.json(), list)
+
+
+def test_get_memories_user_isolation(
+    client: TestClient,
+    authenticated_client: TestClient,
+    secondary_user: Dict[str, Any],
+):
+    """Ensure memories only return historical hangouts for the specific user."""
+    unique_str = uuid.uuid4().hex[:6]
+    test_date = "2024-03-15"
+
+    # Primary user creates historical hangout on 2024-03-15
+    res_past = authenticated_client.post(
+        "/api/v1/hangouts",
+        json={
+            "title": f"Memory Isolation Test {unique_str}",
+            "location_name": "Old Cafe",
+            "hangout_date": test_date,
+        },
+    )
+    assert res_past.status_code == 201
+    past_id = res_past.json()["id"]
+
+    # Secondary user queries memories for that date: should NOT see primary's hangout
+    sec_mem_res = client.get(
+        f"/api/v1/memories/on-this-day?date=2026-03-15",
+        headers=secondary_user["headers"],
+    )
+    assert sec_mem_res.status_code == 200
+    sec_matches = [m for m in sec_mem_res.json() if m["id"] == past_id]
+    assert len(sec_matches) == 0
+
+    # Primary user queries memories for that date: sees it
+    pri_mem_res = authenticated_client.get("/api/v1/memories/on-this-day?date=2026-03-15")
+    assert pri_mem_res.status_code == 200
+    pri_matches = [m for m in pri_mem_res.json() if m["id"] == past_id]
+    assert len(pri_matches) == 1
+
+    # Add secondary user as participant
+    invite_res = authenticated_client.post(
+        f"/api/v1/hangouts/{past_id}/participants",
+        json={"user_id": secondary_user["id"]},
+    )
+    assert invite_res.status_code == 201
+
+    # Secondary user now sees the memory
+    sec_mem_res_after = client.get(
+        f"/api/v1/memories/on-this-day?date=2026-03-15",
+        headers=secondary_user["headers"],
+    )
+    assert sec_mem_res_after.status_code == 200
+    sec_matches_after = [m for m in sec_mem_res_after.json() if m["id"] == past_id]
+    assert len(sec_matches_after) == 1

@@ -84,3 +84,38 @@ def test_get_hangouts_map_bounding_box(authenticated_client: TestClient):
     
     assert len(matching_inside) == 1
     assert len(matching_outside) == 0
+
+
+def test_get_hangouts_map_user_isolation(
+    client: TestClient,
+    authenticated_client: TestClient,
+    secondary_user: Dict[str, Any],
+):
+    """Spatial map endpoint only returns map pins for the specific user."""
+    unique_str = uuid.uuid4().hex[:6]
+
+    # Primary user creates hangout with coordinates
+    res = authenticated_client.post(
+        "/api/v1/hangouts",
+        json={
+            "title": f"Map Isolation Test {unique_str}",
+            "location_name": "Rizal Park",
+            "latitude": 14.5831,
+            "longitude": 120.9794,
+            "hangout_date": "2026-08-25",
+        },
+    )
+    assert res.status_code == 201
+    hangout_id = res.json()["id"]
+
+    # Secondary user queries map: should NOT see primary's pin
+    sec_map_res = client.get("/api/v1/hangouts/map", headers=secondary_user["headers"])
+    assert sec_map_res.status_code == 200
+    sec_matches = [h for h in sec_map_res.json() if h["id"] == hangout_id]
+    assert len(sec_matches) == 0
+
+    # Primary user queries map: sees pin
+    pri_map_res = authenticated_client.get("/api/v1/hangouts/map")
+    assert pri_map_res.status_code == 200
+    pri_matches = [h for h in pri_map_res.json() if h["id"] == hangout_id]
+    assert len(pri_matches) == 1

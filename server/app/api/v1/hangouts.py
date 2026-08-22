@@ -51,6 +51,7 @@ def list_hangouts(
     """Search & filter hangouts matching hangout_name, location_name, date, group_name, or general q."""
     return hangout_service.get_hangouts(
         db=db,
+        user_id=current_user["id"],
         q=q,
         hangout_name=hangout_name,
         location_name=location_name,
@@ -72,6 +73,7 @@ def get_hangouts_map(
     """Spatial Map Query returning hangouts with non-null coordinates within optional bounding box."""
     return hangout_service.get_hangouts_map(
         db=db,
+        user_id=current_user["id"],
         group_id=group_id,
         min_lat=min_lat,
         max_lat=max_lat,
@@ -87,7 +89,7 @@ def get_hangout_details(
     db: Client = Depends(get_db),
 ):
     """Get detailed hangout information with creator profile and participant list."""
-    return hangout_service.get_hangout_by_id(db=db, hangout_id=id)
+    return hangout_service.get_hangout_by_id(db=db, hangout_id=id, user_id=current_user["id"])
 
 
 @router.patch("/{id}", response_model=HangoutResponse)

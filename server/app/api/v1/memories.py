@@ -25,6 +25,7 @@ def get_on_this_day_memories(
     """Retrieve 'On This Day' memories for historical hangouts matching the month and day."""
     return memories_service.get_memories_on_this_day(
         db=db,
+        user_id=current_user["id"],
         target_date=date,
         group_id=group_id,
     )

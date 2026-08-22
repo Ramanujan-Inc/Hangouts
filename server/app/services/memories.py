@@ -1,11 +1,12 @@
 from datetime import date, datetime, timezone
 from typing import Optional, List, Dict, Any
 from supabase import Client
-from app.services.hangouts import get_hangout_participants
+from app.services.hangouts import get_hangout_participants, get_user_hangout_ids
 
 
 def get_memories_on_this_day(
     db: Client,
+    user_id: Optional[str] = None,
     target_date: Optional[date] = None,
     group_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
@@ -18,6 +19,12 @@ def get_memories_on_this_day(
     target_year = target_date.year
 
     query = db.table("hangouts").select("*").lt("hangout_date", target_date.isoformat())
+
+    if user_id:
+        user_hangout_ids = get_user_hangout_ids(db, user_id)
+        if not user_hangout_ids:
+            return []
+        query = query.in_("id", user_hangout_ids)
 
     if group_id:
         query = query.eq("group_id", str(group_id))

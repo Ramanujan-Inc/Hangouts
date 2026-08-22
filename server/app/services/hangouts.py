@@ -54,8 +54,8 @@ def create_hangout(db: Client, hangout_create: HangoutCreate, user_id: str) -> D
     return get_hangout_by_id(db=db, hangout_id=hangout_id)
 
 
-def get_hangout_by_id(db: Client, hangout_id: str) -> Dict[str, Any]:
-    """Fetch detailed hangout view with creator profile and participant list."""
+def get_hangout_by_id(db: Client, hangout_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Fetch detailed hangout view with creator profile and participant list, validating user access."""
     response = db.table("hangouts").select("*").eq("id", hangout_id).execute()
     if not response.data or len(response.data) == 0:
         raise NotFoundError("Hangout not found.")
@@ -69,6 +69,24 @@ def get_hangout_by_id(db: Client, hangout_id: str) -> Dict[str, Any]:
     # Fetch participants with profiles
     participants = get_hangout_participants(db=db, hangout_id=hangout_id)
     hangout["participants"] = participants
+
+    if user_id:
+        is_creator = str(hangout.get("created_by")) == str(user_id)
+        is_participant = any(str(p.get("user_id")) == str(user_id) for p in participants)
+        is_group_member = False
+        if hangout.get("group_id"):
+            member_res = (
+                db.table("group_members")
+                .select("status")
+                .eq("group_id", str(hangout["group_id"]))
+                .eq("user_id", str(user_id))
+                .eq("status", "accepted")
+                .execute()
+            )
+            is_group_member = bool(member_res.data and len(member_res.data) > 0)
+
+        if not (is_creator or is_participant or is_group_member):
+            raise ForbiddenError("You do not have access to view this hangout.")
 
     return hangout
 
@@ -95,16 +113,37 @@ def get_hangout_participants(db: Client, hangout_id: str) -> List[Dict[str, Any]
     return participants
 
 
+def get_user_hangout_ids(db: Client, user_id: str) -> List[str]:
+    """Fetch all hangout IDs where the user is a participant or creator."""
+    part_res = db.table("hangout_participants").select("hangout_id").eq("user_id", str(user_id)).execute()
+    hangout_ids = [p["hangout_id"] for p in (part_res.data or [])]
+
+    created_res = db.table("hangouts").select("id").eq("created_by", str(user_id)).execute()
+    if created_res.data:
+        for h in created_res.data:
+            if h["id"] not in hangout_ids:
+                hangout_ids.append(h["id"])
+
+    return hangout_ids
+
+
 def get_hangouts(
     db: Client,
+    user_id: Optional[str] = None,
     q: Optional[str] = None,
     hangout_name: Optional[str] = None,
     location_name: Optional[str] = None,
     date: Optional[str] = None,
     group_name: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Search & filter hangouts using hangout_name, location_name, date, group_name, or comprehensive omnisearch q."""
+    """Search & filter hangouts using user_id, hangout_name, location_name, date, group_name, or comprehensive omnisearch q."""
     query = db.table("hangouts").select("*")
+
+    if user_id:
+        user_hangout_ids = get_user_hangout_ids(db, user_id)
+        if not user_hangout_ids:
+            return []
+        query = query.in_("id", user_hangout_ids)
 
     if hangout_name:
         query = query.ilike("title", f"%{hangout_name}%")
@@ -168,14 +207,21 @@ def get_hangouts(
 
 def get_hangouts_map(
     db: Client,
+    user_id: Optional[str] = None,
     group_id: Optional[str] = None,
     min_lat: Optional[float] = None,
     max_lat: Optional[float] = None,
     min_lng: Optional[float] = None,
     max_lng: Optional[float] = None,
 ) -> List[Dict[str, Any]]:
-    """Fetch hangouts with non-null latitude and longitude, optionally filtered by group_id and bounding box."""
+    """Fetch hangouts with non-null latitude and longitude, optionally filtered by user, group_id and bounding box."""
     query = db.table("hangouts").select("*").not_.is_("latitude", "null").not_.is_("longitude", "null")
+
+    if user_id:
+        user_hangout_ids = get_user_hangout_ids(db, user_id)
+        if not user_hangout_ids:
+            return []
+        query = query.in_("id", user_hangout_ids)
 
     if group_id:
         query = query.eq("group_id", str(group_id))
