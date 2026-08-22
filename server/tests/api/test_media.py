@@ -150,3 +150,28 @@ def test_delete_media_owner_vs_non_owner(
     # Primary user (uploader) deletes -> 204 No Content
     delete_res = authenticated_client.delete(f"/api/v1/media/{media_id}")
     assert delete_res.status_code == 204
+
+
+def test_upload_bulk_media(authenticated_client: TestClient, primary_user: Dict[str, Any]):
+    """Upload multiple photos in a single bulk request."""
+    hangout_id = _create_test_hangout(authenticated_client)
+
+    fake_img1 = b"\xFF\xD8\xFF\xE0\x00\x10JFIF1"
+    fake_img2 = b"\xFF\xD8\xFF\xE0\x00\x10JFIF2"
+
+    files = [
+        ("files", ("photo1.jpg", io.BytesIO(fake_img1), "image/jpeg")),
+        ("files", ("photo2.jpg", io.BytesIO(fake_img2), "image/jpeg")),
+    ]
+
+    bulk_res = authenticated_client.post(
+        f"/api/v1/hangouts/{hangout_id}/media/bulk",
+        files=files,
+        data={"caption": "Bulk Upload", "is_shared": "true"},
+    )
+    assert bulk_res.status_code == 201
+    items = bulk_res.json()
+    assert len(items) == 2
+    assert all(item["hangout_id"] == hangout_id for item in items)
+    assert all(item["uploaded_by"] == primary_user["id"] for item in items)
+    assert all(item["caption"] == "Bulk Upload" for item in items)

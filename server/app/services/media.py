@@ -126,6 +126,76 @@ def upload_media(
     return media_record
 
 
+def upload_bulk_media(
+    db: Client,
+    hangout_id: str,
+    user_id: str,
+    files: List[UploadFile],
+    captions: Optional[List[str]] = None,
+    caption: Optional[str] = None,
+    is_shared: bool = True,
+) -> List[Dict[str, Any]]:
+    """Upload multiple photos or videos to storage and record database entries in batch with individual or global captions."""
+    if not files:
+        raise BadRequestError("No files provided for upload.")
+
+    # 1. Check hangout existence
+    hangout_res = db.table("hangouts").select("id").eq("id", hangout_id).execute()
+    if not hangout_res.data:
+        raise NotFoundError("Hangout not found.")
+
+    # 2. Get uploader profile
+    profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
+    uploader_profile = profile_res.data[0] if profile_res.data else None
+
+    now = datetime.now(timezone.utc).isoformat()
+    media_records_to_insert = []
+
+    for idx, file in enumerate(files):
+        content_type = file.content_type or ""
+        if content_type not in ALLOWED_MIME_TYPES:
+            raise BadRequestError(
+                f"Unsupported file type '{content_type}' for file '{file.filename}'. Allowed types are photos ({', '.join(ALLOWED_IMAGE_MIME_TYPES)}) and videos ({', '.join(ALLOWED_VIDEO_MIME_TYPES)})."
+            )
+
+        media_type = "video" if content_type in ALLOWED_VIDEO_MIME_TYPES else "photo"
+        file_bytes = file.file.read()
+        file_size = len(file_bytes)
+        check_storage_quota(db, user_id, file_size)
+
+        url = _upload_to_storage(db, file_bytes, file.filename or "media", content_type)
+
+        # Resolve individual caption for this file index if provided
+        file_caption = None
+        if captions and idx < len(captions) and captions[idx]:
+            file_caption = captions[idx]
+        elif caption:
+            file_caption = caption
+
+        media_records_to_insert.append({
+            "hangout_id": hangout_id,
+            "uploaded_by": user_id,
+            "url": url,
+            "thumbnail_url": url,
+            "caption": file_caption,
+            "media_type": media_type,
+            "favorites_count": 0,
+            "file_size_bytes": file_size,
+            "is_shared": is_shared,
+            "created_at": now,
+        })
+
+    insert_res = db.table("media").insert(media_records_to_insert).execute()
+    if not insert_res.data:
+        raise Exception("Failed to save bulk media records.")
+
+    inserted_items = insert_res.data
+    for item in inserted_items:
+        item["uploader"] = uploader_profile
+
+    return inserted_items
+
+
 def get_hangout_media(
     db: Client,
     hangout_id: str,

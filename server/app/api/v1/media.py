@@ -28,6 +28,38 @@ def upload_media(
     )
 
 
+import json
+
+@router.post("/hangouts/{id}/media/bulk", response_model=List[MediaResponse], status_code=status.HTTP_201_CREATED)
+def upload_bulk_media(
+    id: str,
+    files: List[UploadFile] = File(...),
+    captions: Optional[List[str]] = Form(None),
+    captions_json: Optional[str] = Form(None),
+    caption: Optional[str] = Form(None),
+    is_shared: bool = Form(True),
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """Upload multiple photos or videos to a hangout's gallery in batch with individual or global captions."""
+    resolved_captions = captions
+    if captions_json:
+        try:
+            resolved_captions = json.loads(captions_json)
+        except Exception:
+            pass
+
+    return media_service.upload_bulk_media(
+        db=db,
+        hangout_id=id,
+        user_id=current_user["id"],
+        files=files,
+        captions=resolved_captions,
+        caption=caption,
+        is_shared=is_shared,
+    )
+
+
 @router.get("/hangouts/{id}/media", response_model=List[MediaResponse])
 def list_hangout_media(
     id: str,
