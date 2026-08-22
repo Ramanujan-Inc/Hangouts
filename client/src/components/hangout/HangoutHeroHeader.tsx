@@ -9,6 +9,10 @@ interface HangoutHeroHeaderProps {
   coverImage: string
   date: string
   location: string
+  formattedAddress?: string
+  latitude?: number
+  longitude?: number
+  placeId?: string
   participants: string[]
   onBack: () => void
 }
@@ -18,6 +22,10 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
   coverImage,
   date,
   location,
+  formattedAddress,
+  latitude,
+  longitude,
+  placeId,
   participants,
   onBack,
 }) => {
@@ -26,6 +34,12 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
     alt: members[p]?.name || p,
     title: members[p]?.name || p,
   }))
+
+  const mapsUrl = placeId
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}&query_place_id=${placeId}`
+    : latitude != null && longitude != null
+    ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`
+    : null
 
   return (
     <div className="hangout-hero-header">
@@ -62,9 +76,24 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
             <Calendar size={16} />
             <span>{formatDate(date, 'long')}</span>
           </div>
-          <div className="meta-item">
-            <MapPin size={16} className="loc-pin" />
-            <span>{location}</span>
+          <div className="meta-item location-meta-col">
+            <div className="location-title-row">
+              <MapPin size={16} className="loc-pin" />
+              <span className="loc-name">{location}</span>
+              {mapsUrl && (
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="maps-ext-link"
+                >
+                  Open in Maps ↗
+                </a>
+              )}
+            </div>
+            {formattedAddress && formattedAddress !== location && (
+              <span className="loc-full-address">{formattedAddress}</span>
+            )}
           </div>
         </div>
 
@@ -156,6 +185,47 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
           display: flex;
           align-items: center;
           gap: 6px;
+        }
+
+        .location-meta-col {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 2px;
+        }
+
+        .location-title-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        .loc-name {
+          font-weight: 600;
+          color: var(--color-text);
+        }
+
+        .maps-ext-link {
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--color-sea);
+          background-color: var(--tint-sea);
+          padding: 2px 8px;
+          border-radius: 9999px;
+          text-decoration: none;
+          transition: opacity 0.2s;
+        }
+
+        .maps-ext-link:hover {
+          opacity: 0.8;
+          text-decoration: underline;
+        }
+
+        .loc-full-address {
+          font-size: 12px;
+          color: var(--color-text-muted);
+          padding-left: 22px;
         }
 
         :global(.loc-pin) {

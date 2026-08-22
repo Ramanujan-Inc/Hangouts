@@ -30,6 +30,8 @@ export default function CreateHangout() {
   const [time, setTime] = useState('')
   const [showTimeInput, setShowTimeInput] = useState(false)
   const [locationName, setLocationName] = useState('')
+  const [formattedAddress, setFormattedAddress] = useState('')
+  const [placeId, setPlaceId] = useState('')
   const [latitude, setLatitude] = useState<number | null>(null)
   const [longitude, setLongitude] = useState<number | null>(null)
 
@@ -191,10 +193,18 @@ export default function CreateHangout() {
   }
 
   // Location handler
-  const handleSelectLocation = (name: string, lat: number, lng: number) => {
+  const handleSelectLocation = (
+    name: string,
+    lat: number,
+    lng: number,
+    address?: string,
+    id?: string
+  ) => {
     setLocationName(name)
     setLatitude(lat)
     setLongitude(lng)
+    setFormattedAddress(address || '')
+    setPlaceId(id || '')
   }
 
   // Form Submission
@@ -231,6 +241,8 @@ export default function CreateHangout() {
         hangout_date: date,
         hangout_time: time ? `${time}:00` : undefined,
         location_name: locationName.trim() || undefined,
+        formatted_address: formattedAddress.trim() || undefined,
+        place_id: placeId.trim() || undefined,
         latitude: latitude !== null ? latitude : undefined,
         longitude: longitude !== null ? longitude : undefined,
         cover_photo_url: coverPhotoUrl,
@@ -366,10 +378,10 @@ export default function CreateHangout() {
                 onToggleTimeInput={setShowTimeInput}
               />
 
-              {/* Location & Coordinates Picker Trigger */}
+              {/* Location Picker Trigger */}
               <div className="input-group">
                 <label className="field-label">
-                  <MapPin size={16} /> Location & Coordinates
+                  <MapPin size={16} /> Location
                 </label>
                 <div
                   className="location-picker-trigger"
@@ -382,10 +394,8 @@ export default function CreateHangout() {
                     <span className="loc-main">
                       {locationName || 'Add a location or venue...'}
                     </span>
-                    {latitude !== null && longitude !== null && (
-                      <span className="loc-coords">
-                        GPS: {latitude.toFixed(4)}, {longitude.toFixed(4)}
-                      </span>
+                    {formattedAddress && formattedAddress !== locationName && (
+                      <span className="loc-sub-address">{formattedAddress}</span>
                     )}
                   </div>
                 </div>
@@ -522,6 +532,11 @@ export default function CreateHangout() {
             font-size: 15px;
             font-weight: 600;
             color: var(--color-text);
+          }
+
+          .loc-sub-address {
+            font-size: 12px;
+            color: var(--color-text-muted);
           }
 
           .loc-coords {

@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import Layout from '../../components/Layout'
 import { Smile, Film, FileText, DollarSign } from 'lucide-react'
 import { hangoutById } from '../../data/mock'
+import { api } from '../../lib/api'
 import { SegmentedTabs } from '../../components/ui'
 import {
   HangoutTab,
@@ -27,10 +28,46 @@ export default function HangoutDetail() {
   const router = useRouter()
   const { id } = router.query
   const hangoutId = (Array.isArray(id) ? id[0] : id) || '1'
-  const data = hangoutById(hangoutId)
+  const mockData = hangoutById(hangoutId)
 
   const [activeTab, setActiveTab] = useState<HangoutTab>('overview')
-  const [rating, setRating] = useState(data?.rating || 4)
+  const [data, setData] = useState<any>(mockData)
+  const [rating, setRating] = useState(mockData?.rating || 4)
+
+  useEffect(() => {
+    async function loadHangout() {
+      if (!hangoutId) return
+      try {
+        const res = await api.get<any>(`/hangouts/${hangoutId}`)
+        if (res) {
+          const participantNames = res.participants && res.participants.length > 0
+            ? res.participants.map((p: any) => p.profile?.username || p.user_id)
+            : mockData?.participants || ['mika']
+
+          setData({
+            id: res.id,
+            title: res.title,
+            description: res.description || mockData?.description || '',
+            date: res.hangout_date || mockData?.date || '2026-08-22',
+            location: res.location_name || mockData?.location || 'No location set',
+            formattedAddress: res.formatted_address,
+            placeId: res.place_id,
+            latitude: res.latitude,
+            longitude: res.longitude,
+            coverImage: res.cover_photo_url || mockData?.coverImage || 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=500&auto=format&fit=crop&q=60',
+            participants: participantNames,
+            rating: mockData?.rating || 4,
+            media: mockData?.media || [],
+            notes: mockData?.notes || [],
+            expenses: mockData?.expenses || [],
+          })
+        }
+      } catch (err) {
+        console.warn('Failed to load API hangout, falling back to mock:', err)
+      }
+    }
+    loadHangout()
+  }, [hangoutId])
 
   // Media states
   const [media, setMedia] = useState<HangoutMedia[]>(data?.media || data?.photos || [])
@@ -223,6 +260,10 @@ export default function HangoutDetail() {
           coverImage={data.coverImage}
           date={data.date}
           location={data.location}
+          formattedAddress={data.formattedAddress}
+          latitude={data.latitude}
+          longitude={data.longitude}
+          placeId={data.placeId}
           participants={data.participants}
           onBack={() => router.push('/timeline')}
         />

@@ -62,6 +62,10 @@ export interface Hangout {
   description: string
   date: string
   location: string
+  formattedAddress?: string
+  latitude?: number
+  longitude?: number
+  placeId?: string
   coverImage: string
   participants: string[]
   rating: number
@@ -87,6 +91,9 @@ export const hangouts: Hangout[] = [
       'Craving spicy tonkotsu ramen after a long week. Ended up talking for hours about trip planning and old college memories. We ordered the special Gyoza too!',
     date: '2025-07-29',
     location: 'Ramen Nagi, BGC',
+    formattedAddress: 'Bonifacio High Street Central, Taguig, 1634 Metro Manila',
+    latitude: 14.5507,
+    longitude: 121.0465,
     coverImage: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80',
     participants: ['mika', 'jam', 'dave'],
     rating: 4,
@@ -109,6 +116,9 @@ export const hangouts: Hangout[] = [
     description: 'Road trip to the beach! Super clear waters and awesome music.',
     date: '2026-07-15',
     location: 'Anawangin Cove',
+    formattedAddress: 'San Antonio, Zambales, Philippines',
+    latitude: 14.8864,
+    longitude: 120.0617,
     coverImage: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
     participants: ['mika', 'jam', 'dave', 'chloe'],
     rating: 5,
@@ -123,7 +133,10 @@ export const hangouts: Hangout[] = [
     title: 'Coffee & Boardgames',
     description: 'Relaxing afternoon cafe session.',
     date: '2026-07-26',
-    location: 'Wildflour Cafe',
+    location: 'Wildflour Cafe + Bakery',
+    formattedAddress: 'Net Lima Building, 4th Ave, BGC, Taguig, Metro Manila',
+    latitude: 14.5515,
+    longitude: 121.0494,
     coverImage: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=1200&q=80',
     participants: ['mika', 'dave'],
     rating: 4,
