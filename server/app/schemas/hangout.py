@@ -11,6 +11,8 @@ class HangoutBase(BaseModel):
     hangout_date: date
     hangout_time: Optional[time] = None
     location_name: Optional[str] = None
+    formatted_address: Optional[str] = None
+    place_id: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     cover_photo_url: Optional[str] = None
@@ -27,6 +29,8 @@ class HangoutUpdate(BaseModel):
     hangout_date: Optional[date] = None
     hangout_time: Optional[time] = None
     location_name: Optional[str] = None
+    formatted_address: Optional[str] = None
+    place_id: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     cover_photo_url: Optional[str] = None

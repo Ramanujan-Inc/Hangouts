@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS hangouts (
     hangout_date DATE NOT NULL,
     hangout_time TIME,
     location_name VARCHAR(255),
+    formatted_address TEXT,
+    place_id VARCHAR(255),
     latitude NUMERIC(9, 6),
     longitude NUMERIC(9, 6),
     cover_photo_url TEXT,
