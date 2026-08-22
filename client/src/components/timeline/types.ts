@@ -41,7 +41,7 @@ export interface Group {
   cover_image_url?: string | null
 }
 
-export type QuickFilter = 'All' | 'This Month' | 'Memories'
+export type QuickFilter = 'All' | 'Created by Me' | 'This Month' | 'Memories'
 
 export const DEFAULT_COVER =
   'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80'

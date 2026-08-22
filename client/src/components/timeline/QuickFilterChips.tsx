@@ -8,6 +8,7 @@ interface QuickFilterChipsProps {
 
 const quickFilterOptions: Array<{ label: QuickFilter; color: string }> = [
   { label: 'All', color: 'var(--color-blush)' },
+  { label: 'Created by Me', color: 'var(--color-sea)' },
   { label: 'This Month', color: 'var(--color-tangerine)' },
   { label: 'Memories', color: 'var(--color-matcha)' },
 ]

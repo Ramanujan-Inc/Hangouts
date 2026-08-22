@@ -52,6 +52,7 @@ export default function Timeline() {
   )
 
   const fetchHangouts = useCallback(async () => {
+    if (!user) return
     try {
       setLoadingHangouts(true)
       const params = new URLSearchParams()
@@ -81,9 +82,10 @@ export default function Timeline() {
     } finally {
       setLoadingHangouts(false)
     }
-  }, [searchQuery, hangoutNameQuery, locationNameQuery, dateQuery, groupNameQuery])
+  }, [user, searchQuery, hangoutNameQuery, locationNameQuery, dateQuery, groupNameQuery])
 
   const fetchMemories = async () => {
+    if (!user) return
     try {
       const data = await api.get<Memory[]>('/memories/on-this-day')
       if (data && data.length > 0) {
@@ -98,6 +100,7 @@ export default function Timeline() {
   }
 
   const fetchGroups = async () => {
+    if (!user) return
     try {
       const data = await api.get<Group[]>('/groups')
       setGroupsList(data || [])
@@ -107,16 +110,20 @@ export default function Timeline() {
   }
 
   useEffect(() => {
-    fetchGroups()
-    fetchMemories()
-  }, [])
+    if (user) {
+      fetchGroups()
+      fetchMemories()
+    }
+  }, [user])
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchHangouts()
-    }, 250)
-    return () => clearTimeout(timer)
-  }, [fetchHangouts])
+    if (user) {
+      const timer = setTimeout(() => {
+        fetchHangouts()
+      }, 250)
+      return () => clearTimeout(timer)
+    }
+  }, [user, fetchHangouts])
 
   const handleResetFilters = () => {
     setSearchQuery('')
@@ -128,6 +135,9 @@ export default function Timeline() {
   }
 
   const displayedHangouts = hangoutsList.filter((h) => {
+    if (activeQuickFilter === 'Created by Me') {
+      return Boolean(user?.id && h.created_by === user.id)
+    }
     if (activeQuickFilter === 'This Month') {
       const now = new Date()
       const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -216,7 +226,7 @@ export default function Timeline() {
                   variant="card"
                   icon={<Sparkles size={48} />}
                   title="No hangouts found"
-                  description="Try refining your search query or create a new hangout meetup with your crew."
+                  description="Create a new hangout meetup with your crew."
                 />
                 <div className="create-hangout-cta">
                   <Link href="/create">
@@ -227,7 +237,11 @@ export default function Timeline() {
             ) : (
               <div className="hangout-cards-grid">
                 {displayedHangouts.map((h, idx) => (
-                  <HangoutCard key={h.id} hangout={h} index={idx} />
+                  <HangoutCard
+                    key={h.id}
+                    hangout={h}
+                    index={idx}
+                  />
                 ))}
               </div>
             )}

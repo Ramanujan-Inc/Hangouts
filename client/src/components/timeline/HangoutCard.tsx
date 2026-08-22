@@ -13,6 +13,7 @@ interface HangoutCardProps {
 export const HangoutCard: React.FC<HangoutCardProps> = ({ hangout, index }) => {
   const rotationDeg = ((index % 5) - 2) * 1.5
   const participantsList = hangout.participants || []
+
   const avatarStackItems = participantsList.map((p, pIdx) => ({
     src:
       p.profile?.avatar_url ||
