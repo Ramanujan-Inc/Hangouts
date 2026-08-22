@@ -262,7 +262,7 @@ export default function HangoutDetail() {
               }))}
             />
             <span className="avatar-count-badge" style={{ transform: `translateX(-${(data.participants.length - 1) * 12}px)` }}>
-              {data.participants.length} friends
+              {data.participants.length} {data.participants.length === 1 ? 'member' : 'members'}
             </span>
           </div>
         </section>
