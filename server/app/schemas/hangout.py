@@ -63,6 +63,7 @@ class HangoutResponse(HangoutBase):
 
 class MemoryResponse(HangoutResponse):
     years_ago: int
+    days_diff: Optional[int] = 0
 
 
 class RatingCreate(BaseModel):
