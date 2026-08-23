@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { mutate } from 'swr';
 import { api } from '../lib/api';
 
 export interface UserProfile {
@@ -91,6 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('hangout_token');
     setToken(null);
     setUser(null);
+    mutate(() => true, undefined, { revalidate: false });
   }, []);
 
   const refreshUser = useCallback(async () => {

@@ -56,7 +56,7 @@ export default function CreateHangout() {
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Fetch user groups and all known group circle members on mount
+  // Fetch user groups and all known group circle members on mount in a single request
   useEffect(() => {
     async function loadGroupsAndMembers() {
       try {
@@ -66,17 +66,12 @@ export default function CreateHangout() {
 
         const knownMembersMap = new Map<string, GroupMemberProfile>()
         for (const grp of data || []) {
-          try {
-            const groupDetails = await api.get<Group>(`/groups/${grp.id}`)
-            if (groupDetails && groupDetails.members) {
-              for (const m of groupDetails.members) {
-                if (m.status === 'accepted' && m.profile && m.profile.id !== user?.id) {
-                  knownMembersMap.set(m.profile.id, m.profile)
-                }
+          if (grp.members) {
+            for (const m of grp.members) {
+              if (m.status === 'accepted' && m.profile && m.profile.id !== user?.id) {
+                knownMembersMap.set(m.profile.id, m.profile)
               }
             }
-          } catch (e) {
-            // Ignore individual group fetch failure
           }
         }
         setAllCircleMembers(Array.from(knownMembersMap.values()))
@@ -89,13 +84,25 @@ export default function CreateHangout() {
     loadGroupsAndMembers()
   }, [user?.id])
 
-  // When group selection changes, fetch that group's active members
+  // When group selection changes, read from cached groups or fetch on demand
   useEffect(() => {
     async function loadGroupMembers() {
       if (!selectedGroupId) {
         setGroupMembers([])
         return
       }
+
+      // Check if group and members are already in memory
+      const cachedGroup = groups.find((g) => g.id === selectedGroupId)
+      if (cachedGroup && cachedGroup.members) {
+        const membersList = cachedGroup.members
+          .filter((m) => m.status === 'accepted' && m.profile && m.profile.id !== user?.id)
+          .map((m) => m.profile as GroupMemberProfile)
+        setGroupMembers(membersList)
+        setSelectedParticipants(membersList.map((m) => m.id))
+        return
+      }
+
       try {
         setLoadingMembers(true)
         const groupDetails = await api.get<Group>(`/groups/${selectedGroupId}`)
@@ -116,7 +123,7 @@ export default function CreateHangout() {
       }
     }
     loadGroupMembers()
-  }, [selectedGroupId, user?.id])
+  }, [selectedGroupId, groups, user?.id])
 
   // Photo handlers
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

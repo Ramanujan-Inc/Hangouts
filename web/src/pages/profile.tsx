@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
+import useSWR from 'swr'
 import Layout from '../components/Layout'
 import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
@@ -24,9 +25,14 @@ export default function ProfileSettings() {
   const [nameError, setNameError] = useState<string | null>(null)
   const [isSavingName, setIsSavingName] = useState(false)
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false)
-  const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
-  const [loadingStorage, setLoadingStorage] = useState(true)
   const [toastMessage, setToastMessage] = useState('')
+
+  const { data: storageUsageData, isLoading: loadingStorage } = useSWR<StorageUsage>('/storage/usage')
+  const storageUsage = storageUsageData || {
+    used_bytes: 0,
+    max_bytes: 500 * 1024 * 1024,
+    percentage_used: 0.0,
+  }
 
   const displayName = user?.username || 'User'
   const displayEmail = user?.email || ''
@@ -40,28 +46,6 @@ export default function ProfileSettings() {
       }
     }
   }, [user])
-
-  const fetchStorageUsage = async () => {
-    try {
-      setLoadingStorage(true)
-      const usage = await api.get<StorageUsage>('/storage/usage')
-      setStorageUsage(usage)
-    } catch (err) {
-      console.error('Failed to load storage usage:', err)
-      setStorageUsage({
-        used_bytes: 0,
-        max_bytes: 500 * 1024 * 1024,
-        percentage_used: 0.0,
-      })
-    } finally {
-      setLoadingStorage(false)
-    }
-  }
-
-  useEffect(() => {
-    refreshUser().catch(console.error)
-    fetchStorageUsage()
-  }, [])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)

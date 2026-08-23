@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
+import useSWR from 'swr'
 import Layout from '../components/Layout'
 import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
-import { api } from '../lib/api'
 import { Sparkles } from 'lucide-react'
 import { EmptyState, Button, Spinner } from '../components/ui'
 import {
@@ -21,11 +21,7 @@ import {
 
 export default function Timeline() {
   const { user } = useAuth()
-  const [hangoutsList, setHangoutsList] = useState<Hangout[]>([])
-  const [groupsList, setGroupsList] = useState<Group[]>([])
-  const [memory, setMemory] = useState<Memory | null>(null)
   const [showMemory, setShowMemory] = useState(true)
-  const [loadingHangouts, setLoadingHangouts] = useState(true)
 
   // Granular Filter queries
   const [searchQuery, setSearchQuery] = useState('')
@@ -51,79 +47,24 @@ export default function Timeline() {
       activeQuickFilter !== 'All'
   )
 
-  const fetchHangouts = useCallback(async () => {
-    if (!user) return
-    try {
-      setLoadingHangouts(true)
-      const params = new URLSearchParams()
+  // Construct query string for SWR key
+  const params = new URLSearchParams()
+  if (searchQuery.trim()) params.set('q', searchQuery.trim())
+  if (hangoutNameQuery.trim()) params.set('hangout_name', hangoutNameQuery.trim())
+  if (locationNameQuery.trim()) params.set('location_name', locationNameQuery.trim())
+  if (dateQuery) params.set('date', dateQuery)
+  if (groupNameQuery.trim()) params.set('group_name', groupNameQuery.trim())
 
-      if (searchQuery.trim()) {
-        params.set('q', searchQuery.trim())
-      }
-      if (hangoutNameQuery.trim()) {
-        params.set('hangout_name', hangoutNameQuery.trim())
-      }
-      if (locationNameQuery.trim()) {
-        params.set('location_name', locationNameQuery.trim())
-      }
-      if (dateQuery) {
-        params.set('date', dateQuery)
-      }
-      if (groupNameQuery.trim()) {
-        params.set('group_name', groupNameQuery.trim())
-      }
+  const hangoutsEndpoint = user ? `/hangouts${params.toString() ? `?${params.toString()}` : ''}` : null
 
-      const queryStr = params.toString() ? `?${params.toString()}` : ''
-      const data = await api.get<Hangout[]>(`/hangouts${queryStr}`)
-      setHangoutsList(data || [])
-    } catch (err) {
-      console.error('Failed to fetch hangouts:', err)
-      setHangoutsList([])
-    } finally {
-      setLoadingHangouts(false)
-    }
-  }, [user, searchQuery, hangoutNameQuery, locationNameQuery, dateQuery, groupNameQuery])
+  // SWR queries
+  const { data: hangoutsData, isLoading: loadingHangouts } = useSWR<Hangout[]>(hangoutsEndpoint)
+  const { data: groupsData } = useSWR<Group[]>(user ? '/groups' : null)
+  const { data: memoriesData } = useSWR<Memory[]>(user ? '/memories/on-this-day' : null)
 
-  const fetchMemories = async () => {
-    if (!user) return
-    try {
-      const data = await api.get<Memory[]>('/memories/on-this-day')
-      if (data && data.length > 0) {
-        setMemory(data[0])
-      } else {
-        setMemory(null)
-      }
-    } catch (err) {
-      console.error('Failed to fetch memories:', err)
-      setMemory(null)
-    }
-  }
-
-  const fetchGroups = async () => {
-    if (!user) return
-    try {
-      const data = await api.get<Group[]>('/groups')
-      setGroupsList(data || [])
-    } catch (err) {
-      console.error('Failed to fetch groups:', err)
-    }
-  }
-
-  useEffect(() => {
-    if (user) {
-      fetchGroups()
-      fetchMemories()
-    }
-  }, [user])
-
-  useEffect(() => {
-    if (user) {
-      const timer = setTimeout(() => {
-        fetchHangouts()
-      }, 250)
-      return () => clearTimeout(timer)
-    }
-  }, [user, fetchHangouts])
+  const hangoutsList = hangoutsData || []
+  const groupsList = groupsData || []
+  const memory = memoriesData && memoriesData.length > 0 ? memoriesData[0] : null
 
   const handleResetFilters = () => {
     setSearchQuery('')

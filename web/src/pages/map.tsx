@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import useSWR from 'swr'
 import Layout from '../components/Layout'
 import { MapPin, Calendar, ArrowRight, ChevronDown, RefreshCw } from 'lucide-react'
 import { formatDate } from '../lib/format'
-import { api } from '../lib/api'
 import { HangoutPin } from '../components/MapComponent'
 
 // Dynamically import OpenStreetMap Leaflet component (No SSR for Leaflet)
@@ -20,35 +20,17 @@ const MapComponent = dynamic(() => import('../components/MapComponent'), {
 })
 
 export default function GroupMap() {
-  const [pins, setPins] = useState<HangoutPin[]>([])
+  const { data: pinsData, isLoading: loading } = useSWR<HangoutPin[]>('/hangouts/map')
+  const pins = pinsData || []
   const [selectedPin, setSelectedPin] = useState<HangoutPin | null>(null)
   const [filterGroup, setFilterGroup] = useState('College Barkada')
   const [showDropdown, setShowDropdown] = useState(false)
-  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetchMapPins()
-  }, [filterGroup])
-
-  const fetchMapPins = async () => {
-    setLoading(true)
-    try {
-      const data = await api.get<HangoutPin[]>('/hangouts/map')
-      if (data && data.length > 0) {
-        setPins(data)
-        setSelectedPin(data[0])
-      } else {
-        setPins([])
-        setSelectedPin(null)
-      }
-    } catch (err) {
-      console.warn('Failed to load map pins from backend:', err)
-      setPins([])
-      setSelectedPin(null)
-    } finally {
-      setLoading(false)
+    if (pins.length > 0 && !selectedPin) {
+      setSelectedPin(pins[0])
     }
-  }
+  }, [pins, selectedPin])
 
   return (
     <Layout>
