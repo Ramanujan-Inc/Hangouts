@@ -32,6 +32,7 @@ export interface Hangout {
 
 export interface Memory extends Hangout {
   years_ago: number
+  days_diff?: number
 }
 
 export interface Group {
