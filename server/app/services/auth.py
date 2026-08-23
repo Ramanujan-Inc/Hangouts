@@ -16,6 +16,8 @@ def sign_up_user(db: Client, user_in: UserSignUp) -> Dict[str, Any]:
             detail="Username is already taken.",
         )
 
+    avatar_url_val = user_in.avatar_url or "https://api.dicebear.com/7.x/adventurer/svg?seed=mika"
+
     try:
         auth_response = db.auth.sign_up(
             {
@@ -24,7 +26,7 @@ def sign_up_user(db: Client, user_in: UserSignUp) -> Dict[str, Any]:
                 "options": {
                     "data": {
                         "username": username_val,
-                        "avatar_url": user_in.avatar_url,
+                        "avatar_url": avatar_url_val,
                     }
                 },
             }

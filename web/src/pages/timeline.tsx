@@ -7,6 +7,7 @@ import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
 import { Sparkles } from 'lucide-react'
 import { EmptyState, Button, Spinner } from '../components/ui'
+import { DEFAULT_AVATAR } from '../data/mock'
 import {
   Hangout,
   Memory,
@@ -95,7 +96,7 @@ export default function Timeline() {
     return true
   })
 
-  const userAvatar = user?.avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=Mika'
+  const userAvatar = user?.avatar_url || DEFAULT_AVATAR
   const userName = user?.username || 'User'
 
   return (

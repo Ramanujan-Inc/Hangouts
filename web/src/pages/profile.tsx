@@ -7,7 +7,7 @@ import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
 import { api, ApiError } from '../lib/api'
 import { LogOut } from 'lucide-react'
-import { profileAvatars } from '../data/mock'
+import { profileAvatars, DEFAULT_AVATAR } from '../data/mock'
 import { Toast } from '../components/ui'
 import {
   StorageUsage,
@@ -20,7 +20,8 @@ import {
 export default function ProfileSettings() {
   const router = useRouter()
   const { user, logout, refreshUser } = useAuth()
-  const [avatarIndex, setAvatarIndex] = useState(0)
+  const defaultIndex = Math.max(0, profileAvatars.indexOf(DEFAULT_AVATAR))
+  const [avatarIndex, setAvatarIndex] = useState(defaultIndex)
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false)
   const [nameError, setNameError] = useState<string | null>(null)
   const [isSavingName, setIsSavingName] = useState(false)
@@ -36,7 +37,7 @@ export default function ProfileSettings() {
 
   const displayName = user?.username || 'User'
   const displayEmail = user?.email || ''
-  const currentAvatar = user?.avatar_url || profileAvatars[avatarIndex] || profileAvatars[0]
+  const currentAvatar = user?.avatar_url || profileAvatars[avatarIndex] || DEFAULT_AVATAR
 
   useEffect(() => {
     if (user?.avatar_url) {
@@ -44,8 +45,10 @@ export default function ProfileSettings() {
       if (idx !== -1) {
         setAvatarIndex(idx)
       }
+    } else {
+      setAvatarIndex(defaultIndex)
     }
-  }, [user])
+  }, [user, defaultIndex])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
