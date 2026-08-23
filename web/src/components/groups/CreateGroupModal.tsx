@@ -3,13 +3,15 @@ import { Upload, Camera, Check } from 'lucide-react'
 import { Modal, TextField, Button } from '../ui'
 import { api } from '../../lib/api'
 import { PRESET_COVERS } from './types'
+import { MemberInviteInput, InvitedMember } from './MemberInviteInput'
 
 interface CreateGroupModalProps {
   isOpen: boolean
   onClose: () => void
-  onCreate: (name: string, coverImageUrl: string) => Promise<void>
+  onCreate: (name: string, coverImageUrl: string, inviteUsernames?: string[]) => Promise<void>
   onNotify?: (message: string) => void
   creating?: boolean
+  currentUsername?: string
 }
 
 export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
@@ -18,11 +20,13 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   onCreate,
   onNotify,
   creating = false,
+  currentUsername,
 }) => {
   const [newGroupName, setNewGroupName] = useState('')
   const [selectedCover, setSelectedCover] = useState(PRESET_COVERS[0])
   const [customCoverPreview, setCustomCoverPreview] = useState<string | null>(null)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [invitedMembers, setInvitedMembers] = useState<InvitedMember[]>([])
 
   if (!isOpen) return null
 
@@ -54,10 +58,12 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     e.preventDefault()
     if (!newGroupName.trim()) return
 
-    await onCreate(newGroupName.trim(), selectedCover)
+    const usernames = invitedMembers.map((m) => m.username)
+    await onCreate(newGroupName.trim(), selectedCover, usernames)
     setNewGroupName('')
     setCustomCoverPreview(null)
     setSelectedCover(PRESET_COVERS[0])
+    setInvitedMembers([])
   }
 
   return (
@@ -69,6 +75,15 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           value={newGroupName}
           onChange={(e) => setNewGroupName(e.target.value)}
           required
+        />
+
+        {/* Reusable Invite Members Component */}
+        <MemberInviteInput
+          invitedMembers={invitedMembers}
+          onInvitedMembersChange={setInvitedMembers}
+          currentUsername={currentUsername}
+          label="Invite Members (Optional)"
+          placeholder="Enter username (e.g. jam, dave)"
         />
 
         <div className="cover-picker-section">

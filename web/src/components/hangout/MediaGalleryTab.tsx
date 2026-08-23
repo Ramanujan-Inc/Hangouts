@@ -1,7 +1,6 @@
 import React from 'react'
 import { Plus, Film, Video, Heart, Play } from 'lucide-react'
 import { Button, EmptyState, Badge } from '../ui'
-import MemberAvatar from '../MemberAvatar'
 import { HangoutMedia } from './types'
 
 interface MediaGalleryTabProps {
@@ -23,20 +22,19 @@ export const MediaGalleryTab: React.FC<MediaGalleryTabProps> = ({
   onSelectMedia,
   onToggleFavorite,
 }) => {
-  const filteredMedia = media.filter((item) => {
-    if (mediaFilter === 'favorites') {
-      return Boolean(item.is_favorited || item.favorites_count > 0)
-    }
-    if (mediaFilter === 'videos') {
-      return item.media_type === 'video'
-    }
-    return true
-  })
+  const filteredMedia = media
+    .filter((item) => {
+      if (mediaFilter === 'favorites') {
+        return Boolean(item.is_favorited)
+      }
+      if (mediaFilter === 'videos') {
+        return item.media_type === 'video'
+      }
+      return true
+    })
+    .sort((a, b) => (b.favorites_count || 0) - (a.favorites_count || 0))
 
-  const favoritesCount = media.filter(
-    (m) => Boolean(m.is_favorited || m.favorites_count > 0)
-  ).length
-
+  const favoritesCount = media.filter((m) => Boolean(m.is_favorited)).length
   const videosCount = media.filter((m) => m.media_type === 'video').length
 
   return (
@@ -113,10 +111,6 @@ export const MediaGalleryTab: React.FC<MediaGalleryTabProps> = ({
                 ) : (
                   <img src={item.url} alt={item.caption || 'Hangout memory'} className="media-asset" />
                 )}
-
-                <div className="uploader-badge">
-                  <MemberAvatar profile={item.uploader} memberId={item.uploaded_by} size={24} />
-                </div>
 
                 {item.media_type === 'video' && (
                   <div className="video-type-tag">
@@ -258,13 +252,6 @@ export const MediaGalleryTab: React.FC<MediaGalleryTabProps> = ({
           display: flex;
           align-items: center;
           justify-content: center;
-        }
-
-        .uploader-badge {
-          position: absolute;
-          top: 8px;
-          left: 8px;
-          z-index: 2;
         }
 
         .video-type-tag {

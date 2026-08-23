@@ -84,16 +84,36 @@ export default function GroupsPage() {
     }
   }
 
-  const handleCreateGroup = async (name: string, coverImageUrl: string) => {
+  const handleCreateGroup = async (
+    name: string,
+    coverImageUrl: string,
+    inviteUsernames: string[] = []
+  ) => {
     try {
       setCreating(true)
       const newGroup = await api.post<Group>('/groups', {
         name,
         cover_image_url: coverImageUrl,
       })
+
+      // Send invitations to added members if any
+      if (inviteUsernames.length > 0) {
+        for (const username of inviteUsernames) {
+          try {
+            await api.post(`/groups/${newGroup.id}/members`, { username })
+          } catch (err: any) {
+            console.error(`Failed to invite ${username}:`, err)
+          }
+        }
+      }
+
       setGroups((prev) => [newGroup, ...prev])
       setIsCreateOpen(false)
-      showToast(`Group "${newGroup.name}" created!`)
+      showToast(
+        inviteUsernames.length > 0
+          ? `Group "${newGroup.name}" created and invitations sent!`
+          : `Group "${newGroup.name}" created!`
+      )
       fetchGroups()
     } catch (err: any) {
       showToast(err.message || 'Failed to create group')
@@ -102,44 +122,60 @@ export default function GroupsPage() {
     }
   }
 
-  const handleInviteMember = async (username: string) => {
-    if (!selectedGroup) return
+  const handleInviteMember = async (usernames: string[]) => {
+    if (!selectedGroup || usernames.length === 0) return
 
     try {
       setInviting(true)
-      const member = await api.post<GroupMember>(`/groups/${selectedGroup.id}/members`, {
-        username,
-      })
+      const invitedCount = usernames.length
+      const addedMembers: GroupMember[] = []
 
-      // Update local group members
-      setGroups((prev) =>
-        prev.map((g) => {
-          if (g.id === selectedGroup.id) {
-            const currentMembers = g.members || []
-            return {
-              ...g,
-              members: [...currentMembers, member],
-            }
-          }
-          return g
-        })
-      )
-
-      // Update active modal group details if currently open
-      setActiveGroupDetail((prev) => {
-        if (!prev || prev.id !== selectedGroup.id) return prev
-        const currentMembers = prev.members || []
-        return {
-          ...prev,
-          members: [...currentMembers, member],
+      for (const username of usernames) {
+        try {
+          const member = await api.post<GroupMember>(`/groups/${selectedGroup.id}/members`, {
+            username,
+          })
+          if (member) addedMembers.push(member)
+        } catch (err: any) {
+          console.error(`Failed to invite ${username}:`, err)
         }
-      })
+      }
+
+      if (addedMembers.length > 0) {
+        // Update local group members
+        setGroups((prev) =>
+          prev.map((g) => {
+            if (g.id === selectedGroup.id) {
+              const currentMembers = g.members || []
+              return {
+                ...g,
+                members: [...currentMembers, ...addedMembers],
+              }
+            }
+            return g
+          })
+        )
+
+        // Update active modal group details if currently open
+        setActiveGroupDetail((prev) => {
+          if (!prev || prev.id !== selectedGroup.id) return prev
+          const currentMembers = prev.members || []
+          return {
+            ...prev,
+            members: [...currentMembers, ...addedMembers],
+          }
+        })
+      }
 
       setIsInviteOpen(false)
-      showToast(`Invited ${username}!`)
+      showToast(
+        invitedCount === 1
+          ? `Invited ${usernames[0]}!`
+          : `Invitations sent to ${invitedCount} friends!`
+      )
       fetchGroups()
     } catch (err: any) {
-      showToast(err.message || 'Failed to invite member')
+      showToast(err.message || 'Failed to invite members')
     } finally {
       setInviting(false)
     }
@@ -259,6 +295,7 @@ export default function GroupsPage() {
             onCreate={handleCreateGroup}
             onNotify={showToast}
             creating={creating}
+            currentUsername={user?.username}
           />
 
           {/* Invite Member Modal */}
@@ -271,6 +308,7 @@ export default function GroupsPage() {
             }}
             onInvite={handleInviteMember}
             inviting={inviting}
+            currentUsername={user?.username}
           />
         </div>
 
