@@ -4,7 +4,6 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import Layout from '../components/Layout'
 import { MapPin, Calendar, ArrowRight, ChevronDown, RefreshCw } from 'lucide-react'
-import { mapPins, hangoutById } from '../data/mock'
 import { formatDate } from '../lib/format'
 import { api } from '../lib/api'
 import { HangoutPin } from '../components/MapComponent'
@@ -20,23 +19,9 @@ const MapComponent = dynamic(() => import('../components/MapComponent'), {
   ),
 })
 
-// Fallback mock pins for demonstration if API coordinates are not populated
-const fallbackPins: HangoutPin[] = mapPins.map((pin, idx) => {
-  const h = hangoutById(pin.id)
-  return {
-    id: pin.id,
-    title: h?.title || 'Group Hangout',
-    location_name: h?.location || 'Manila',
-    latitude: 14.5800 + (idx * 0.015),
-    longitude: 120.9800 + (idx * 0.012),
-    hangout_date: h?.date || '2026-08-10',
-    cover_photo_url: h?.coverImage || 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=500&auto=format&fit=crop&q=60',
-  }
-})
-
 export default function GroupMap() {
-  const [pins, setPins] = useState<HangoutPin[]>(fallbackPins)
-  const [selectedPin, setSelectedPin] = useState<HangoutPin | null>(fallbackPins[0])
+  const [pins, setPins] = useState<HangoutPin[]>([])
+  const [selectedPin, setSelectedPin] = useState<HangoutPin | null>(null)
   const [filterGroup, setFilterGroup] = useState('College Barkada')
   const [showDropdown, setShowDropdown] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -53,11 +38,13 @@ export default function GroupMap() {
         setPins(data)
         setSelectedPin(data[0])
       } else {
-        setPins(fallbackPins)
+        setPins([])
+        setSelectedPin(null)
       }
     } catch (err) {
-      console.warn('Backend map endpoint unavailable, using mock pin data:', err)
-      setPins(fallbackPins)
+      console.warn('Failed to load map pins from backend:', err)
+      setPins([])
+      setSelectedPin(null)
     } finally {
       setLoading(false)
     }

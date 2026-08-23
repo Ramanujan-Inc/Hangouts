@@ -1,7 +1,6 @@
 import React from 'react'
 import { X, Heart, Trash2 } from 'lucide-react'
 import MemberAvatar from '../MemberAvatar'
-import { members } from '../../data/mock'
 import { HangoutMedia } from './types'
 
 interface MediaLightboxModalProps {
