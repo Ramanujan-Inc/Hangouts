@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, ZoomControl, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -11,6 +11,7 @@ export interface HangoutPin {
   longitude: number
   hangout_date?: string
   cover_photo_url?: string
+  group_id?: string | null
 }
 
 interface MapComponentProps {
@@ -86,11 +87,13 @@ export default function MapComponent({
       <MapContainer
         center={mapCenter}
         zoom={zoom}
+        zoomControl={false}
         scrollWheelZoom={true}
         attributionControl={false}
         style={{ width: '100%', height: '100%', borderRadius: 'inherit', background: '#eef4fb' }}
       >
         <MapController center={mapCenter} zoom={zoom} />
+        <ZoomControl position="bottomright" />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
@@ -126,6 +129,43 @@ export default function MapComponent({
           border-radius: inherit;
           background: #eef4fb;
           z-index: 1;
+        }
+
+        /* Modernized Leaflet Zoom Controls */
+        .map-component-root .leaflet-bottom.leaflet-right {
+          margin-bottom: 20px;
+          margin-right: 20px;
+        }
+
+        .map-component-root .leaflet-control-zoom {
+          border: 1px solid rgba(0, 0, 0, 0.08) !important;
+          border-radius: 14px !important;
+          overflow: hidden;
+          box-shadow: 0 4px 16px rgba(46, 42, 40, 0.12) !important;
+          background: rgba(255, 255, 255, 0.95) !important;
+          backdrop-filter: blur(12px) !important;
+          -webkit-backdrop-filter: blur(12px) !important;
+        }
+
+        .map-component-root .leaflet-control-zoom a {
+          background: transparent !important;
+          color: var(--color-text) !important;
+          border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+          width: 36px !important;
+          height: 36px !important;
+          line-height: 36px !important;
+          font-size: 16px !important;
+          font-weight: 700 !important;
+          transition: all 0.2s ease;
+        }
+
+        .map-component-root .leaflet-control-zoom a:last-child {
+          border-bottom: none !important;
+        }
+
+        .map-component-root .leaflet-control-zoom a:hover {
+          background: #ffffff !important;
+          color: var(--color-tangerine) !important;
         }
 
         /* Custom Leaflet Pin Markers */

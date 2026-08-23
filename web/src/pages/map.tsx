@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import useSWR from 'swr'
 import Layout from '../components/Layout'
-import { MapPin, Calendar, ArrowRight, ChevronDown, RefreshCw } from 'lucide-react'
+import { MapPin, Calendar, ArrowRight, ChevronDown, RefreshCw, Users, Check } from 'lucide-react'
 import { formatDate } from '../lib/format'
 import { HangoutPin } from '../components/MapComponent'
+import { Group } from '../components/groups/types'
 
 // Dynamically import OpenStreetMap Leaflet component (No SSR for Leaflet)
 const MapComponent = dynamic(() => import('../components/MapComponent'), {
@@ -19,18 +20,81 @@ const MapComponent = dynamic(() => import('../components/MapComponent'), {
   ),
 })
 
-export default function GroupMap() {
-  const { data: pinsData, isLoading: loading } = useSWR<HangoutPin[]>('/hangouts/map')
-  const pins = pinsData || []
-  const [selectedPin, setSelectedPin] = useState<HangoutPin | null>(null)
-  const [filterGroup, setFilterGroup] = useState('College Barkada')
-  const [showDropdown, setShowDropdown] = useState(false)
+type DateFilterType = 'All Time' | 'This Month' | 'This Year' | 'Memories'
 
+export default function GroupMap() {
+  const { data: pinsData, isLoading: loadingPins } = useSWR<HangoutPin[]>('/hangouts/map')
+  const { data: groupsData, isLoading: loadingGroups } = useSWR<Group[]>('/groups')
+  const pins = pinsData || []
+  const groups = groupsData || []
+
+  const [selectedPin, setSelectedPin] = useState<HangoutPin | null>(null)
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('all')
+  const [selectedDateFilter, setSelectedDateFilter] = useState<DateFilterType>('All Time')
+
+  const [showGroupDropdown, setShowGroupDropdown] = useState(false)
+  const [showDateDropdown, setShowDateDropdown] = useState(false)
+
+  const groupDropdownRef = useRef<HTMLDivElement>(null)
+  const dateDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdowns on outside click
   useEffect(() => {
-    if (pins.length > 0 && !selectedPin) {
-      setSelectedPin(pins[0])
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (groupDropdownRef.current && !groupDropdownRef.current.contains(e.target as Node)) {
+        setShowGroupDropdown(false)
+      }
+      if (dateDropdownRef.current && !dateDropdownRef.current.contains(e.target as Node)) {
+        setShowDateDropdown(false)
+      }
     }
-  }, [pins, selectedPin])
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
+  }, [])
+
+  // Filter pins dynamically by group and date
+  const filteredPins = useMemo(() => {
+    return pins.filter((pin) => {
+      if (selectedGroupId !== 'all' && pin.group_id && pin.group_id !== selectedGroupId) {
+        return false
+      }
+      if (selectedDateFilter !== 'All Time' && pin.hangout_date) {
+        const pinDate = new Date(pin.hangout_date)
+        const now = new Date()
+        if (selectedDateFilter === 'This Month') {
+          const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+          if (!pin.hangout_date.startsWith(currentYM)) return false
+        } else if (selectedDateFilter === 'This Year') {
+          if (pinDate.getFullYear() !== now.getFullYear()) return false
+        } else if (selectedDateFilter === 'Memories') {
+          if (pinDate.getFullYear() >= now.getFullYear()) return false
+        }
+      }
+      return true
+    })
+  }, [pins, selectedGroupId, selectedDateFilter])
+
+  // Maintain valid selected pin selection
+  useEffect(() => {
+    if (filteredPins.length > 0) {
+      if (!selectedPin || !filteredPins.some((p) => p.id === selectedPin.id)) {
+        setSelectedPin(filteredPins[0])
+      }
+    } else {
+      setSelectedPin(null)
+    }
+  }, [filteredPins, selectedPin])
+
+  const selectedGroupName =
+    selectedGroupId === 'all'
+      ? 'All Groups'
+      : groups.find((g) => g.id === selectedGroupId)?.name || 'Group'
+
+  const loading = loadingPins || loadingGroups
 
   return (
     <Layout>
@@ -39,40 +103,100 @@ export default function GroupMap() {
       </Head>
 
       <div className="map-page-container">
-        {/* Top Floating Filter Bar */}
-        <div className="map-filter-bar">
-          <div className="filter-select-wrapper">
-            <button className="filter-btn" onClick={() => setShowDropdown(!showDropdown)}>
-              <span>{filterGroup}</span>
-              <ChevronDown size={16} />
-            </button>
+        {/* Interactive OpenStreetMap Canvas */}
+        <div className="map-canvas-container">
+          {/* Floating Filter Controls Overlay */}
+          <div className="map-filter-bar">
+            {/* Group Filter Dropdown */}
+            <div className="filter-select-wrapper" ref={groupDropdownRef}>
+              <button
+                className={`filter-btn ${showGroupDropdown ? 'open' : ''} ${selectedGroupId !== 'all' ? 'active' : ''}`}
+                onClick={() => {
+                  setShowGroupDropdown(!showGroupDropdown)
+                  setShowDateDropdown(false)
+                }}
+                type="button"
+                aria-label="Filter by group"
+              >
+                <Users size={14} className="filter-icon" />
+                <span className="filter-btn-text">{selectedGroupName}</span>
+                <ChevronDown size={14} className={`chevron-icon ${showGroupDropdown ? 'rotate' : ''}`} />
+              </button>
 
-            {showDropdown && (
-              <div className="filter-dropdown">
-                <div className="dropdown-item" onClick={() => { setFilterGroup('College Barkada'); setShowDropdown(false); }}>College Barkada</div>
-                <div className="dropdown-item" onClick={() => { setFilterGroup('Weekend Warriors'); setShowDropdown(false); }}>Weekend Warriors</div>
-                <div className="dropdown-item" onClick={() => { setFilterGroup('All Groups'); setShowDropdown(false); }}>All Groups</div>
+              {showGroupDropdown && (
+                <div className="filter-dropdown">
+                  <div
+                    className={`dropdown-item ${selectedGroupId === 'all' ? 'selected' : ''}`}
+                    onClick={() => {
+                      setSelectedGroupId('all')
+                      setShowGroupDropdown(false)
+                    }}
+                  >
+                    <span>All Groups</span>
+                    {selectedGroupId === 'all' && <Check size={14} className="check-icon" />}
+                  </div>
+                  {groups.map((group) => (
+                    <div
+                      key={group.id}
+                      className={`dropdown-item ${selectedGroupId === group.id ? 'selected' : ''}`}
+                      onClick={() => {
+                        setSelectedGroupId(group.id)
+                        setShowGroupDropdown(false)
+                      }}
+                    >
+                      <span>{group.name}</span>
+                      {selectedGroupId === group.id && <Check size={14} className="check-icon" />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Date Filter Dropdown */}
+            <div className="filter-select-wrapper" ref={dateDropdownRef}>
+              <button
+                className={`filter-btn ${showDateDropdown ? 'open' : ''} ${selectedDateFilter !== 'All Time' ? 'active' : ''}`}
+                onClick={() => {
+                  setShowDateDropdown(!showDateDropdown)
+                  setShowGroupDropdown(false)
+                }}
+                type="button"
+                aria-label="Filter by date"
+              >
+                <Calendar size={14} className="filter-icon" />
+                <span className="filter-btn-text">{selectedDateFilter}</span>
+                <ChevronDown size={14} className={`chevron-icon ${showDateDropdown ? 'rotate' : ''}`} />
+              </button>
+
+              {showDateDropdown && (
+                <div className="filter-dropdown">
+                  {(['All Time', 'This Month', 'This Year', 'Memories'] as DateFilterType[]).map((option) => (
+                    <div
+                      key={option}
+                      className={`dropdown-item ${selectedDateFilter === option ? 'selected' : ''}`}
+                      onClick={() => {
+                        setSelectedDateFilter(option)
+                        setShowDateDropdown(false)
+                      }}
+                    >
+                      <span>{option}</span>
+                      {selectedDateFilter === option && <Check size={14} className="check-icon" />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {loading && (
+              <div className="loading-chip">
+                <RefreshCw size={13} className="spin" />
+                <span>Loading pins...</span>
               </div>
             )}
           </div>
 
-          <div className="date-chip">
-            <Calendar size={14} />
-            <span>All Time</span>
-          </div>
-
-          {loading && (
-            <div className="loading-chip">
-              <RefreshCw size={14} className="spin" />
-              <span>Loading pins...</span>
-            </div>
-          )}
-        </div>
-
-        {/* Interactive OpenStreetMap Canvas */}
-        <div className="map-canvas-container">
           <MapComponent
-            pins={pins}
+            pins={filteredPins}
             selectedPin={selectedPin}
             onSelectPin={(pin) => setSelectedPin(pin)}
             center={[14.5995, 120.9842]}
@@ -117,15 +241,17 @@ export default function GroupMap() {
           max-height: 700px;
           display: flex;
           flex-direction: column;
-          gap: 20px;
         }
 
         .map-filter-bar {
-          position: relative;
+          position: absolute;
+          top: 16px;
+          left: 16px;
           display: flex;
           align-items: center;
-          gap: 12px;
-          z-index: 2000;
+          gap: 10px;
+          z-index: 1000;
+          flex-wrap: wrap;
         }
 
         .filter-select-wrapper {
@@ -136,56 +262,126 @@ export default function GroupMap() {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 10px 20px;
+          padding: 9px 16px;
           border-radius: 9999px;
-          border: 1px solid var(--color-surface-container-high);
-          background-color: var(--color-surface-container-lowest);
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          box-shadow: 0 4px 16px rgba(46, 42, 40, 0.12);
           font-family: var(--font-display);
           font-weight: 700;
-          font-size: 14px;
-          color: var(--color-text-muted);
+          font-size: 13px;
+          color: var(--color-text);
           cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover {
+          background: #ffffff;
+          box-shadow: 0 6px 20px rgba(46, 42, 40, 0.16);
+          transform: translateY(-1px);
+        }
+
+        .filter-btn.open,
+        .filter-btn.active {
+          border-color: var(--color-tangerine);
+          color: var(--color-text);
+        }
+
+        .filter-icon {
+          color: var(--color-tangerine);
+        }
+
+        .filter-btn-text {
+          max-width: 140px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .chevron-icon {
+          color: var(--color-text-muted);
+          transition: transform 0.2s ease;
+        }
+
+        .chevron-icon.rotate {
+          transform: rotate(180deg);
         }
 
         .filter-dropdown {
           position: absolute;
-          top: 100%;
+          top: calc(100% + 8px);
           left: 0;
-          margin-top: 8px;
-          background-color: var(--color-surface-container-lowest);
+          background: rgba(255, 255, 255, 0.98);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
           border-radius: 16px;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.12);
-          border: 1px solid var(--color-surface-container-high);
-          overflow: hidden;
-          width: 180px;
-          z-index: 2010;
+          box-shadow: 0 12px 32px rgba(46, 42, 40, 0.18);
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          padding: 6px;
+          min-width: 180px;
+          max-height: 240px;
+          overflow-y: auto;
+          z-index: 1010;
+          animation: dropdownFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes dropdownFadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-6px) scale(0.97);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
         }
 
         .dropdown-item {
-          padding: 12px 16px;
-          font-size: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 9px 12px;
+          border-radius: 10px;
+          font-size: 13px;
           font-weight: 600;
           cursor: pointer;
           color: var(--color-text-muted);
-          transition: background 0.2s;
+          transition: all 0.15s ease;
         }
 
         .dropdown-item:hover {
-          background-color: var(--color-surface-container-low);
+          background-color: var(--color-surface-container);
           color: var(--color-text);
         }
 
-        .date-chip, .loading-chip {
+        .dropdown-item.selected {
+          background-color: var(--tint-butter);
+          color: #85610e;
+          font-weight: 700;
+        }
+
+        .check-icon {
+          color: var(--color-tangerine);
+          margin-left: 8px;
+          flex-shrink: 0;
+        }
+
+        .loading-chip {
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 10px 20px;
+          gap: 6px;
+          padding: 8px 14px;
           border-radius: 9999px;
-          background-color: var(--color-surface-container);
+          background: rgba(255, 255, 255, 0.92);
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(0, 0, 0, 0.08);
           font-family: var(--font-display);
           font-weight: 700;
-          font-size: 14px;
+          font-size: 12px;
           color: var(--color-text-muted);
+          box-shadow: 0 4px 12px rgba(46, 42, 40, 0.08);
         }
 
         .spin {
