@@ -117,6 +117,7 @@ def upload_media(
         raise Exception("Failed to save media record.")
 
     media_record = insert_res.data[0]
+    media_record["is_favorited"] = False
 
     # Attach uploader profile
     profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
@@ -192,6 +193,7 @@ def upload_bulk_media(
     inserted_items = insert_res.data
     for item in inserted_items:
         item["uploader"] = uploader_profile
+        item["is_favorited"] = False
 
     return inserted_items
 
@@ -230,8 +232,17 @@ def get_hangout_media(
         if profiles_res.data:
             profiles_map = {p["id"]: p for p in profiles_res.data}
 
+    # 4. Attach is_favorited for user_id
+    media_ids = [item["id"] for item in visible_items if "id" in item]
+    favorited_ids = set()
+    if media_ids and user_id:
+        fav_res = db.table("media_favorites").select("media_id").in_("media_id", media_ids).eq("user_id", str(user_id)).execute()
+        if fav_res.data:
+            favorited_ids = {str(f["media_id"]) for f in fav_res.data}
+
     for item in visible_items:
         item["uploader"] = profiles_map.get(item.get("uploaded_by"))
+        item["is_favorited"] = str(item.get("id")) in favorited_ids
 
     return visible_items
 
@@ -253,6 +264,11 @@ def favorite_media(db: Client, media_id: str, user_id: str) -> Dict[str, Any]:
         db.table("media").update({"favorites_count": new_count}).eq("id", media_id).execute()
         media_item["favorites_count"] = new_count
 
+    media_item["is_favorited"] = True
+    profile_res = db.table("profiles").select("*").eq("id", media_item["uploaded_by"]).execute()
+    if profile_res.data:
+        media_item["uploader"] = profile_res.data[0]
+
     return media_item
 
 
@@ -270,6 +286,11 @@ def unfavorite_media(db: Client, media_id: str, user_id: str) -> Dict[str, Any]:
         new_count = max(0, media_item.get("favorites_count", 1) - 1)
         db.table("media").update({"favorites_count": new_count}).eq("id", media_id).execute()
         media_item["favorites_count"] = new_count
+
+    media_item["is_favorited"] = False
+    profile_res = db.table("profiles").select("*").eq("id", media_item["uploaded_by"]).execute()
+    if profile_res.data:
+        media_item["uploader"] = profile_res.data[0]
 
     return media_item
 

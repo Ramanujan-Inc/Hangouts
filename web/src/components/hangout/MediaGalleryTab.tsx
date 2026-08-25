@@ -129,15 +129,15 @@ export const MediaGalleryTab: React.FC<MediaGalleryTabProps> = ({
                 )}
 
                 <div
-                  className="photo-likes-overlay"
+                  className={`photo-likes-overlay ${isFavorited ? 'favorited' : ''}`}
                   onClick={(e) => onToggleFavorite(item.id, e)}
-                  title="Favorite this memory"
+                  title={isFavorited ? 'Remove from favorites' : 'Favorite this memory'}
                   role="button"
                   tabIndex={0}
                 >
                   <Heart
                     size={14}
-                    fill={isFavorited ? '#ff6b6b' : 'white'}
+                    fill={isFavorited ? '#ff6b6b' : 'transparent'}
                     color={isFavorited ? '#ff6b6b' : 'white'}
                   />
                   <span>{item.favorites_count || 0}</span>
@@ -283,6 +283,16 @@ export const MediaGalleryTab: React.FC<MediaGalleryTabProps> = ({
           font-weight: 700;
           color: white;
           z-index: 3;
+          transition: transform 0.15s ease, background-color 0.2s ease;
+        }
+
+        .photo-likes-overlay:hover {
+          transform: scale(1.05);
+          background: rgba(0, 0, 0, 0.8);
+        }
+
+        .photo-likes-overlay.favorited {
+          color: #ff6b6b;
         }
       `}</style>
     </div>

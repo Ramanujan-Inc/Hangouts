@@ -32,6 +32,7 @@ class MediaResponse(MediaBase):
     uploaded_by: UUID
     created_at: datetime
     uploader: Optional[ProfileResponse] = None
+    is_favorited: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

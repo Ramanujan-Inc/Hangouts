@@ -104,8 +104,11 @@ def test_list_hangout_media_privacy(
     assert other_items[0]["caption"] == "Public Photo"
 
 
-def test_favorite_and_unfavorite_media(authenticated_client: TestClient):
-    """Toggle media item favorite count."""
+def test_favorite_and_unfavorite_media(
+    authenticated_client: TestClient,
+    secondary_user: Dict[str, Any],
+):
+    """Toggle media item favorite count and verify user-specific is_favorited flag."""
     hangout_id = _create_test_hangout(authenticated_client)
 
     fake_img = b"\xFF\xD8\xFF\xE0\x00\x10JFIF"
@@ -114,16 +117,45 @@ def test_favorite_and_unfavorite_media(authenticated_client: TestClient):
         files={"file": ("fav.jpg", io.BytesIO(fake_img), "image/jpeg")},
     )
     media_id = upload_res.json()["id"]
+    assert upload_res.json()["is_favorited"] is False
 
     # 1. Favorite
     fav_res = authenticated_client.post(f"/api/v1/media/{media_id}/favorite")
     assert fav_res.status_code == 200
     assert fav_res.json()["favorites_count"] == 1
+    assert fav_res.json()["is_favorited"] is True
 
-    # 2. Unfavorite
+    # 2. Check get_hangout_media for primary user
+    list_res = authenticated_client.get(f"/api/v1/hangouts/{hangout_id}/media")
+    assert list_res.status_code == 200
+    items = list_res.json()
+    assert len(items) == 1
+    assert items[0]["is_favorited"] is True
+    assert items[0]["favorites_count"] == 1
+
+    # 3. Check get_hangout_media for secondary user (not yet favorited by secondary)
+    other_list_res = authenticated_client.get(
+        f"/api/v1/hangouts/{hangout_id}/media",
+        headers=secondary_user["headers"],
+    )
+    assert other_list_res.status_code == 200
+    other_items = other_list_res.json()
+    assert len(other_items) == 1
+    assert other_items[0]["is_favorited"] is False
+    assert other_items[0]["favorites_count"] == 1
+
+    # 4. Unfavorite
     unfav_res = authenticated_client.delete(f"/api/v1/media/{media_id}/favorite")
     assert unfav_res.status_code == 200
     assert unfav_res.json()["favorites_count"] == 0
+    assert unfav_res.json()["is_favorited"] is False
+
+    # 5. Check get_hangout_media after unfavorite
+    list_res_after = authenticated_client.get(f"/api/v1/hangouts/{hangout_id}/media")
+    assert list_res_after.status_code == 200
+    items_after = list_res_after.json()
+    assert items_after[0]["is_favorited"] is False
+    assert items_after[0]["favorites_count"] == 0
 
 
 def test_delete_media_owner_vs_non_owner(
