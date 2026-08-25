@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Plus, X, Loader2, UserPlus } from 'lucide-react'
 import { Button } from '../ui'
 import { api } from '../../lib/api'
+import { getAvatarUrl } from '../../lib/avatar'
 
 export interface InvitedMember {
   username: string
@@ -156,11 +157,7 @@ export const MemberInviteInput: React.FC<MemberInviteInputProps> = ({
       {invitedMembers.length > 0 && (
         <div className="invited-chips-list">
           {invitedMembers.map((member) => {
-            const avatarUrl =
-              member.avatar_url ||
-              `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(
-                member.username
-              )}`
+            const avatarUrl = getAvatarUrl(member.avatar_url)
 
             return (
               <div key={member.username} className="invited-chip">

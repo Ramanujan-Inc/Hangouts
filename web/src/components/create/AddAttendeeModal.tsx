@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Plus, Check, Loader2, AlertCircle } from 'lucide-react'
 import { Modal, Button } from '../ui'
 import { api } from '../../lib/api'
+import { getAvatarUrl } from '../../lib/avatar'
 import { GroupMemberProfile } from './types'
 
 interface AddAttendeeModalProps {
@@ -109,12 +110,7 @@ export const AddAttendeeModal: React.FC<AddAttendeeModalProps> = ({
         {searchUserResult && (
           <div className="search-result-card">
             <img
-              src={
-                searchUserResult.avatar_url ||
-                `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(
-                  searchUserResult.username
-                )}`
-              }
+              src={getAvatarUrl(searchUserResult.avatar_url)}
               alt={searchUserResult.username}
               className="found-user-avatar"
             />

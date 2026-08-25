@@ -1,5 +1,6 @@
 import React from 'react'
 import { Users, Plus, Check, Loader2 } from 'lucide-react'
+import { getAvatarUrl } from '../../lib/avatar'
 import { GroupMemberProfile } from './types'
 
 interface ParticipantSelectorProps {
@@ -64,9 +65,7 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
         <div className="participants-scroll">
           {activeMembersList.map((member) => {
             const isSelected = selectedParticipants.includes(member.id)
-            const avatarUrl =
-              member.avatar_url ||
-              `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(member.username)}`
+            const avatarUrl = getAvatarUrl(member.avatar_url)
 
             return (
               <div

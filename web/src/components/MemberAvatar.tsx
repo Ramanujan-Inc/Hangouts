@@ -1,5 +1,6 @@
 import React from 'react'
 import { members } from '../data/mock'
+import { getAvatarUrl } from '../lib/avatar'
 import Avatar from './ui/Avatar'
 import { UserProfile } from './hangout/types'
 
@@ -19,11 +20,8 @@ export default function MemberAvatar({
   size = 28,
 }: MemberAvatarProps) {
   const resolvedName = profile?.username || name || (memberId ? members[memberId]?.name : undefined) || memberId || 'User'
-  const resolvedAvatar =
-    profile?.avatar_url ||
-    avatarUrl ||
-    (memberId && members[memberId]?.avatar) ||
-    `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(resolvedName)}`
+  const customAvatar = profile?.avatar_url || avatarUrl || (memberId ? members[memberId]?.avatar : undefined)
+  const resolvedAvatar = getAvatarUrl(customAvatar)
 
   return <Avatar src={resolvedAvatar} alt={resolvedName} size={size} title={resolvedName} />
 }

@@ -210,7 +210,7 @@ export default function GroupMap() {
               <div className="preview-card-body">
                 <div className="preview-image-box">
                   <img
-                    src={selectedPin.cover_photo_url || 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=500&auto=format&fit=crop&q=60'}
+                    src={selectedPin.cover_photo_url || '/images/covers/hangout-default.jpg'}
                     alt={selectedPin.title}
                   />
                 </div>

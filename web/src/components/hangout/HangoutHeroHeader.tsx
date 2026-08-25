@@ -3,6 +3,7 @@ import { ArrowLeft, Share2, Calendar, MapPin } from 'lucide-react'
 import { AvatarStack, Badge } from '../ui'
 import { formatDate } from '../../lib/format'
 import { members } from '../../data/mock'
+import { getAvatarUrl } from '../../lib/avatar'
 
 interface HangoutHeroHeaderProps {
   title: string
@@ -33,15 +34,13 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
     if (typeof p === 'string') {
       const mem = members[p]
       return {
-        src: mem?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(p)}`,
+        src: getAvatarUrl(mem?.avatar),
         alt: mem?.name || p,
         title: mem?.name || p,
       }
     }
     const username = p.profile?.username || p.user_id || 'Member'
-    const avatar =
-      p.profile?.avatar_url ||
-      `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(username)}`
+    const avatar = getAvatarUrl(p.profile?.avatar_url)
     return {
       src: avatar,
       alt: username,

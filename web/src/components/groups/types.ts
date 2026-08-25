@@ -33,8 +33,8 @@ export interface GroupInvite {
 }
 
 export const PRESET_COVERS = [
-  'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1511632765486-a01980e01a18?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1543807535-eceef0bc6599?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=600&q=80',
+  '/images/covers/group-1.jpg',
+  '/images/covers/group-2.jpg',
+  '/images/covers/group-3.jpg',
+  '/images/covers/group-4.jpg',
 ]

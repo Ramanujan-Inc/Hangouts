@@ -2,6 +2,7 @@ import React from 'react'
 import Link from 'next/link'
 import { Heart, MapPin, Sparkles, ArrowRight } from 'lucide-react'
 import { Badge, AvatarStack } from '../ui'
+import { getAvatarUrl } from '../../lib/avatar'
 import { Memory, DEFAULT_COVER } from './types'
 
 interface MemoryHeroBannerProps {
@@ -22,14 +23,13 @@ export const MemoryHeroBanner: React.FC<MemoryHeroBannerProps> = ({
     : (memory.years_ago === 1 ? 'Around this time 1 year ago...' : `Around this time ${memory.years_ago} years ago...`)
 
   const participantsList = memory.participants || []
-  const avatarStackItems = participantsList.map((p, pIdx) => ({
-    src:
-      p.profile?.avatar_url ||
-      `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(
-        p.profile?.username || `Member${pIdx}`
-      )}`,
-    alt: p.profile?.username || 'Member',
-  }))
+  const avatarStackItems = participantsList.map((p, pIdx) => {
+    const username = p.profile?.username || `Member${pIdx}`
+    return {
+      src: getAvatarUrl(p.profile?.avatar_url),
+      alt: username,
+    }
+  })
 
   const participantNames = participantsList
     .slice(0, 3)

@@ -56,7 +56,7 @@ function MapController({ center, zoom }: { center: [number, number]; zoom?: numb
 }
 
 const createCustomIcon = (coverUrl?: string, isSelected?: boolean) => {
-  const imgUrl = coverUrl || 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=500&auto=format&fit=crop&q=60'
+  const imgUrl = coverUrl || '/images/covers/hangout-default.jpg'
   return L.divIcon({
     className: 'custom-leaflet-marker-wrapper',
     html: `

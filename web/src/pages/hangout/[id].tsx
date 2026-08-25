@@ -306,7 +306,7 @@ function HangoutDetailContent() {
         {/* Cover Image Banner & Title Block */}
         <HangoutHeroHeader
           title={hangout.title}
-          coverImage={hangout.cover_photo_url || 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=500&auto=format&fit=crop&q=60'}
+          coverImage={hangout.cover_photo_url || '/images/covers/hangout-default.jpg'}
           date={hangout.hangout_date}
           location={hangout.location_name || 'No location set'}
           formattedAddress={hangout.formatted_address || undefined}
