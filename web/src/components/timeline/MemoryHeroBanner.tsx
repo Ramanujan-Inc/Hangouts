@@ -95,13 +95,13 @@ export const MemoryHeroBanner: React.FC<MemoryHeroBannerProps> = ({
 
       <style jsx>{`
         .memory-banner-card {
-          background: linear-gradient(135deg, rgba(247, 226, 233, 0.95) 0%, rgba(254, 246, 228, 0.95) 100%);
-          border: 1px solid rgba(227, 104, 136, 0.35);
+          background: var(--memory-banner-bg);
+          border: 1px solid var(--memory-banner-border);
           border-radius: 28px;
           padding: 26px 32px;
           margin-bottom: 32px;
           position: relative;
-          box-shadow: 0 10px 30px rgba(227, 104, 136, 0.1), 0 2px 8px rgba(0, 0, 0, 0.04);
+          box-shadow: var(--memory-banner-shadow);
           overflow: hidden;
         }
 

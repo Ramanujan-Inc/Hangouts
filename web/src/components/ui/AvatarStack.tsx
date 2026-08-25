@@ -41,7 +41,7 @@ export default function AvatarStack({ avatars, size = 28, overlap = 8 }: AvatarS
 
         .stack-avatar {
           border-radius: 50%;
-          border: 2px solid white;
+          border: 2px solid var(--color-surface-container-lowest);
           background-color: var(--color-surface-container);
           object-fit: cover;
         }

@@ -1,0 +1,87 @@
+<svg viewBox="0 0 400 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="p1_day_sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFC9A8"/>
+      <stop offset="45%" stop-color="#FFE5D4"/>
+      <stop offset="100%" stop-color="#FFF6EE"/>
+    </linearGradient>
+    <linearGradient id="p1_day_sun" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFA84A"/>
+      <stop offset="100%" stop-color="#FFD66B"/>
+    </linearGradient>
+    <linearGradient id="p1_day_hill1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#E8E2BE"/>
+      <stop offset="100%" stop-color="#C5DCA0"/>
+    </linearGradient>
+    <linearGradient id="p1_day_hill2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#9BC88B"/>
+      <stop offset="100%" stop-color="#6DAE5C"/>
+    </linearGradient>
+    <filter id="p1_day_glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Sky Background -->
+  <rect width="400" height="240" rx="18" fill="url(#p1_day_sky)" />
+
+  <!-- Warm Sun & Radiance -->
+  <circle cx="200" cy="115" r="45" fill="url(#p1_day_sun)" opacity="0.85" filter="url(#p1_day_glow)" />
+  <circle cx="200" cy="115" r="70" fill="#FFE3A8" opacity="0.3" filter="url(#p1_day_glow)" />
+
+  <!-- Soft Clouds -->
+  <path d="M40,65 Q55,50 75,55 Q95,45 115,58 Q130,55 135,70 L35,70 Z" fill="#FFFFFF" opacity="0.65" />
+  <path d="M280,50 Q295,38 315,42 Q330,32 345,45 Q360,42 365,55 L275,55 Z" fill="#FFFFFF" opacity="0.55" />
+
+  <!-- Washi Tape Accent (Scrapbook touch) -->
+  <polygon points="18,12 55,8 52,22 15,26" fill="#F2799A" opacity="0.8" />
+
+  <!-- Background Hills -->
+  <path d="M-20,240 L-20,165 Q90,130 200,160 Q310,135 420,155 L420,240 Z" fill="url(#p1_day_hill1)" />
+
+  <!-- Hanging String Bunting / Pennants -->
+  <path d="M-10,35 Q100,68 200,40 Q300,68 410,35" stroke="#7A6855" stroke-width="1.5" stroke-dasharray="2,4" opacity="0.6" />
+  <polygon points="60,53 72,72 84,55" fill="#E36888" />
+  <polygon points="120,55 132,75 144,53" fill="#F08C21" />
+  <polygon points="190,43 200,63 210,43" fill="#6698CC" />
+  <polygon points="255,54 267,74 279,56" fill="#B4B534" />
+  <polygon points="320,53 332,71 344,50" fill="#E36888" />
+
+  <!-- Foreground Rolling Hill -->
+  <path d="M-20,240 L-20,190 Q120,165 240,195 Q340,180 420,200 L420,240 Z" fill="url(#p1_day_hill2)" />
+
+  <!-- Picnic Mat (Pastel Gingham) -->
+  <polygon points="110,195 290,195 335,235 65,235" fill="#FFFDF8" opacity="0.95" />
+  <polygon points="110,195 290,195 335,235 65,235" fill="none" stroke="#E36888" stroke-width="1.5" stroke-dasharray="4,4" />
+
+  <!-- Sparkling Picnic Cups & Treats -->
+  <circle cx="150" cy="214" r="5" fill="#6698CC" />
+  <circle cx="250" cy="214" r="5" fill="#E36888" />
+
+  <!-- Friends Silhouettes with Vibrant Outfits -->
+  <!-- Friend 1 (Left - Waving) -->
+  <circle cx="145" cy="165" r="13" fill="#FFE5D4" />
+  <path d="M135,160 Q145,150 155,160 Q150,154 135,160 Z" fill="#6B4226" /> <!-- Hair -->
+  <rect x="133" y="178" width="24" height="28" rx="7" fill="#6698CC" />
+  <path d="M157,180 Q168,170 165,160" stroke="#FFE5D4" stroke-width="4" stroke-linecap="round" fill="none" /> <!-- Waving hand -->
+
+  <!-- Friend 2 (Center - Sitting relaxed with camera) -->
+  <circle cx="200" cy="155" r="14" fill="#FFDCC2" />
+  <path d="M188,150 Q200,140 212,150 Q205,142 188,150 Z" fill="#D97724" /> <!-- Hair -->
+  <rect x="186" y="169" width="28" height="34" rx="8" fill="#E36888" />
+  <!-- Camera -->
+  <rect x="193" y="180" width="14" height="10" rx="2" fill="#2E2A28" />
+  <circle cx="200" cy="185" r="3" fill="#6698CC" />
+
+  <!-- Friend 3 (Right - Toasting drink) -->
+  <circle cx="255" cy="165" r="13" fill="#FAD2B0" />
+  <path d="M245,162 Q255,152 265,162 Z" fill="#2E2A28" /> <!-- Hair -->
+  <rect x="243" y="178" width="24" height="28" rx="7" fill="#B4B534" />
+  <path d="M243,182 Q232,175 235,168" stroke="#FAD2B0" stroke-width="4" stroke-linecap="round" fill="none" />
+
+  <!-- Sparkles & Hearts floating -->
+  <path d="M200,132 L202,137 L207,139 L202,141 L200,146 L198,141 L193,139 L198,137 Z" fill="#FFA84A" />
+  <path d="M95,140 L97,143 L100,144 L97,145 L95,148 L93,145 L90,144 L93,143 Z" fill="#E36888" />
+  <path d="M305,135 L307,138 L310,139 L307,140 L305,143 L303,140 L300,139 L303,138 Z" fill="#F08C21" />
+</svg>

@@ -22,7 +22,7 @@ export default function Modal({ onClose, title, children }: ModalProps) {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(46, 42, 40, 0.4);
+          background: var(--modal-backdrop-bg);
           display: flex;
           align-items: center;
           justify-content: center;

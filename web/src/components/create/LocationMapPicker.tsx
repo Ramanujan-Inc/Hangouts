@@ -132,7 +132,7 @@ export default function LocationMapPicker({
           overflow: hidden;
           border: 1px solid var(--color-surface-container-high);
           box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
-          background-color: #eef4fb;
+          background-color: var(--color-background);
         }
 
         .location-map-picker-root .leaflet-container {

@@ -48,7 +48,6 @@ export const TimelineFilterDrawer: React.FC<TimelineFilterDrawerProps> = ({
             placeholder="Search hangouts, places, notes..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            inputClassName="pill-input-butter"
           />
         </div>
         <button

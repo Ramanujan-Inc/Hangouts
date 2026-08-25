@@ -264,8 +264,8 @@ export default function GroupMap() {
           gap: 8px;
           padding: 9px 16px;
           border-radius: 9999px;
-          border: 1px solid rgba(0, 0, 0, 0.08);
-          background: rgba(255, 255, 255, 0.95);
+          border: 1px solid var(--color-surface-container-high);
+          background: var(--nav-backdrop-bg);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
           box-shadow: 0 4px 16px rgba(46, 42, 40, 0.12);
@@ -278,7 +278,7 @@ export default function GroupMap() {
         }
 
         .filter-btn:hover {
-          background: #ffffff;
+          background: var(--color-surface-container-lowest);
           box-shadow: 0 6px 20px rgba(46, 42, 40, 0.16);
           transform: translateY(-1px);
         }
@@ -313,12 +313,12 @@ export default function GroupMap() {
           position: absolute;
           top: calc(100% + 8px);
           left: 0;
-          background: rgba(255, 255, 255, 0.98);
+          background: var(--color-surface-container-lowest);
           backdrop-filter: blur(16px);
           -webkit-backdrop-filter: blur(16px);
           border-radius: 16px;
           box-shadow: 0 12px 32px rgba(46, 42, 40, 0.18);
-          border: 1px solid rgba(0, 0, 0, 0.08);
+          border: 1px solid var(--color-surface-container-high);
           padding: 6px;
           min-width: 180px;
           max-height: 240px;
@@ -358,7 +358,7 @@ export default function GroupMap() {
 
         .dropdown-item.selected {
           background-color: var(--tint-butter);
-          color: #85610e;
+          color: var(--color-text);
           font-weight: 700;
         }
 
@@ -374,9 +374,9 @@ export default function GroupMap() {
           gap: 6px;
           padding: 8px 14px;
           border-radius: 9999px;
-          background: rgba(255, 255, 255, 0.92);
+          background: var(--nav-backdrop-bg);
           backdrop-filter: blur(8px);
-          border: 1px solid rgba(0, 0, 0, 0.08);
+          border: 1px solid var(--color-surface-container-high);
           font-family: var(--font-display);
           font-weight: 700;
           font-size: 12px;
@@ -402,7 +402,7 @@ export default function GroupMap() {
           overflow: hidden;
           box-shadow: var(--shadow-ambient);
           border: 1px solid var(--color-surface-container-high);
-          background-color: #e6f0fa;
+          background-color: var(--color-surface-container-low);
         }
 
         .map-loading-placeholder {
@@ -415,7 +415,7 @@ export default function GroupMap() {
           font-family: var(--font-display);
           font-weight: 700;
           color: var(--color-text-muted);
-          background-color: #e6f0fa;
+          background-color: var(--color-surface-container-low);
         }
 
         /* Custom Leaflet Pin Markers */

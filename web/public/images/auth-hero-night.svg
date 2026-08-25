@@ -1,0 +1,110 @@
+<svg viewBox="0 0 400 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="p1_night_sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0F0C1B"/>
+      <stop offset="50%" stop-color="#1A1429"/>
+      <stop offset="100%" stop-color="#2D172B"/>
+    </linearGradient>
+    <linearGradient id="p1_night_moon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF2D1"/>
+      <stop offset="100%" stop-color="#FCE192"/>
+    </linearGradient>
+    <radialGradient id="p1_fire_glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF9F1C" stop-opacity="0.8"/>
+      <stop offset="40%" stop-color="#FF5C8A" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#2D172B" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="p1_night_hill1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1D1830"/>
+      <stop offset="100%" stop-color="#141022"/>
+    </linearGradient>
+    <linearGradient id="p1_night_hill2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#261A30"/>
+      <stop offset="100%" stop-color="#191020"/>
+    </linearGradient>
+    <filter id="p1_night_glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Midnight Sky -->
+  <rect width="400" height="240" rx="18" fill="url(#p1_night_sky)" />
+
+  <!-- Twinkling Stars & Constellations -->
+  <circle cx="45" cy="40" r="1.5" fill="#FFFFFF" opacity="0.9" />
+  <circle cx="85" cy="65" r="1" fill="#FFFFFF" opacity="0.7" />
+  <circle cx="130" cy="30" r="2" fill="#FCE192" opacity="0.95" />
+  <circle cx="170" cy="55" r="1.5" fill="#FFFFFF" opacity="0.8" />
+  <circle cx="230" cy="35" r="2" fill="#FFFFFF" opacity="0.9" />
+  <circle cx="290" cy="60" r="1" fill="#FFFFFF" opacity="0.7" />
+  <circle cx="340" cy="35" r="1.5" fill="#FCE192" opacity="0.9" />
+  <circle cx="370" cy="70" r="1" fill="#FFFFFF" opacity="0.6" />
+
+  <!-- 4-point Diamond Stars -->
+  <path d="M110,45 L112,50 L117,52 L112,54 L110,59 L108,54 L103,52 L108,50 Z" fill="#FFF3D6" opacity="0.9" />
+  <path d="M260,40 L261.5,44 L266,45.5 L261.5,47 L260,51 L258.5,47 L254,45.5 L258.5,44 Z" fill="#F2799A" opacity="0.8" />
+
+  <!-- Glowing Crescent Moon -->
+  <g transform="translate(310, 24)">
+    <path d="M26,4 C13.5,4 3.5,14 3.5,26.5 C3.5,39 13.5,49 26,49 C19,43.5 15,35.5 15,26.5 C15,17.5 19,9.5 26,4 Z" fill="url(#p1_night_moon)" />
+    <path d="M26,4 C13.5,4 3.5,14 3.5,26.5 C3.5,39 13.5,49 26,49 C19,43.5 15,35.5 15,26.5 C15,17.5 19,9.5 26,4 Z" fill="url(#p1_night_moon)" opacity="0.4" filter="url(#p1_night_glow)" />
+  </g>
+
+  <!-- Glowing Fairy String Lights -->
+  <path d="M-10,40 Q100,75 200,45 Q300,75 410,40" stroke="#FFE699" stroke-width="1.5" stroke-dasharray="1,8" opacity="0.8" />
+  <circle cx="45" cy="54" r="4.5" fill="#FFD166" filter="url(#p1_night_glow)" />
+  <circle cx="110" cy="62" r="4.5" fill="#FFD166" filter="url(#p1_night_glow)" />
+  <circle cx="200" cy="45" r="4.5" fill="#FFD166" filter="url(#p1_night_glow)" />
+  <circle cx="290" cy="62" r="4.5" fill="#FFD166" filter="url(#p1_night_glow)" />
+  <circle cx="355" cy="54" r="4.5" fill="#FFD166" filter="url(#p1_night_glow)" />
+
+  <!-- Background Mountain Silhouettes -->
+  <path d="M-20,240 L-20,160 Q100,125 200,155 Q300,130 420,150 L420,240 Z" fill="url(#p1_night_hill1)" />
+
+  <!-- Foreground Hill -->
+  <path d="M-20,240 L-20,185 Q120,160 240,190 Q340,175 420,195 L420,240 Z" fill="url(#p1_night_hill2)" />
+
+  <!-- Warm Bonfire Ambient Radial Glow -->
+  <circle cx="200" cy="205" r="75" fill="url(#p1_fire_glow)" />
+
+  <!-- Rug / Blanket -->
+  <polygon points="105,198 295,198 335,236 65,236" fill="#201828" stroke="#F2799A" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.9" />
+
+  <!-- Friends around the fire (Synced with Day Character Identies & Hair) -->
+  <!-- Friend 1 (Left - Blue Outfit, Brown Hair) -->
+  <circle cx="145" cy="165" r="13" fill="#FFE5D4" />
+  <path d="M135,160 Q145,150 155,160 Q150,154 135,160 Z" fill="#6B4226" /> <!-- Hair -->
+  <rect x="133" y="178" width="24" height="28" rx="7" fill="#6698CC" />
+
+  <!-- Friend 2 (Center - Pink Outfit, Auburn Hair, Marshmallow Stick) -->
+  <circle cx="200" cy="155" r="14" fill="#FFDCC2" />
+  <path d="M188,150 Q200,140 212,150 Q205,142 188,150 Z" fill="#D97724" /> <!-- Hair -->
+  <rect x="186" y="169" width="28" height="34" rx="8" fill="#E36888" />
+  <!-- Stick with Marshmallow -->
+  <line x1="200" y1="185" x2="200" y2="208" stroke="#C48858" stroke-width="2" />
+  <rect x="197" y="206" width="6" height="7" rx="2" fill="#FFF7ED" />
+
+  <!-- Friend 3 (Right - Matcha Green Outfit, Dark Hair, Acoustic Guitar) -->
+  <circle cx="255" cy="165" r="13" fill="#FAD2B0" />
+  <path d="M245,162 Q255,152 265,162 Z" fill="#2E2A28" /> <!-- Hair -->
+  <rect x="243" y="178" width="24" height="28" rx="7" fill="#B4B534" />
+  <!-- Guitar Shape -->
+  <ellipse cx="238" cy="192" rx="7" ry="9" fill="#C48858" />
+  <line x1="238" y1="185" x2="232" y2="174" stroke="#9C6235" stroke-width="2" />
+
+  <!-- Glowing Campfire in Foreground -->
+  <!-- Wood logs -->
+  <line x1="185" y1="222" x2="215" y2="218" stroke="#5C3826" stroke-width="4" stroke-linecap="round" />
+  <line x1="188" y1="218" x2="212" y2="222" stroke="#4A2B1C" stroke-width="4" stroke-linecap="round" />
+  <!-- Dynamic Flame Layers -->
+  <path d="M190,220 Q195,200 200,195 Q205,200 210,220 Z" fill="#FF9F1C" filter="url(#p1_night_glow)" />
+  <path d="M194,220 Q197,206 200,201 Q203,206 206,220 Z" fill="#FFD166" />
+  <path d="M197,220 Q199,212 200,208 Q201,212 203,220 Z" fill="#FFFDF8" />
+
+  <!-- Floating Glowing Embers / Fireflies -->
+  <circle cx="196" cy="190" r="1.5" fill="#FFD166" />
+  <circle cx="206" cy="186" r="1" fill="#FFA84A" />
+  <circle cx="188" cy="182" r="1.5" fill="#FF5C8A" />
+  <circle cx="214" cy="178" r="1.2" fill="#FFD166" />
+</svg>

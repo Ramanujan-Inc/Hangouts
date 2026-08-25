@@ -246,7 +246,7 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
           display: flex;
           align-items: center;
           justify-content: center;
-          border: 2px solid white;
+          border: 2px solid var(--color-surface-container-lowest);
         }
 
         .chip-name {

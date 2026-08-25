@@ -125,19 +125,51 @@ export const NotesTab: React.FC<NotesTabProps> = ({
         }
 
         .sticky-note-butter {
-          background-color: var(--color-butter);
+          background-color: var(--note-butter-bg);
+          border: 1px solid var(--note-butter-border);
+        }
+        .sticky-note-butter .note-text,
+        .sticky-note-butter .note-author {
+          color: var(--note-butter-text);
+        }
+        .sticky-note-butter .note-time {
+          color: var(--note-butter-muted);
         }
 
         .sticky-note-blush {
-          background-color: var(--color-blush);
+          background-color: var(--note-blush-bg);
+          border: 1px solid var(--note-blush-border);
+        }
+        .sticky-note-blush .note-text,
+        .sticky-note-blush .note-author {
+          color: var(--note-blush-text);
+        }
+        .sticky-note-blush .note-time {
+          color: var(--note-blush-muted);
         }
 
         .sticky-note-sea {
-          background-color: var(--color-sea);
+          background-color: var(--note-sea-bg);
+          border: 1px solid var(--note-sea-border);
+        }
+        .sticky-note-sea .note-text,
+        .sticky-note-sea .note-author {
+          color: var(--note-sea-text);
+        }
+        .sticky-note-sea .note-time {
+          color: var(--note-sea-muted);
         }
 
         .sticky-note-matcha {
-          background-color: #cbe8ba;
+          background-color: var(--note-matcha-bg);
+          border: 1px solid var(--note-matcha-border);
+        }
+        .sticky-note-matcha .note-text,
+        .sticky-note-matcha .note-author {
+          color: var(--note-matcha-text);
+        }
+        .sticky-note-matcha .note-time {
+          color: var(--note-matcha-muted);
         }
 
         .sticky-header {
@@ -153,8 +185,8 @@ export const NotesTab: React.FC<NotesTabProps> = ({
           gap: 4px;
           font-size: 10px;
           font-weight: 700;
-          background: rgba(0, 0, 0, 0.15);
-          color: var(--color-text);
+          background: rgba(0, 0, 0, 0.12);
+          color: inherit;
           padding: 2px 6px;
           border-radius: 6px;
         }
@@ -163,17 +195,19 @@ export const NotesTab: React.FC<NotesTabProps> = ({
           margin-left: auto;
           background: transparent;
           border: none;
-          color: var(--color-text-muted);
+          color: inherit;
+          opacity: 0.65;
           cursor: pointer;
           padding: 2px;
           display: flex;
           align-items: center;
           justify-content: center;
           border-radius: 4px;
-          transition: color 0.15s;
+          transition: opacity 0.15s, color 0.15s;
         }
 
         .delete-note-btn:hover {
+          opacity: 1;
           color: #ff6b6b;
         }
 
@@ -181,7 +215,6 @@ export const NotesTab: React.FC<NotesTabProps> = ({
           font-family: var(--font-display);
           font-size: 15px;
           font-weight: 600;
-          color: var(--color-text);
           line-height: 1.4;
           margin: 0 0 16px 0;
         }
@@ -199,12 +232,10 @@ export const NotesTab: React.FC<NotesTabProps> = ({
           gap: 6px;
           font-size: 12px;
           font-weight: 700;
-          color: var(--color-text);
         }
 
         .note-time {
           font-size: 11px;
-          color: var(--color-text-muted);
         }
       `}</style>
     </div>

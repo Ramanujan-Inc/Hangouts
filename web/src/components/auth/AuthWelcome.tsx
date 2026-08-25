@@ -1,6 +1,7 @@
 import React from 'react'
 import { Sparkles } from 'lucide-react'
 import { Button } from '../ui'
+import { useTheme } from '../../context/ThemeContext'
 
 interface AuthWelcomeProps {
   onGoogleDemo: () => void
@@ -15,11 +16,14 @@ export const AuthWelcome: React.FC<AuthWelcomeProps> = ({
   onLogIn,
   loading = false,
 }) => {
+  const { resolvedTheme } = useTheme()
+  const heroImageSrc = resolvedTheme === 'dark' ? '/images/auth-hero-night.svg' : '/images/auth-hero-day.svg'
+
   return (
     <div className="welcome-flow">
       <div className="hero-illustration">
         <img
-          src="/images/auth-hero.svg"
+          src={heroImageSrc}
           alt="Hangout friends together"
           className="illustration-img"
         />

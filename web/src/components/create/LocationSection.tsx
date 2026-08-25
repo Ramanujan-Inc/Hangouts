@@ -381,7 +381,12 @@ export const LocationSection: React.FC<LocationSectionProps> = ({
 
         .location-search-input:focus {
           border-color: var(--color-blush);
-          box-shadow: 0 0 0 3px rgba(227, 104, 136, 0.15);
+          box-shadow: 0 0 0 3px var(--tint-blush);
+        }
+
+        .location-search-input::placeholder {
+          color: var(--color-text-muted);
+          opacity: 0.75;
         }
 
         .map-picker-wrapper {
@@ -397,7 +402,7 @@ export const LocationSection: React.FC<LocationSectionProps> = ({
           align-items: center;
           justify-content: center;
           gap: 8px;
-          background-color: #eef4fb;
+          background-color: var(--color-surface-container-low);
           border-radius: 18px;
           color: var(--color-text-muted);
           font-family: var(--font-display);
@@ -437,21 +442,26 @@ export const LocationSection: React.FC<LocationSectionProps> = ({
 
         .location-name-input {
           width: 100%;
-          padding: 8px 12px;
+          padding: 10px 14px;
           border-radius: 10px;
-          border: 1.5px solid var(--color-surface-container-high);
-          background-color: #ffffff;
+          border: 1px solid var(--color-surface-container-high);
+          background-color: var(--color-surface-container-lowest);
           font-family: var(--font-body);
           font-size: 14px;
           font-weight: 600;
           color: var(--color-text);
           outline: none;
-          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+
+        .location-name-input::placeholder {
+          color: var(--color-text-muted);
+          opacity: 0.75;
         }
 
         .location-name-input:focus {
           border-color: var(--color-blush);
-          box-shadow: 0 0 0 3px rgba(227, 104, 136, 0.15);
+          box-shadow: 0 0 0 3px var(--tint-blush);
         }
 
         .address-sub-row {
