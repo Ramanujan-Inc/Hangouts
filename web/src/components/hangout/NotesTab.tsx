@@ -23,7 +23,7 @@ export const NotesTab: React.FC<NotesTabProps> = ({
   return (
     <div className="notes-tab">
       <div className="tab-section-header">
-        <h3>Collaborative Sticky Notes ({notes.length})</h3>
+        <h3>Sticky Notes ({notes.length})</h3>
         <Button size="compact" onClick={onOpenAddNote}>
           <Plus size={16} /> Add Note
         </Button>

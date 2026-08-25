@@ -25,7 +25,12 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
   const uploaderName = activeMedia.uploader?.username || activeMedia.uploaded_by || 'Member'
 
   return (
-    <div className="lightbox-backdrop" role="dialog" aria-modal="true">
+    <div
+      className="lightbox-backdrop"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
       <button
         className="lightbox-close"
         onClick={onClose}
@@ -35,7 +40,7 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
         <X size={24} />
       </button>
 
-      <div className="lightbox-container">
+      <div className="lightbox-container" onClick={(e) => e.stopPropagation()}>
         {activeMedia.media_type === 'video' ? (
           <video
             src={activeMedia.url}
