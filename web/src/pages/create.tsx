@@ -15,7 +15,7 @@ import {
   PhotoUploaderSection,
   ParticipantSelector,
   DateTimeInput,
-  LocationPickerModal,
+  LocationSection,
   AddAttendeeModal,
 } from '../components/create'
 
@@ -46,7 +46,6 @@ export default function CreateHangout() {
 
   // Modals
   const [showAddAttendeeModal, setShowAddAttendeeModal] = useState(false)
-  const [showLocationPicker, setShowLocationPicker] = useState(false)
 
   // Photos
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([])
@@ -206,18 +205,18 @@ export default function CreateHangout() {
   }
 
   // Location handler
-  const handleSelectLocation = (
-    name: string,
-    lat: number,
-    lng: number,
-    address?: string,
-    id?: string
-  ) => {
-    setLocationName(name)
-    setLatitude(lat)
-    setLongitude(lng)
-    setFormattedAddress(address || '')
-    setPlaceId(id || '')
+  const handleLocationChange = (data: {
+    locationName: string
+    formattedAddress?: string
+    latitude?: number
+    longitude?: number
+    placeId?: string
+  }) => {
+    setLocationName(data.locationName)
+    if (data.formattedAddress !== undefined) setFormattedAddress(data.formattedAddress)
+    if (data.latitude !== undefined) setLatitude(data.latitude)
+    if (data.longitude !== undefined) setLongitude(data.longitude)
+    if (data.placeId !== undefined) setPlaceId(data.placeId)
   }
 
   // Form Submission
@@ -392,28 +391,15 @@ export default function CreateHangout() {
                 onToggleTimeInput={setShowTimeInput}
               />
 
-              {/* Location Picker Trigger */}
-              <div className="input-group">
-                <label className="field-label">
-                  <MapPin size={16} /> Location
-                </label>
-                <div
-                  className="location-picker-trigger"
-                  onClick={() => setShowLocationPicker(true)}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <MapPin size={18} className="loc-pin" />
-                  <div className="loc-text-col">
-                    <span className="loc-main">
-                      {locationName || 'Add a location or venue...'}
-                    </span>
-                    {formattedAddress && formattedAddress !== locationName && (
-                      <span className="loc-sub-address">{formattedAddress}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
+              {/* Inline Interactive Location Section */}
+              <LocationSection
+                locationName={locationName}
+                formattedAddress={formattedAddress}
+                latitude={latitude}
+                longitude={longitude}
+                placeId={placeId}
+                onLocationChange={handleLocationChange}
+              />
             </div>
 
             {/* Submit Action CTA */}
@@ -433,14 +419,6 @@ export default function CreateHangout() {
               </Button>
             </div>
           </form>
-
-          {/* Location & Coordinates Picker Modal */}
-          <LocationPickerModal
-            isOpen={showLocationPicker}
-            onClose={() => setShowLocationPicker(false)}
-            onSelectLocation={handleSelectLocation}
-            currentLocationName={locationName}
-          />
 
           {/* Add Attendee by Username Modal */}
           <AddAttendeeModal
@@ -511,52 +489,6 @@ export default function CreateHangout() {
             appearance: none;
             cursor: pointer;
             padding-right: 36px;
-          }
-
-          .location-picker-trigger {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 14px 18px;
-            border-radius: 9999px;
-            background-color: var(--color-surface-container-low);
-            border: 2px solid transparent;
-            cursor: pointer;
-            transition: all 0.2s ease;
-          }
-
-          .location-picker-trigger:hover {
-            background-color: var(--color-surface-container);
-            border-color: var(--color-blush);
-          }
-
-          :global(.loc-pin) {
-            color: var(--color-blush);
-            flex-shrink: 0;
-          }
-
-          .loc-text-col {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            flex: 1;
-          }
-
-          .loc-main {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--color-text);
-          }
-
-          .loc-sub-address {
-            font-size: 12px;
-            color: var(--color-text-muted);
-          }
-
-          .loc-coords {
-            font-size: 11px;
-            color: var(--color-sea);
-            font-weight: 700;
           }
 
           .sticky-cta-footer {
