@@ -17,7 +17,6 @@ import {
   ParticipantSelector,
   DateTimeInput,
   LocationSection,
-  AddAttendeeModal,
 } from '../components/create'
 
 export default function CreateHangout() {
@@ -41,12 +40,8 @@ export default function CreateHangout() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>('')
   const [allCircleMembers, setAllCircleMembers] = useState<GroupMemberProfile[]>([])
   const [groupMembers, setGroupMembers] = useState<GroupMemberProfile[]>([])
-  const [customAttendees, setCustomAttendees] = useState<GroupMemberProfile[]>([])
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([])
   const [loadingMembers, setLoadingMembers] = useState(false)
-
-  // Modals
-  const [showAddAttendeeModal, setShowAddAttendeeModal] = useState(false)
 
   // Photos
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([])
@@ -174,12 +169,7 @@ export default function CreateHangout() {
   }
 
   // Attendees handlers
-  const activeMembersList = selectedGroupId
-    ? groupMembers
-    : [
-        ...allCircleMembers,
-        ...customAttendees.filter((custom) => !allCircleMembers.some((m) => m.id === custom.id)),
-      ]
+  const activeMembersList = selectedGroupId ? groupMembers : allCircleMembers
 
   const handleToggleParticipant = (memberId: string) => {
     if (selectedParticipants.includes(memberId)) {
@@ -194,15 +184,6 @@ export default function CreateHangout() {
       setSelectedParticipants([])
     } else {
       setSelectedParticipants(activeMembersList.map((m) => m.id))
-    }
-  }
-
-  const handleAddFoundUser = (profile: GroupMemberProfile) => {
-    if (!customAttendees.some((m) => m.id === profile.id)) {
-      setCustomAttendees((prev) => [...prev, profile])
-    }
-    if (!selectedParticipants.includes(profile.id)) {
-      setSelectedParticipants((prev) => [...prev, profile.id])
     }
   }
 
@@ -367,7 +348,6 @@ export default function CreateHangout() {
                 loadingMembers={loadingMembers}
                 onToggleParticipant={handleToggleParticipant}
                 onSelectAll={handleSelectAllParticipants}
-                onOpenAddAttendeeModal={() => setShowAddAttendeeModal(true)}
               />
 
               {/* Date & Optional Time Row */}
@@ -408,14 +388,6 @@ export default function CreateHangout() {
               </Button>
             </div>
           </form>
-
-          {/* Add Attendee by Username Modal */}
-          <AddAttendeeModal
-            isOpen={showAddAttendeeModal}
-            onClose={() => setShowAddAttendeeModal(false)}
-            onAddUser={handleAddFoundUser}
-            currentUserId={user?.id}
-          />
         </div>
 
         <style jsx>{`
