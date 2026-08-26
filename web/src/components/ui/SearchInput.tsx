@@ -9,27 +9,43 @@ export default function SearchInput({ inputClassName = '', placeholder = 'Search
   return (
     <>
       <div className="search-wrapper">
-        <Search className="search-icon" size={20} />
-        <input type="text" className={`pill-input search-input ${inputClassName}`} placeholder={placeholder} {...props} />
+        <div className="search-icon-wrapper" aria-hidden="true">
+          <Search size={18} />
+        </div>
+        <input
+          type="text"
+          className={`pill-input search-input ${inputClassName}`}
+          placeholder={placeholder}
+          {...props}
+        />
       </div>
       <style jsx>{`
         .search-wrapper {
           position: relative;
           display: flex;
           align-items: center;
+          width: 100%;
         }
 
-        .search-icon {
+        .search-icon-wrapper {
           position: absolute;
-          left: 18px;
+          left: 16px;
           color: var(--color-text-muted);
           z-index: 1;
           pointer-events: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: color 0.2s ease;
+        }
+
+        .search-wrapper:focus-within .search-icon-wrapper {
+          color: var(--color-blush);
         }
 
         .search-input {
-          padding: 14px 20px 14px 48px;
-          box-shadow: inset 0 2px 4px rgba(46, 42, 40, 0.08);
+          width: 100%;
+          padding-left: 44px;
         }
       `}</style>
     </>

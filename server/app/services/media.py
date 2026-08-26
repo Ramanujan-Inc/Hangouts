@@ -5,6 +5,11 @@ from fastapi import UploadFile
 from supabase import Client
 from app.core.config import settings
 from app.core.exceptions import NotFoundError, ForbiddenError, BadRequestError
+from app.core.storage import (
+    upload_file_bytes,
+    generate_presigned_download_url,
+    delete_file_object,
+)
 from app.services.storage import check_storage_quota
 
 ALLOWED_IMAGE_MIME_TYPES = {
@@ -27,43 +32,35 @@ ALLOWED_VIDEO_MIME_TYPES = {
 ALLOWED_MIME_TYPES = ALLOWED_IMAGE_MIME_TYPES | ALLOWED_VIDEO_MIME_TYPES
 
 
-def _upload_to_storage(db: Client, file_bytes: bytes, filename: str, content_type: str) -> str:
-    """Helper to upload file bytes to Cloudflare R2 or Supabase Storage as configured."""
-    object_id = str(uuid.uuid4())
+def _upload_media_to_r2(hangout_id: str, file_bytes: bytes, filename: str, content_type: str) -> str:
+    """Upload media file bytes to the private Cloudflare R2 hangout-media bucket and return its relative object key."""
     safe_filename = filename.replace(" ", "_") if filename else "file"
-    object_key = f"media/{object_id}_{safe_filename}"
+    media_uuid = str(uuid.uuid4())
+    object_key = f"{settings.ENVIRONMENT}/hng_{hangout_id}/med_{media_uuid}_{safe_filename}"
 
-    # 1. Cloudflare R2 Upload
-    if settings.R2_ACCOUNT_ID and settings.R2_ACCESS_KEY_ID and settings.R2_SECRET_ACCESS_KEY:
-        try:
-            import boto3
-            r2_endpoint = f"https://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-            s3 = boto3.client(
-                "s3",
-                endpoint_url=r2_endpoint,
-                aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-                region_name="auto",
-            )
-            s3.put_object(
-                Bucket=settings.R2_BUCKET_NAME,
-                Key=object_key,
-                Body=file_bytes,
-                ContentType=content_type,
-            )
-            if settings.R2_PUBLIC_URL:
-                return f"{settings.R2_PUBLIC_URL.rstrip('/')}/{object_key}"
-            return f"{r2_endpoint}/{settings.R2_BUCKET_NAME}/{object_key}"
-        except Exception:
-            pass
+    upload_file_bytes(
+        bucket=settings.R2_BUCKET_MEDIA,
+        key=object_key,
+        file_bytes=file_bytes,
+        content_type=content_type,
+    )
+    return object_key
 
-    # 2. Supabase Storage / Native Storage Upload
-    try:
-        db.storage.from_(settings.STORAGE_BUCKET).upload(object_key, file_bytes, {"content-type": content_type})
-    except Exception:
-        pass
 
-    return f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.STORAGE_BUCKET}/{object_key}"
+def _sign_media_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """Attach temporary signed download URLs for private media items."""
+    signed = dict(item)
+    if "url" in signed and signed["url"]:
+        signed["url"] = generate_presigned_download_url(
+            bucket=settings.R2_BUCKET_MEDIA,
+            key=signed["url"],
+        )
+    if "thumbnail_url" in signed and signed["thumbnail_url"]:
+        signed["thumbnail_url"] = generate_presigned_download_url(
+            bucket=settings.R2_BUCKET_MEDIA,
+            key=signed["thumbnail_url"],
+        )
+    return signed
 
 
 def upload_media(
@@ -74,7 +71,7 @@ def upload_media(
     caption: Optional[str] = None,
     is_shared: bool = True,
 ) -> Dict[str, Any]:
-    """Upload photo or video media file to storage and record database entry."""
+    """Upload photo or video media file to private storage and record database entry."""
     # 1. Check hangout existence
     hangout_res = db.table("hangouts").select("id").eq("id", hangout_id).execute()
     if not hangout_res.data:
@@ -90,20 +87,19 @@ def upload_media(
     # 3. Determine media_type ('photo' or 'video')
     media_type = "video" if content_type in ALLOWED_VIDEO_MIME_TYPES else "photo"
 
-    # 4. Upload file object to storage
+    # 4. Upload file object to private R2 storage
     file_bytes = file.file.read()
     file_size = len(file_bytes)
     check_storage_quota(db, user_id, file_size)
 
-    url = _upload_to_storage(db, file_bytes, file.filename or "media", content_type)
-    thumbnail_url = url  # Can be expanded for video/image thumbnail rendering
+    object_key = _upload_media_to_r2(hangout_id, file_bytes, file.filename or "media", content_type)
 
     now = datetime.now(timezone.utc).isoformat()
     media_data = {
         "hangout_id": hangout_id,
         "uploaded_by": user_id,
-        "url": url,
-        "thumbnail_url": thumbnail_url,
+        "url": object_key,
+        "thumbnail_url": object_key,
         "caption": caption,
         "media_type": media_type,
         "favorites_count": 0,
@@ -117,13 +113,14 @@ def upload_media(
         raise Exception("Failed to save media record.")
 
     media_record = insert_res.data[0]
+    media_record["is_favorited"] = False
 
     # Attach uploader profile
     profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
     if profile_res.data:
         media_record["uploader"] = profile_res.data[0]
 
-    return media_record
+    return _sign_media_item(media_record)
 
 
 def upload_bulk_media(
@@ -135,7 +132,7 @@ def upload_bulk_media(
     caption: Optional[str] = None,
     is_shared: bool = True,
 ) -> List[Dict[str, Any]]:
-    """Upload multiple photos or videos to storage and record database entries in batch with individual or global captions."""
+    """Upload multiple photos or videos to private storage and record database entries in batch with captions."""
     if not files:
         raise BadRequestError("No files provided for upload.")
 
@@ -163,7 +160,7 @@ def upload_bulk_media(
         file_size = len(file_bytes)
         check_storage_quota(db, user_id, file_size)
 
-        url = _upload_to_storage(db, file_bytes, file.filename or "media", content_type)
+        object_key = _upload_media_to_r2(hangout_id, file_bytes, file.filename or "media", content_type)
 
         # Resolve individual caption for this file index if provided
         file_caption = None
@@ -175,8 +172,8 @@ def upload_bulk_media(
         media_records_to_insert.append({
             "hangout_id": hangout_id,
             "uploaded_by": user_id,
-            "url": url,
-            "thumbnail_url": url,
+            "url": object_key,
+            "thumbnail_url": object_key,
             "caption": file_caption,
             "media_type": media_type,
             "favorites_count": 0,
@@ -192,8 +189,9 @@ def upload_bulk_media(
     inserted_items = insert_res.data
     for item in inserted_items:
         item["uploader"] = uploader_profile
+        item["is_favorited"] = False
 
-    return inserted_items
+    return [_sign_media_item(item) for item in inserted_items]
 
 
 def get_hangout_media(
@@ -202,7 +200,7 @@ def get_hangout_media(
     user_id: str,
     media_type_filter: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Retrieve gallery media for a hangout, enforcing privacy rules (is_shared = false visible only to uploader)."""
+    """Retrieve gallery media for a hangout, enforcing privacy rules and signing URLs."""
     # 1. Check hangout existence
     hangout_res = db.table("hangouts").select("id").eq("id", hangout_id).execute()
     if not hangout_res.data:
@@ -230,10 +228,19 @@ def get_hangout_media(
         if profiles_res.data:
             profiles_map = {p["id"]: p for p in profiles_res.data}
 
+    # 4. Attach is_favorited for user_id
+    media_ids = [item["id"] for item in visible_items if "id" in item]
+    favorited_ids = set()
+    if media_ids and user_id:
+        fav_res = db.table("media_favorites").select("media_id").in_("media_id", media_ids).eq("user_id", str(user_id)).execute()
+        if fav_res.data:
+            favorited_ids = {str(f["media_id"]) for f in fav_res.data}
+
     for item in visible_items:
         item["uploader"] = profiles_map.get(item.get("uploaded_by"))
+        item["is_favorited"] = str(item.get("id")) in favorited_ids
 
-    return visible_items
+    return [_sign_media_item(item) for item in visible_items]
 
 
 def favorite_media(db: Client, media_id: str, user_id: str) -> Dict[str, Any]:
@@ -253,7 +260,12 @@ def favorite_media(db: Client, media_id: str, user_id: str) -> Dict[str, Any]:
         db.table("media").update({"favorites_count": new_count}).eq("id", media_id).execute()
         media_item["favorites_count"] = new_count
 
-    return media_item
+    media_item["is_favorited"] = True
+    profile_res = db.table("profiles").select("*").eq("id", media_item["uploaded_by"]).execute()
+    if profile_res.data:
+        media_item["uploader"] = profile_res.data[0]
+
+    return _sign_media_item(media_item)
 
 
 def unfavorite_media(db: Client, media_id: str, user_id: str) -> Dict[str, Any]:
@@ -271,11 +283,16 @@ def unfavorite_media(db: Client, media_id: str, user_id: str) -> Dict[str, Any]:
         db.table("media").update({"favorites_count": new_count}).eq("id", media_id).execute()
         media_item["favorites_count"] = new_count
 
-    return media_item
+    media_item["is_favorited"] = False
+    profile_res = db.table("profiles").select("*").eq("id", media_item["uploaded_by"]).execute()
+    if profile_res.data:
+        media_item["uploader"] = profile_res.data[0]
+
+    return _sign_media_item(media_item)
 
 
 def delete_media(db: Client, media_id: str, user_id: str) -> None:
-    """Delete a media item (only allowed by original uploader)."""
+    """Delete a media item from R2 storage and database (only allowed by original uploader)."""
     media_res = db.table("media").select("*").eq("id", media_id).execute()
     if not media_res.data:
         raise NotFoundError("Media item not found.")
@@ -284,4 +301,8 @@ def delete_media(db: Client, media_id: str, user_id: str) -> None:
     if str(media_item.get("uploaded_by")) != str(user_id):
         raise ForbiddenError("Only the original uploader can delete this media item.")
 
+    # Delete object from private R2 bucket
+    delete_file_object(bucket=settings.R2_BUCKET_MEDIA, key=media_item.get("url", ""))
+
     db.table("media").delete().eq("id", media_id).execute()
+

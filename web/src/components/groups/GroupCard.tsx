@@ -1,5 +1,6 @@
 import React from 'react'
 import { Card, AvatarStack } from '../ui'
+import { getAvatarUrl } from '../../lib/avatar'
 import { Group } from './types'
 
 interface GroupCardProps {
@@ -9,13 +10,14 @@ interface GroupCardProps {
 
 export const GroupCard: React.FC<GroupCardProps> = ({ group, onClick }) => {
   const members = group.members || []
-  const avatars = members.map((m) => ({
-    src:
-      m.profile?.avatar_url ||
-      `https://api.dicebear.com/7.x/adventurer/svg?seed=${m.profile?.username || m.user_id}`,
-    alt: m.profile?.username || 'Member',
-    title: m.profile?.username || 'Member',
-  }))
+  const avatars = members.map((m) => {
+    const username = m.profile?.username || m.user_id || 'Member'
+    return {
+      src: getAvatarUrl(m.profile?.avatar_url),
+      alt: username,
+      title: username,
+    }
+  })
 
   const memberNamesText = members
     .slice(0, 3)

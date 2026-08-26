@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, ZoomControl, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { useTheme } from '../context/ThemeContext'
 
 export interface HangoutPin {
   id: string
@@ -11,6 +12,7 @@ export interface HangoutPin {
   longitude: number
   hangout_date?: string
   cover_photo_url?: string
+  group_id?: string | null
 }
 
 interface MapComponentProps {
@@ -54,7 +56,7 @@ function MapController({ center, zoom }: { center: [number, number]; zoom?: numb
 }
 
 const createCustomIcon = (coverUrl?: string, isSelected?: boolean) => {
-  const imgUrl = coverUrl || 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=500&auto=format&fit=crop&q=60'
+  const imgUrl = coverUrl || '/images/covers/hangout-default.jpg'
   return L.divIcon({
     className: 'custom-leaflet-marker-wrapper',
     html: `
@@ -77,6 +79,9 @@ export default function MapComponent({
   center = [14.5995, 120.9842],
   zoom = 12,
 }: MapComponentProps) {
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
+
   const mapCenter: [number, number] = selectedPin
     ? [Number(selectedPin.latitude), Number(selectedPin.longitude)]
     : center
@@ -86,11 +91,18 @@ export default function MapComponent({
       <MapContainer
         center={mapCenter}
         zoom={zoom}
+        zoomControl={false}
         scrollWheelZoom={true}
         attributionControl={false}
-        style={{ width: '100%', height: '100%', borderRadius: 'inherit', background: '#eef4fb' }}
+        style={{
+          width: '100%',
+          height: '100%',
+          borderRadius: 'inherit',
+          background: isDark ? '#141110' : '#eef4fb',
+        }}
       >
         <MapController center={mapCenter} zoom={zoom} />
+        <ZoomControl position="bottomright" />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
@@ -124,8 +136,45 @@ export default function MapComponent({
           width: 100% !important;
           height: 100% !important;
           border-radius: inherit;
-          background: #eef4fb;
+          background: var(--color-background);
           z-index: 1;
+        }
+
+        /* Modernized Leaflet Zoom Controls */
+        .map-component-root .leaflet-bottom.leaflet-right {
+          margin-bottom: 20px;
+          margin-right: 20px;
+        }
+
+        .map-component-root .leaflet-control-zoom {
+          border: 1px solid var(--color-surface-container-high) !important;
+          border-radius: 14px !important;
+          overflow: hidden;
+          box-shadow: var(--shadow-ambient) !important;
+          background: var(--color-surface-container-lowest) !important;
+          backdrop-filter: blur(12px) !important;
+          -webkit-backdrop-filter: blur(12px) !important;
+        }
+
+        .map-component-root .leaflet-control-zoom a {
+          background: transparent !important;
+          color: var(--color-text) !important;
+          border-bottom: 1px solid var(--color-surface-container-high) !important;
+          width: 36px !important;
+          height: 36px !important;
+          line-height: 36px !important;
+          font-size: 16px !important;
+          font-weight: 700 !important;
+          transition: all 0.2s ease;
+        }
+
+        .map-component-root .leaflet-control-zoom a:last-child {
+          border-bottom: none !important;
+        }
+
+        .map-component-root .leaflet-control-zoom a:hover {
+          background: var(--color-surface-container-low) !important;
+          color: var(--color-tangerine) !important;
         }
 
         /* Custom Leaflet Pin Markers */

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
+import useSWR from 'swr'
 import Layout from '../components/Layout'
 import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
 import { api, ApiError } from '../lib/api'
 import { LogOut } from 'lucide-react'
-import { profileAvatars } from '../data/mock'
+import { profileAvatars, DEFAULT_AVATAR } from '../data/mock'
 import { Toast } from '../components/ui'
 import {
   StorageUsage,
@@ -19,18 +20,24 @@ import {
 export default function ProfileSettings() {
   const router = useRouter()
   const { user, logout, refreshUser } = useAuth()
-  const [avatarIndex, setAvatarIndex] = useState(0)
+  const defaultIndex = Math.max(0, profileAvatars.indexOf(DEFAULT_AVATAR))
+  const [avatarIndex, setAvatarIndex] = useState(defaultIndex)
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false)
   const [nameError, setNameError] = useState<string | null>(null)
   const [isSavingName, setIsSavingName] = useState(false)
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false)
-  const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
-  const [loadingStorage, setLoadingStorage] = useState(true)
   const [toastMessage, setToastMessage] = useState('')
+
+  const { data: storageUsageData, isLoading: loadingStorage } = useSWR<StorageUsage>('/storage/usage')
+  const storageUsage = storageUsageData || {
+    used_bytes: 0,
+    max_bytes: 500 * 1024 * 1024,
+    percentage_used: 0.0,
+  }
 
   const displayName = user?.username || 'User'
   const displayEmail = user?.email || ''
-  const currentAvatar = user?.avatar_url || profileAvatars[avatarIndex] || profileAvatars[0]
+  const currentAvatar = user?.avatar_url || profileAvatars[avatarIndex] || DEFAULT_AVATAR
 
   useEffect(() => {
     if (user?.avatar_url) {
@@ -38,30 +45,10 @@ export default function ProfileSettings() {
       if (idx !== -1) {
         setAvatarIndex(idx)
       }
+    } else {
+      setAvatarIndex(defaultIndex)
     }
-  }, [user])
-
-  const fetchStorageUsage = async () => {
-    try {
-      setLoadingStorage(true)
-      const usage = await api.get<StorageUsage>('/storage/usage')
-      setStorageUsage(usage)
-    } catch (err) {
-      console.error('Failed to load storage usage:', err)
-      setStorageUsage({
-        used_bytes: 0,
-        max_bytes: 500 * 1024 * 1024,
-        percentage_used: 0.0,
-      })
-    } finally {
-      setLoadingStorage(false)
-    }
-  }
-
-  useEffect(() => {
-    refreshUser().catch(console.error)
-    fetchStorageUsage()
-  }, [])
+  }, [user, defaultIndex])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)

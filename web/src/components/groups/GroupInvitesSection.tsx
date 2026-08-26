@@ -1,6 +1,6 @@
 import React from 'react'
 import { Mail, Check, X } from 'lucide-react'
-import { Button, Card } from '../ui'
+import { Button } from '../ui'
 import { GroupInvite } from './types'
 
 interface GroupInvitesSectionProps {
@@ -30,7 +30,7 @@ export const GroupInvitesSection: React.FC<GroupInvitesSectionProps> = ({
           const isResponding = respondingInviteId === invite.group_id
 
           return (
-            <Card key={invite.id} variant="low" padding="none" className="invite-card">
+            <div key={invite.id} className="invite-card">
               <div
                 className="invite-cover-thumbnail"
                 style={{
@@ -68,31 +68,31 @@ export const GroupInvitesSection: React.FC<GroupInvitesSectionProps> = ({
                   </Button>
                 </div>
               </div>
-            </Card>
+            </div>
           )
         })}
       </div>
 
       <style jsx>{`
         .pending-invites-section {
-          margin-bottom: 32px;
-          background-color: var(--tint-butter);
-          border: 1px solid rgba(242, 216, 143, 0.6);
-          border-radius: 24px;
-          padding: 24px;
+          margin-bottom: 28px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
         }
 
         .invites-title-row {
           display: flex;
           align-items: center;
           gap: 8px;
-          margin-bottom: 16px;
-          color: #85610e;
+          color: var(--color-tangerine);
         }
 
         .invites-title-row h3 {
-          font-size: 16px;
-          color: #85610e;
+          font-size: 15px;
+          font-family: var(--font-display);
+          font-weight: 700;
+          color: var(--color-text);
           margin: 0;
         }
 
@@ -102,36 +102,39 @@ export const GroupInvitesSection: React.FC<GroupInvitesSectionProps> = ({
           gap: 16px;
         }
 
-        :global(.invite-card) {
+        .invite-card {
           display: flex;
-          background-color: var(--color-surface-container-lowest) !important;
-          border-radius: 16px !important;
-          overflow: hidden;
-          box-shadow: 0 4px 12px rgba(46, 42, 40, 0.04);
+          gap: 16px;
+          align-items: center;
+          padding: 6px 0;
         }
 
         .invite-cover-thumbnail {
-          width: 80px;
-          min-height: 80px;
+          width: 56px;
+          height: 56px;
+          border-radius: 12px;
           background-size: cover;
           background-position: center;
           flex-shrink: 0;
         }
 
         .invite-content {
-          padding: 12px 16px;
           display: flex;
           flex-direction: column;
-          justify-content: space-between;
+          gap: 8px;
           flex: 1;
-          gap: 10px;
+          min-width: 0;
         }
 
         .invite-group-name {
           font-size: 15px;
+          font-family: var(--font-display);
           font-weight: 700;
           color: var(--color-text);
-          margin: 0 0 2px 0;
+          margin: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .invite-from {
@@ -140,9 +143,15 @@ export const GroupInvitesSection: React.FC<GroupInvitesSectionProps> = ({
           margin: 0;
         }
 
+        .invite-from strong {
+          color: var(--color-text);
+        }
+
         .invite-actions {
           display: flex;
+          align-items: center;
           gap: 8px;
+          margin-top: 2px;
         }
       `}</style>
     </div>

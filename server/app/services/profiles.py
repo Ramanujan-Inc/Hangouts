@@ -3,25 +3,43 @@ from typing import Optional, Dict, Any
 from fastapi import HTTPException, status, UploadFile
 from supabase import Client
 from app.schemas.profile import ProfileUpdate
+from app.core.config import settings
 from app.core.exceptions import BadRequestError
-from app.services.media import _upload_to_storage, ALLOWED_IMAGE_MIME_TYPES
+from app.core.storage import upload_file_bytes, get_avatar_public_url
+from app.services.media import ALLOWED_IMAGE_MIME_TYPES
 
 
 def upload_user_avatar(db: Client, user_id: str, file: UploadFile) -> Dict[str, str]:
-    """Upload custom avatar image to storage and update user profile avatar_url."""
+    """Upload custom avatar image to the public R2 avatars bucket and update user profile avatar_url."""
     content_type = file.content_type or ""
     if content_type not in ALLOWED_IMAGE_MIME_TYPES:
         raise BadRequestError(
             f"Invalid image type '{content_type}'. Allowed types are {', '.join(ALLOWED_IMAGE_MIME_TYPES)}."
         )
     file_bytes = file.file.read()
-    url = _upload_to_storage(db, file_bytes, file.filename or "avatar.jpg", content_type)
+
+    # Determine extension and key
+    filename = file.filename or "avatar.jpg"
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "jpg"
+    safe_ext = ext if ext in ["jpg", "jpeg", "png", "webp", "gif", "heic"] else "jpg"
+    timestamp = int(datetime.now(timezone.utc).timestamp())
+    object_key = f"{settings.ENVIRONMENT}/usr_{user_id}_{timestamp}.{safe_ext}"
+
+    # Upload to public avatars bucket
+    upload_file_bytes(
+        bucket=settings.R2_BUCKET_AVATARS,
+        key=object_key,
+        file_bytes=file_bytes,
+        content_type=content_type,
+    )
+
+    public_url = get_avatar_public_url(object_key)
     update_profile(
         db=db,
         profile_id=user_id,
-        profile_update=ProfileUpdate(avatar_url=url),
+        profile_update=ProfileUpdate(avatar_url=public_url),
     )
-    return {"url": url}
+    return {"url": public_url}
 
 
 

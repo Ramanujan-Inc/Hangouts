@@ -8,19 +8,21 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
 
-    # Supabase & Storage Settings (Required in .env)
+    # Supabase Settings (Database & Auth)
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
     SUPABASE_JWT_SECRET: str = ""
-    STORAGE_BUCKET: str = "hangout-media"
-    MAX_USER_STORAGE_BYTES: int = 500 * 1024 * 1024  # 500 MB default per user quota
 
-    # Cloudflare R2 Storage Settings (Optional override)
+    # Cloudflare R2 Storage Settings
     R2_ACCOUNT_ID: Optional[str] = None
     R2_ACCESS_KEY_ID: Optional[str] = None
     R2_SECRET_ACCESS_KEY: Optional[str] = None
-    R2_BUCKET_NAME: str = "hangout-media"
-    R2_PUBLIC_URL: Optional[str] = None
+    R2_BUCKET_MEDIA: str = "hangouts-media"
+    R2_BUCKET_AVATARS: str = "avatars"
+    R2_AVATARS_PUBLIC_URL: Optional[str] = None
+    R2_MEDIA_CUSTOM_DOMAIN: Optional[str] = None
+    R2_PRESIGNED_EXPIRATION_SECONDS: int = 3600
+    MAX_USER_STORAGE_BYTES: int = 500 * 1024 * 1024  # 500 MB default per user quota
 
     # CORS Settings - Configurable via ENV (comma separated or JSON array)
     CORS_ORIGINS: Union[List[str], str] = [

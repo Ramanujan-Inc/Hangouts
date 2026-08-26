@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { MapPin, Calendar } from 'lucide-react'
 import { AvatarStack, Badge } from '../ui'
 import { formatDate } from '../../lib/format'
+import { getAvatarUrl } from '../../lib/avatar'
 import { Hangout, DEFAULT_COVER } from './types'
 
 interface HangoutCardProps {
@@ -14,14 +15,13 @@ export const HangoutCard: React.FC<HangoutCardProps> = ({ hangout, index }) => {
   const rotationDeg = ((index % 5) - 2) * 1.5
   const participantsList = hangout.participants || []
 
-  const avatarStackItems = participantsList.map((p, pIdx) => ({
-    src:
-      p.profile?.avatar_url ||
-      `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(
-        p.profile?.username || `Member${pIdx}`
-      )}`,
-    alt: p.profile?.username || 'Member',
-  }))
+  const avatarStackItems = participantsList.map((p, pIdx) => {
+    const username = p.profile?.username || `Member${pIdx}`
+    return {
+      src: getAvatarUrl(p.profile?.avatar_url),
+      alt: username,
+    }
+  })
 
   return (
     <Link href={`/hangout/${hangout.id}`} className="hangout-card-link">

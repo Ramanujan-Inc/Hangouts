@@ -5,18 +5,18 @@ import Layout from '../components/Layout'
 import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
-import { MapPin, Users, Sparkles, Loader2 } from 'lucide-react'
-import { Button, TextArea, TextField, InlineAlert } from '../components/ui'
+import { Sparkles, Loader2, Users } from 'lucide-react'
+import { Button, InlineAlert, Select } from '../components/ui'
 import {
   GroupMemberProfile,
   Group,
   HangoutResponse,
   UploadedPhoto,
   PhotoUploaderSection,
+  TitleDescriptionInput,
   ParticipantSelector,
   DateTimeInput,
-  LocationPickerModal,
-  AddAttendeeModal,
+  LocationSection,
 } from '../components/create'
 
 export default function CreateHangout() {
@@ -40,13 +40,8 @@ export default function CreateHangout() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>('')
   const [allCircleMembers, setAllCircleMembers] = useState<GroupMemberProfile[]>([])
   const [groupMembers, setGroupMembers] = useState<GroupMemberProfile[]>([])
-  const [customAttendees, setCustomAttendees] = useState<GroupMemberProfile[]>([])
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([])
   const [loadingMembers, setLoadingMembers] = useState(false)
-
-  // Modals
-  const [showAddAttendeeModal, setShowAddAttendeeModal] = useState(false)
-  const [showLocationPicker, setShowLocationPicker] = useState(false)
 
   // Photos
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([])
@@ -56,7 +51,7 @@ export default function CreateHangout() {
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Fetch user groups and all known group circle members on mount
+  // Fetch user groups and all known group circle members on mount in a single request
   useEffect(() => {
     async function loadGroupsAndMembers() {
       try {
@@ -66,17 +61,12 @@ export default function CreateHangout() {
 
         const knownMembersMap = new Map<string, GroupMemberProfile>()
         for (const grp of data || []) {
-          try {
-            const groupDetails = await api.get<Group>(`/groups/${grp.id}`)
-            if (groupDetails && groupDetails.members) {
-              for (const m of groupDetails.members) {
-                if (m.status === 'accepted' && m.profile && m.profile.id !== user?.id) {
-                  knownMembersMap.set(m.profile.id, m.profile)
-                }
+          if (grp.members) {
+            for (const m of grp.members) {
+              if (m.status === 'accepted' && m.profile && m.profile.id !== user?.id) {
+                knownMembersMap.set(m.profile.id, m.profile)
               }
             }
-          } catch (e) {
-            // Ignore individual group fetch failure
           }
         }
         setAllCircleMembers(Array.from(knownMembersMap.values()))
@@ -89,13 +79,26 @@ export default function CreateHangout() {
     loadGroupsAndMembers()
   }, [user?.id])
 
-  // When group selection changes, fetch that group's active members
+  // When group selection changes, read from cached groups or fetch on demand
   useEffect(() => {
     async function loadGroupMembers() {
       if (!selectedGroupId) {
         setGroupMembers([])
+        setSelectedParticipants([])
         return
       }
+
+      // Check if group and members are already in memory
+      const cachedGroup = groups.find((g) => g.id === selectedGroupId)
+      if (cachedGroup && cachedGroup.members) {
+        const membersList = cachedGroup.members
+          .filter((m) => m.status === 'accepted' && m.profile && m.profile.id !== user?.id)
+          .map((m) => m.profile as GroupMemberProfile)
+        setGroupMembers(membersList)
+        setSelectedParticipants(membersList.map((m) => m.id))
+        return
+      }
+
       try {
         setLoadingMembers(true)
         const groupDetails = await api.get<Group>(`/groups/${selectedGroupId}`)
@@ -116,7 +119,7 @@ export default function CreateHangout() {
       }
     }
     loadGroupMembers()
-  }, [selectedGroupId, user?.id])
+  }, [selectedGroupId, groups, user?.id])
 
   // Photo handlers
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,12 +169,7 @@ export default function CreateHangout() {
   }
 
   // Attendees handlers
-  const activeMembersList = selectedGroupId
-    ? groupMembers
-    : [
-        ...allCircleMembers,
-        ...customAttendees.filter((custom) => !allCircleMembers.some((m) => m.id === custom.id)),
-      ]
+  const activeMembersList = selectedGroupId ? groupMembers : allCircleMembers
 
   const handleToggleParticipant = (memberId: string) => {
     if (selectedParticipants.includes(memberId)) {
@@ -189,28 +187,19 @@ export default function CreateHangout() {
     }
   }
 
-  const handleAddFoundUser = (profile: GroupMemberProfile) => {
-    if (!customAttendees.some((m) => m.id === profile.id)) {
-      setCustomAttendees((prev) => [...prev, profile])
-    }
-    if (!selectedParticipants.includes(profile.id)) {
-      setSelectedParticipants((prev) => [...prev, profile.id])
-    }
-  }
-
   // Location handler
-  const handleSelectLocation = (
-    name: string,
-    lat: number,
-    lng: number,
-    address?: string,
-    id?: string
-  ) => {
-    setLocationName(name)
-    setLatitude(lat)
-    setLongitude(lng)
-    setFormattedAddress(address || '')
-    setPlaceId(id || '')
+  const handleLocationChange = (data: {
+    locationName: string
+    formattedAddress?: string
+    latitude?: number
+    longitude?: number
+    placeId?: string
+  }) => {
+    setLocationName(data.locationName)
+    if (data.formattedAddress !== undefined) setFormattedAddress(data.formattedAddress)
+    if (data.latitude !== undefined) setLatitude(data.latitude)
+    if (data.longitude !== undefined) setLongitude(data.longitude)
+    if (data.placeId !== undefined) setPlaceId(data.placeId)
   }
 
   // Form Submission
@@ -328,41 +317,28 @@ export default function CreateHangout() {
 
             {/* Form Fields */}
             <div className="form-fields">
-              <TextField
-                label="Hangout Title"
-                required
-                placeholder="e.g. Friday Night Ramen"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-
-              <TextArea
-                label="Description & Scrapbook Notes"
-                placeholder="What are we doing? Write down any notes, funny moments, or plans..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+              {/* Title & Optional Collapsible Description */}
+              <TitleDescriptionInput
+                title={title}
+                description={description}
+                onTitleChange={setTitle}
+                onDescriptionChange={setDescription}
               />
 
               {/* Group Selection Dropdown */}
-              <div className="input-group">
-                <label className="field-label">
-                  <Users size={16} /> Group Circle
-                </label>
-                <div className="select-container">
-                  <select
-                    className="pill-input select-input"
-                    value={selectedGroupId}
-                    onChange={(e) => setSelectedGroupId(e.target.value)}
-                  >
-                    <option value="">Personal / Standalone Hangout (No Group)</option>
-                    {groups.map((grp) => (
-                      <option key={grp.id} value={grp.id}>
-                        {grp.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <Select
+                label="Group Circle"
+                icon={<Users size={16} />}
+                value={selectedGroupId}
+                onChange={(e) => setSelectedGroupId(e.target.value)}
+              >
+                <option value="">No group</option>
+                {groups.map((grp) => (
+                  <option key={grp.id} value={grp.id}>
+                    {grp.name}
+                  </option>
+                ))}
+              </Select>
 
               {/* Dynamic Attendees Participant Selector */}
               <ParticipantSelector
@@ -372,7 +348,6 @@ export default function CreateHangout() {
                 loadingMembers={loadingMembers}
                 onToggleParticipant={handleToggleParticipant}
                 onSelectAll={handleSelectAllParticipants}
-                onOpenAddAttendeeModal={() => setShowAddAttendeeModal(true)}
               />
 
               {/* Date & Optional Time Row */}
@@ -385,28 +360,15 @@ export default function CreateHangout() {
                 onToggleTimeInput={setShowTimeInput}
               />
 
-              {/* Location Picker Trigger */}
-              <div className="input-group">
-                <label className="field-label">
-                  <MapPin size={16} /> Location
-                </label>
-                <div
-                  className="location-picker-trigger"
-                  onClick={() => setShowLocationPicker(true)}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <MapPin size={18} className="loc-pin" />
-                  <div className="loc-text-col">
-                    <span className="loc-main">
-                      {locationName || 'Add a location or venue...'}
-                    </span>
-                    {formattedAddress && formattedAddress !== locationName && (
-                      <span className="loc-sub-address">{formattedAddress}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
+              {/* Inline Interactive Location Section */}
+              <LocationSection
+                locationName={locationName}
+                formattedAddress={formattedAddress}
+                latitude={latitude}
+                longitude={longitude}
+                placeId={placeId}
+                onLocationChange={handleLocationChange}
+              />
             </div>
 
             {/* Submit Action CTA */}
@@ -426,22 +388,6 @@ export default function CreateHangout() {
               </Button>
             </div>
           </form>
-
-          {/* Location & Coordinates Picker Modal */}
-          <LocationPickerModal
-            isOpen={showLocationPicker}
-            onClose={() => setShowLocationPicker(false)}
-            onSelectLocation={handleSelectLocation}
-            currentLocationName={locationName}
-          />
-
-          {/* Add Attendee by Username Modal */}
-          <AddAttendeeModal
-            isOpen={showAddAttendeeModal}
-            onClose={() => setShowAddAttendeeModal(false)}
-            onAddUser={handleAddFoundUser}
-            currentUserId={user?.id}
-          />
         </div>
 
         <style jsx>{`
@@ -478,78 +424,6 @@ export default function CreateHangout() {
             display: flex;
             flex-direction: column;
             gap: 20px;
-          }
-
-          .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-          }
-
-          .field-label {
-            font-family: var(--font-display);
-            font-weight: 700;
-            font-size: 14px;
-            color: var(--color-text);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-          }
-
-          .select-container {
-            position: relative;
-          }
-
-          .select-input {
-            appearance: none;
-            cursor: pointer;
-            padding-right: 36px;
-          }
-
-          .location-picker-trigger {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 14px 18px;
-            border-radius: 9999px;
-            background-color: var(--color-surface-container-low);
-            border: 2px solid transparent;
-            cursor: pointer;
-            transition: all 0.2s ease;
-          }
-
-          .location-picker-trigger:hover {
-            background-color: var(--color-surface-container);
-            border-color: var(--color-blush);
-          }
-
-          :global(.loc-pin) {
-            color: var(--color-blush);
-            flex-shrink: 0;
-          }
-
-          .loc-text-col {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            flex: 1;
-          }
-
-          .loc-main {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--color-text);
-          }
-
-          .loc-sub-address {
-            font-size: 12px;
-            color: var(--color-text-muted);
-          }
-
-          .loc-coords {
-            font-size: 11px;
-            color: var(--color-sea);
-            font-weight: 700;
           }
 
           .sticky-cta-footer {

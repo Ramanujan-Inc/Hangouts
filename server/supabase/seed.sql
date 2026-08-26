@@ -34,7 +34,7 @@ INSERT INTO auth.users (
     crypt('Password123!', gen_salt('bf')),
     NOW(),
     '{"provider": "email", "providers": ["email"]}',
-    '{"username": "Mika", "avatar_url": "https://api.dicebear.com/7.x/adventurer/svg?seed=mika"}',
+    '{"username": "Mika", "avatar_url": "/avatars/mika.svg"}',
     NOW(),
     NOW(),
     '',
@@ -51,7 +51,7 @@ INSERT INTO auth.users (
     crypt('Password123!', gen_salt('bf')),
     NOW(),
     '{"provider": "email", "providers": ["email"]}',
-    '{"username": "Jam", "avatar_url": "https://api.dicebear.com/7.x/adventurer/svg?seed=jam"}',
+    '{"username": "Jam", "avatar_url": "/avatars/jam.svg"}',
     NOW(),
     NOW(),
     '',
@@ -68,7 +68,7 @@ INSERT INTO auth.users (
     crypt('Password123!', gen_salt('bf')),
     NOW(),
     '{"provider": "email", "providers": ["email"]}',
-    '{"username": "Dave", "avatar_url": "https://api.dicebear.com/7.x/adventurer/svg?seed=dave"}',
+    '{"username": "Dave", "avatar_url": "/avatars/dave.svg"}',
     NOW(),
     NOW(),
     '',
@@ -85,7 +85,7 @@ INSERT INTO auth.users (
     crypt('Password123!', gen_salt('bf')),
     NOW(),
     '{"provider": "email", "providers": ["email"]}',
-    '{"username": "Chloe", "avatar_url": "https://api.dicebear.com/7.x/adventurer/svg?seed=chloe"}',
+    '{"username": "Chloe", "avatar_url": "/avatars/chloe.svg"}',
     NOW(),
     NOW(),
     '',
@@ -97,10 +97,10 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Upsert profiles to guarantee username and avatar_url synchronization
 INSERT INTO public.profiles (id, email, username, avatar_url) VALUES
-('a0000000-0000-0000-0000-000000000001', 'mika@hangouts.dev', 'Mika', 'https://api.dicebear.com/7.x/adventurer/svg?seed=mika'),
-('a0000000-0000-0000-0000-000000000002', 'jam@hangouts.dev', 'Jam', 'https://api.dicebear.com/7.x/adventurer/svg?seed=jam'),
-('a0000000-0000-0000-0000-000000000003', 'dave@hangouts.dev', 'Dave', 'https://api.dicebear.com/7.x/adventurer/svg?seed=dave'),
-('a0000000-0000-0000-0000-000000000004', 'chloe@hangouts.dev', 'Chloe', 'https://api.dicebear.com/7.x/adventurer/svg?seed=chloe')
+('a0000000-0000-0000-0000-000000000001', 'mika@hangouts.dev', 'Mika', '/avatars/mika.svg'),
+('a0000000-0000-0000-0000-000000000002', 'jam@hangouts.dev', 'Jam', '/avatars/jam.svg'),
+('a0000000-0000-0000-0000-000000000003', 'dave@hangouts.dev', 'Dave', '/avatars/dave.svg'),
+('a0000000-0000-0000-0000-000000000004', 'chloe@hangouts.dev', 'Chloe', '/avatars/chloe.svg')
 ON CONFLICT (id) DO UPDATE SET
     username = EXCLUDED.username,
     avatar_url = EXCLUDED.avatar_url;
@@ -109,8 +109,8 @@ ON CONFLICT (id) DO UPDATE SET
 -- 2. SEED GROUPS & MEMBERS
 -- ============================================================================
 INSERT INTO public.groups (id, name, cover_image_url, created_by) VALUES
-('b0000000-0000-0000-0000-000000000001', 'Weekend Warriors', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80', 'a0000000-0000-0000-0000-000000000001'),
-('b0000000-0000-0000-0000-000000000002', 'Foodies Club', 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80', 'a0000000-0000-0000-0000-000000000002')
+('b0000000-0000-0000-0000-000000000001', 'Weekend Warriors', '/images/covers/beach.jpg', 'a0000000-0000-0000-0000-000000000001'),
+('b0000000-0000-0000-0000-000000000002', 'Foodies Club', '/images/covers/food.jpg', 'a0000000-0000-0000-0000-000000000002')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.group_members (group_id, user_id, status) VALUES
@@ -140,7 +140,7 @@ INSERT INTO public.hangouts (id, title, description, hangout_date, hangout_time,
     NULL,
     14.5507,
     121.0465,
-    'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80',
+    '/images/covers/ramen.jpg',
     'b0000000-0000-0000-0000-000000000002',
     'a0000000-0000-0000-0000-000000000001'
 ),
@@ -155,7 +155,7 @@ INSERT INTO public.hangouts (id, title, description, hangout_date, hangout_time,
     NULL,
     14.8864,
     120.0617,
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
+    '/images/covers/beach.jpg',
     'b0000000-0000-0000-0000-000000000001',
     'a0000000-0000-0000-0000-000000000001'
 ),
@@ -170,7 +170,7 @@ INSERT INTO public.hangouts (id, title, description, hangout_date, hangout_time,
     NULL,
     14.5515,
     121.0494,
-    'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=1200&q=80',
+    '/images/covers/coffee.jpg',
     NULL,
     'a0000000-0000-0000-0000-000000000003'
 ),
@@ -185,7 +185,7 @@ INSERT INTO public.hangouts (id, title, description, hangout_date, hangout_time,
     NULL,
     14.5896,
     120.9747,
-    'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1200&q=80',
+    '/images/covers/bar.jpg',
     'b0000000-0000-0000-0000-000000000001',
     'a0000000-0000-0000-0000-000000000001'
 )
@@ -242,8 +242,8 @@ INSERT INTO public.media (id, hangout_id, uploaded_by, url, thumbnail_url, capti
     'e0000000-0000-0000-0000-000000000001',
     'c0000000-0000-0000-0000-000000000001',
     'a0000000-0000-0000-0000-000000000001',
-    'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=600&q=80',
-    'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=600&q=80',
+    '/images/covers/ramen.jpg',
+    '/images/covers/ramen.jpg',
     'Ramen Feast',
     'photo',
     TRUE
@@ -252,8 +252,8 @@ INSERT INTO public.media (id, hangout_id, uploaded_by, url, thumbnail_url, capti
     'e0000000-0000-0000-0000-000000000002',
     'c0000000-0000-0000-0000-000000000001',
     'a0000000-0000-0000-0000-000000000002',
-    'https://images.unsplash.com/photo-1557872943-16a5ac26437e?auto=format&fit=crop&w=600&q=80',
-    'https://images.unsplash.com/photo-1557872943-16a5ac26437e?auto=format&fit=crop&w=600&q=80',
+    '/images/covers/food.jpg',
+    '/images/covers/food.jpg',
     'Gyoza side dish',
     'photo',
     TRUE
@@ -263,7 +263,7 @@ INSERT INTO public.media (id, hangout_id, uploaded_by, url, thumbnail_url, capti
     'c0000000-0000-0000-0000-000000000001',
     'a0000000-0000-0000-0000-000000000003',
     'https://assets.mixkit.co/videos/preview/mixkit-chef-preparing-ramen-soup-42867-large.mp4',
-    'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=600&q=80',
+    '/images/covers/dimsum.jpg',
     'Chef in action',
     'video',
     TRUE
@@ -272,8 +272,8 @@ INSERT INTO public.media (id, hangout_id, uploaded_by, url, thumbnail_url, capti
     'e0000000-0000-0000-0000-000000000004',
     'c0000000-0000-0000-0000-000000000001',
     'a0000000-0000-0000-0000-000000000001',
-    'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80',
-    'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80',
+    '/images/covers/bbq.jpg',
+    '/images/covers/bbq.jpg',
     'Late night noodles',
     'photo',
     TRUE
@@ -282,8 +282,8 @@ INSERT INTO public.media (id, hangout_id, uploaded_by, url, thumbnail_url, capti
     'e0000000-0000-0000-0000-000000000005',
     'c0000000-0000-0000-0000-000000000002',
     'a0000000-0000-0000-0000-000000000004',
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
+    '/images/covers/beach.jpg',
+    '/images/covers/beach.jpg',
     'Pristine beach waters',
     'photo',
     TRUE
@@ -292,8 +292,8 @@ INSERT INTO public.media (id, hangout_id, uploaded_by, url, thumbnail_url, capti
     'e0000000-0000-0000-0000-000000000006',
     'c0000000-0000-0000-0000-000000000004',
     'a0000000-0000-0000-0000-000000000001',
-    'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=600&q=80',
-    'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=600&q=80',
+    '/images/covers/bar.jpg',
+    '/images/covers/bar.jpg',
     'Historic Street Lanterns',
     'photo',
     TRUE

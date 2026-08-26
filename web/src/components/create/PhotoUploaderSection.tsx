@@ -330,25 +330,27 @@ export const PhotoUploaderSection: React.FC<PhotoUploaderSectionProps> = ({
 
         .photo-caption-input {
           width: 100%;
-          padding: 8px 14px;
+          padding: 10px 14px;
           border-radius: 12px;
           border: 1px solid var(--color-surface-container-high);
-          background-color: var(--color-surface-container-low);
+          background-color: var(--color-surface-container-lowest);
           color: var(--color-text);
           font-size: 13px;
           outline: none;
-          transition: border-color 0.15s, background-color 0.15s;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
           box-sizing: border-box;
         }
 
         .photo-caption-input:focus {
           border-color: var(--color-blush);
-          background-color: var(--color-surface-container);
+          box-shadow: 0 0 0 3px var(--tint-blush);
+          background-color: var(--color-surface-container-lowest);
         }
 
         .photo-caption-input::placeholder {
           color: var(--color-text-muted);
-          font-size: 12px;
+          opacity: 0.75;
+          font-size: 13px;
         }
       `}</style>
     </div>

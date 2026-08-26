@@ -3,19 +3,32 @@ from typing import Optional, List, Dict, Any
 from fastapi import UploadFile
 from supabase import Client
 from app.schemas.group import GroupCreate, GroupUpdate
+import uuid
+from app.core.config import settings
 from app.core.exceptions import ForbiddenError, NotFoundError, BadRequestError
-from app.services.media import _upload_to_storage, ALLOWED_IMAGE_MIME_TYPES
+from app.core.storage import upload_file_bytes, get_public_url
+from app.services.media import ALLOWED_IMAGE_MIME_TYPES
 
 
 def upload_group_cover_image(db: Client, file: UploadFile) -> Dict[str, str]:
-    """Upload a custom group cover photo to storage and return its public URL."""
+    """Upload a custom group cover photo to public R2 storage and return its CDN URL."""
     content_type = file.content_type or ""
     if content_type not in ALLOWED_IMAGE_MIME_TYPES:
         raise BadRequestError(
             f"Invalid image type '{content_type}'. Allowed types are {', '.join(ALLOWED_IMAGE_MIME_TYPES)}."
         )
     file_bytes = file.file.read()
-    url = _upload_to_storage(db, file_bytes, file.filename or "group_cover.jpg", content_type)
+    filename = file.filename or "group_cover.jpg"
+    safe_filename = filename.replace(" ", "_")
+    object_key = f"{settings.ENVIRONMENT}/covers/grp_{uuid.uuid4()}_{safe_filename}"
+
+    upload_file_bytes(
+        bucket=settings.R2_BUCKET_AVATARS,
+        key=object_key,
+        file_bytes=file_bytes,
+        content_type=content_type,
+    )
+    url = get_public_url(bucket=settings.R2_BUCKET_AVATARS, key=object_key)
     return {"url": url}
 
 

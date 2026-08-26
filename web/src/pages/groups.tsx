@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
+import useSWR from 'swr'
 import Layout from '../components/Layout'
 import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
@@ -21,11 +22,28 @@ import {
 export default function GroupsPage() {
   const router = useRouter()
   const { user } = useAuth()
-  const [groups, setGroups] = useState<Group[]>([])
-  const [invites, setInvites] = useState<GroupInvite[]>([])
+
+  // SWR queries with automatic caching and revalidation
+  const {
+    data: groupsData,
+    error: groupsError,
+    isLoading: groupsLoading,
+    mutate: mutateGroups,
+  } = useSWR<Group[]>('/groups')
+
+  const {
+    data: invitesData,
+    error: invitesError,
+    isLoading: invitesLoading,
+    mutate: mutateInvites,
+  } = useSWR<GroupInvite[]>('/groups/invites')
+
+  const groups = groupsData || []
+  const invites = invitesData || []
+  const loading = (groupsLoading && !groupsData) || (invitesLoading && !invitesData)
+  const error = groupsError?.message || invitesError?.message || null
+
   const [respondingInviteId, setRespondingInviteId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState('')
 
   // Modals state
@@ -42,31 +60,6 @@ export default function GroupsPage() {
     setToastMessage(msg)
   }
 
-  const fetchGroups = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const groupsData = await api.get<Group[]>('/groups').catch((err) => {
-        console.error('Failed to load groups:', err)
-        return []
-      })
-      const invitesData = await api.get<GroupInvite[]>('/groups/invites').catch((err) => {
-        console.error('Failed to load invites:', err)
-        return []
-      })
-      setGroups(groupsData || [])
-      setInvites(invitesData || [])
-    } catch (err: any) {
-      setError(err.message || 'Failed to load groups')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchGroups()
-  }, [])
-
   const handleRespondInvite = async (
     groupId: string,
     action: 'accept' | 'decline',
@@ -76,7 +69,7 @@ export default function GroupsPage() {
       setRespondingInviteId(groupId)
       await api.post(`/groups/${groupId}/invites/respond`, { action })
       showToast(action === 'accept' ? `Joined "${groupName || 'group'}"!` : 'Invitation declined')
-      await fetchGroups()
+      await Promise.all([mutateGroups(), mutateInvites()])
     } catch (err: any) {
       showToast(err.message || `Failed to ${action} invite`)
     } finally {
@@ -84,17 +77,36 @@ export default function GroupsPage() {
     }
   }
 
-  const handleCreateGroup = async (name: string, coverImageUrl: string) => {
+  const handleCreateGroup = async (
+    name: string,
+    coverImageUrl: string,
+    inviteUsernames: string[] = []
+  ) => {
     try {
       setCreating(true)
       const newGroup = await api.post<Group>('/groups', {
         name,
         cover_image_url: coverImageUrl,
       })
-      setGroups((prev) => [newGroup, ...prev])
+
+      // Send invitations to added members if any
+      if (inviteUsernames.length > 0) {
+        for (const username of inviteUsernames) {
+          try {
+            await api.post(`/groups/${newGroup.id}/members`, { username })
+          } catch (err: any) {
+            console.error(`Failed to invite ${username}:`, err)
+          }
+        }
+      }
+
       setIsCreateOpen(false)
-      showToast(`Group "${newGroup.name}" created!`)
-      fetchGroups()
+      showToast(
+        inviteUsernames.length > 0
+          ? `Group "${newGroup.name}" created and invitations sent!`
+          : `Group "${newGroup.name}" created!`
+      )
+      await mutateGroups()
     } catch (err: any) {
       showToast(err.message || 'Failed to create group')
     } finally {
@@ -102,44 +114,46 @@ export default function GroupsPage() {
     }
   }
 
-  const handleInviteMember = async (username: string) => {
-    if (!selectedGroup) return
+  const handleInviteMember = async (usernames: string[]) => {
+    if (!selectedGroup || usernames.length === 0) return
 
     try {
       setInviting(true)
-      const member = await api.post<GroupMember>(`/groups/${selectedGroup.id}/members`, {
-        username,
-      })
+      const invitedCount = usernames.length
+      const addedMembers: GroupMember[] = []
 
-      // Update local group members
-      setGroups((prev) =>
-        prev.map((g) => {
-          if (g.id === selectedGroup.id) {
-            const currentMembers = g.members || []
-            return {
-              ...g,
-              members: [...currentMembers, member],
-            }
-          }
-          return g
-        })
-      )
-
-      // Update active modal group details if currently open
-      setActiveGroupDetail((prev) => {
-        if (!prev || prev.id !== selectedGroup.id) return prev
-        const currentMembers = prev.members || []
-        return {
-          ...prev,
-          members: [...currentMembers, member],
+      for (const username of usernames) {
+        try {
+          const member = await api.post<GroupMember>(`/groups/${selectedGroup.id}/members`, {
+            username,
+          })
+          if (member) addedMembers.push(member)
+        } catch (err: any) {
+          console.error(`Failed to invite ${username}:`, err)
         }
-      })
+      }
+
+      if (addedMembers.length > 0) {
+        // Update active modal group details if currently open
+        setActiveGroupDetail((prev) => {
+          if (!prev || prev.id !== selectedGroup.id) return prev
+          const currentMembers = prev.members || []
+          return {
+            ...prev,
+            members: [...currentMembers, ...addedMembers],
+          }
+        })
+      }
 
       setIsInviteOpen(false)
-      showToast(`Invited ${username}!`)
-      fetchGroups()
+      showToast(
+        invitedCount === 1
+          ? `Invited ${usernames[0]}!`
+          : `Invitations sent to ${invitedCount} friends!`
+      )
+      await mutateGroups()
     } catch (err: any) {
-      showToast(err.message || 'Failed to invite member')
+      showToast(err.message || 'Failed to invite members')
     } finally {
       setInviting(false)
     }
@@ -151,8 +165,8 @@ export default function GroupsPage() {
 
     try {
       await api.delete(`/groups/${groupId}/members/${user.id}`)
-      setGroups((prev) => prev.filter((g) => g.id !== groupId))
       showToast(`Left "${groupName}"`)
+      await mutateGroups()
     } catch (err: any) {
       showToast(err.message || 'Failed to leave group')
     }
@@ -208,7 +222,7 @@ export default function GroupsPage() {
           ) : error ? (
             <div className="error-state">
               <p>{error}</p>
-              <Button size="small" onClick={fetchGroups}>
+              <Button size="small" onClick={() => mutateGroups()}>
                 Try Again
               </Button>
             </div>
@@ -259,6 +273,7 @@ export default function GroupsPage() {
             onCreate={handleCreateGroup}
             onNotify={showToast}
             creating={creating}
+            currentUsername={user?.username}
           />
 
           {/* Invite Member Modal */}
@@ -271,6 +286,7 @@ export default function GroupsPage() {
             }}
             onInvite={handleInviteMember}
             inviting={inviting}
+            currentUsername={user?.username}
           />
         </div>
 

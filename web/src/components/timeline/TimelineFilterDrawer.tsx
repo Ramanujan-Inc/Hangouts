@@ -1,6 +1,6 @@
 import React from 'react'
 import { SlidersHorizontal, RotateCcw } from 'lucide-react'
-import { SearchInput, Badge, Card } from '../ui'
+import { SearchInput, Badge, Card, Select } from '../ui'
 import { Group } from './types'
 
 interface TimelineFilterDrawerProps {
@@ -48,7 +48,6 @@ export const TimelineFilterDrawer: React.FC<TimelineFilterDrawerProps> = ({
             placeholder="Search hangouts, places, notes..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            inputClassName="pill-input-butter"
           />
         </div>
         <button
@@ -105,21 +104,18 @@ export const TimelineFilterDrawer: React.FC<TimelineFilterDrawerProps> = ({
             </div>
 
             <div className="filter-field">
-              <label>Group</label>
-              <div className="select-container">
-                <select
-                  className="pill-input select-input"
-                  value={groupNameQuery}
-                  onChange={(e) => onGroupNameChange(e.target.value)}
-                >
-                  <option value="">All Groups</option>
-                  {groupsList.map((grp) => (
-                    <option key={grp.id} value={grp.name}>
-                      {grp.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="Group"
+                value={groupNameQuery}
+                onChange={(e) => onGroupNameChange(e.target.value)}
+              >
+                <option value="">All Groups</option>
+                {groupsList.map((grp) => (
+                  <option key={grp.id} value={grp.name}>
+                    {grp.name}
+                  </option>
+                ))}
+              </Select>
             </div>
           </div>
 
@@ -196,15 +192,6 @@ export const TimelineFilterDrawer: React.FC<TimelineFilterDrawerProps> = ({
           font-size: 12px;
           font-weight: 700;
           color: var(--color-text-muted);
-        }
-
-        .select-container {
-          position: relative;
-        }
-
-        .select-input {
-          appearance: none;
-          cursor: pointer;
         }
 
         .filter-reset-row {

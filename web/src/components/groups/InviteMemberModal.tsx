@@ -1,13 +1,15 @@
-import React, { useState } from 'react'
-import { Modal, TextField, Button } from '../ui'
+import React, { useState, useRef } from 'react'
+import { Modal, Button } from '../ui'
 import { Group } from './types'
+import { MemberInviteInput, InvitedMember } from './MemberInviteInput'
 
 interface InviteMemberModalProps {
   group: Group | null
   isOpen: boolean
   onClose: () => void
-  onInvite: (username: string) => Promise<void>
+  onInvite: (usernames: string[]) => Promise<void>
   inviting?: boolean
+  currentUsername?: string
 }
 
 export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
@@ -16,44 +18,70 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
   onClose,
   onInvite,
   inviting = false,
+  currentUsername,
 }) => {
-  const [inviteUsername, setInviteUsername] = useState('')
+  const [invitedMembers, setInvitedMembers] = useState<InvitedMember[]>([])
+  const pendingInputRef = useRef('')
 
   if (!isOpen || !group) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!inviteUsername.trim()) return
 
-    await onInvite(inviteUsername.trim())
-    setInviteUsername('')
+    const usernamesToInvite = [...invitedMembers.map((m) => m.username)]
+
+    // If user typed into the input field without pressing "+ Invite", include that user
+    const pending = pendingInputRef.current.trim().toLowerCase()
+    if (pending && !usernamesToInvite.some((u) => u.toLowerCase() === pending)) {
+      usernamesToInvite.push(pending)
+    }
+
+    if (usernamesToInvite.length === 0) return
+
+    await onInvite(usernamesToInvite)
+    setInvitedMembers([])
+    pendingInputRef.current = ''
+  }
+
+  const handleClose = () => {
+    setInvitedMembers([])
+    pendingInputRef.current = ''
+    onClose()
   }
 
   return (
-    <Modal title={`Invite to "${group.name}"`} onClose={onClose}>
+    <Modal title={`Invite to "${group.name}"`} onClose={handleClose}>
       <form onSubmit={handleSubmit} className="modal-form">
         <p className="modal-desc">
-          Enter the username of the friend you want to invite to this group.
+          Enter usernames of friends you want to invite to <strong>{group.name}</strong>.
         </p>
 
-        <TextField
-          label="Username"
-          placeholder="e.g. jam, dave, chloe"
-          value={inviteUsername}
-          onChange={(e) => setInviteUsername(e.target.value)}
-          required
+        {/* Reusable Member Invite Input */}
+        <MemberInviteInput
+          invitedMembers={invitedMembers}
+          onInvitedMembersChange={setInvitedMembers}
+          currentUsername={currentUsername}
+          existingMembers={group.members || []}
+          label="Add Friends by Username"
+          placeholder="Enter username (e.g. jam, dave, chloe)"
+          autoFocus={true}
+          pendingInputRef={pendingInputRef}
         />
 
         <div className="modal-actions">
-          <Button variant="outline" size="default" onClick={onClose} type="button">
+          <Button variant="outline" size="default" onClick={handleClose} type="button">
             Cancel
           </Button>
           <Button
             type="submit"
             size="default"
-            disabled={inviting || !inviteUsername.trim()}
+            disabled={inviting || (invitedMembers.length === 0 && !pendingInputRef.current.trim())}
           >
-            {inviting ? 'Inviting...' : 'Send Invite'}
+            {inviting
+              ? 'Sending...'
+              : invitedMembers.length > 1
+              ? `Send Invites (${invitedMembers.length})`
+              : 'Send Invite'}
           </Button>
         </div>
       </form>
@@ -62,7 +90,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
         .modal-form {
           display: flex;
           flex-direction: column;
-          gap: 20px;
+          gap: 18px;
         }
 
         .modal-desc {

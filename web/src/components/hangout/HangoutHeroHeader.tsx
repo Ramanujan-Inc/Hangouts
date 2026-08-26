@@ -3,6 +3,7 @@ import { ArrowLeft, Share2, Calendar, MapPin } from 'lucide-react'
 import { AvatarStack, Badge } from '../ui'
 import { formatDate } from '../../lib/format'
 import { members } from '../../data/mock'
+import { getAvatarUrl } from '../../lib/avatar'
 
 interface HangoutHeroHeaderProps {
   title: string
@@ -33,15 +34,13 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
     if (typeof p === 'string') {
       const mem = members[p]
       return {
-        src: mem?.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(p)}`,
+        src: getAvatarUrl(mem?.avatar),
         alt: mem?.name || p,
         title: mem?.name || p,
       }
     }
     const username = p.profile?.username || p.user_id || 'Member'
-    const avatar =
-      p.profile?.avatar_url ||
-      `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(username)}`
+    const avatar = getAvatarUrl(p.profile?.avatar_url)
     return {
       src: avatar,
       alt: username,
@@ -159,21 +158,22 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
           width: 44px;
           height: 44px;
           border-radius: 50%;
-          background: rgba(255, 255, 255, 0.85);
-          backdrop-filter: blur(8px);
-          border: none;
+          background-color: var(--color-surface-container-lowest);
+          border: 1px solid var(--color-surface-container-high);
           display: flex;
           align-items: center;
           justify-content: center;
           color: var(--color-text);
           cursor: pointer;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          transition: transform 0.2s, background-color 0.2s;
+          box-shadow: var(--shadow-ambient), 0 4px 16px rgba(0, 0, 0, 0.18);
+          transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
         }
 
         .frosted-btn:hover {
           transform: scale(1.08);
-          background: rgba(255, 255, 255, 1);
+          background-color: var(--color-surface-container);
+          border-color: var(--color-blush);
+          color: var(--color-blush);
         }
 
         .title-section {

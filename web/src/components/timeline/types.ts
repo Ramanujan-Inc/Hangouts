@@ -32,6 +32,7 @@ export interface Hangout {
 
 export interface Memory extends Hangout {
   years_ago: number
+  days_diff?: number
 }
 
 export interface Group {
@@ -43,5 +44,4 @@ export interface Group {
 
 export type QuickFilter = 'All' | 'Created by Me' | 'This Month' | 'Memories'
 
-export const DEFAULT_COVER =
-  'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80'
+export const DEFAULT_COVER = '/images/covers/hangout-default.jpg'

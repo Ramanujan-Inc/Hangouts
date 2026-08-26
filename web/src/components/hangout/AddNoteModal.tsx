@@ -180,7 +180,7 @@ export const AddNoteModal: React.FC<AddNoteModalProps> = ({
         }
 
         .note-matcha {
-          background-color: #cbe8ba;
+          background-color: var(--color-matcha);
         }
 
         .modal-btn-row {

@@ -1,6 +1,7 @@
 import React from 'react'
 import { Users, UserPlus, LogOut } from 'lucide-react'
 import { Modal, Button, Badge } from '../ui'
+import { getAvatarUrl } from '../../lib/avatar'
 import { Group } from './types'
 
 interface GroupDetailModalProps {
@@ -71,19 +72,18 @@ export const GroupDetailModal: React.FC<GroupDetailModalProps> = ({
             ) : (
               members.map((m) => {
                 const isOwner = m.user_id === group.created_by
-                const avatarUrl =
-                  m.profile?.avatar_url ||
-                  `https://api.dicebear.com/7.x/adventurer/svg?seed=${m.profile?.username || m.user_id}`
+                const username = m.profile?.username || m.user_id || 'User'
+                const avatarUrl = getAvatarUrl(m.profile?.avatar_url)
 
                 return (
                   <div key={m.id} className="member-item">
                     <img
                       src={avatarUrl}
-                      alt={m.profile?.username || 'Member'}
+                      alt={username}
                       className="member-avatar"
                     />
                     <div className="member-info">
-                      <span className="member-name">{m.profile?.username || 'User'}</span>
+                      <span className="member-name">{username}</span>
                     </div>
                     {isOwner && (
                       <Badge variant="blush" size="sm">

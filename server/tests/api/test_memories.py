@@ -213,3 +213,28 @@ def test_get_memories_user_isolation(
     assert sec_mem_res_after.status_code == 200
     sec_matches_after = [m for m in sec_mem_res_after.json() if m["id"] == past_id]
     assert len(sec_matches_after) == 1
+
+
+def test_get_memories_weekly_window(authenticated_client: TestClient):
+    """Ensure hangouts within ±3 days of target anniversary are captured in memories."""
+    unique_str = uuid.uuid4().hex[:6]
+
+    # Create a historical hangout on 2024-08-21 (2 days before Aug 23)
+    res_past = authenticated_client.post(
+        "/api/v1/hangouts",
+        json={
+            "title": f"Sunset Walk {unique_str}",
+            "location_name": "Manila Bay",
+            "hangout_date": "2024-08-21",
+        },
+    )
+    assert res_past.status_code == 201
+    past_id = res_past.json()["id"]
+
+    # Query memories for Aug 23, 2026 (target date is 2 days after the anniversary Aug 21)
+    res = authenticated_client.get("/api/v1/memories/on-this-day?date=2026-08-23")
+    assert res.status_code == 200
+    matches = [m for m in res.json() if m["id"] == past_id]
+    assert len(matches) == 1
+    assert matches[0]["years_ago"] == 2
+    assert matches[0]["days_diff"] == -2

@@ -1,5 +1,6 @@
 import React from 'react'
 import { Users, Plus, Check, Loader2 } from 'lucide-react'
+import { getAvatarUrl } from '../../lib/avatar'
 import { GroupMemberProfile } from './types'
 
 interface ParticipantSelectorProps {
@@ -9,7 +10,6 @@ interface ParticipantSelectorProps {
   loadingMembers: boolean
   onToggleParticipant: (id: string) => void
   onSelectAll: () => void
-  onOpenAddAttendeeModal: () => void
 }
 
 export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
@@ -19,7 +19,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
   loadingMembers,
   onToggleParticipant,
   onSelectAll,
-  onOpenAddAttendeeModal,
 }) => {
   const isAllSelected =
     activeMembersList.length > 0 && selectedParticipants.length === activeMembersList.length
@@ -49,24 +48,12 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
               ? 'No other members in this group yet.'
               : 'No circle members found.'}
           </p>
-          {!selectedGroupId && (
-            <button
-              type="button"
-              className="add-by-username-btn"
-              onClick={onOpenAddAttendeeModal}
-            >
-              <Plus size={14} />
-              <span>Search & Add User by Username</span>
-            </button>
-          )}
         </div>
       ) : (
         <div className="participants-scroll">
           {activeMembersList.map((member) => {
             const isSelected = selectedParticipants.includes(member.id)
-            const avatarUrl =
-              member.avatar_url ||
-              `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(member.username)}`
+            const avatarUrl = getAvatarUrl(member.avatar_url)
 
             return (
               <div
@@ -88,21 +75,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
               </div>
             )
           })}
-
-          {!selectedGroupId && (
-            <div
-              className="participant-chip add-more-chip"
-              onClick={onOpenAddAttendeeModal}
-              title="Search & add user by username"
-              role="button"
-              tabIndex={0}
-            >
-              <div className="avatar-wrapper add-avatar">
-                <Plus size={20} />
-              </div>
-              <span className="chip-name">Add User</span>
-            </div>
-          )}
         </div>
       )}
 
@@ -172,26 +144,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
           margin: 0;
         }
 
-        .add-by-username-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          background-color: var(--color-surface-container-lowest);
-          border: 1px solid var(--color-outline-variant);
-          padding: 8px 14px;
-          border-radius: 9999px;
-          font-size: 13px;
-          font-weight: 700;
-          color: var(--color-sea);
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .add-by-username-btn:hover {
-          border-color: var(--color-sea);
-          background-color: var(--tint-sea);
-        }
-
         .participants-scroll {
           display: flex;
           gap: 10px;
@@ -246,7 +198,7 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
           display: flex;
           align-items: center;
           justify-content: center;
-          border: 2px solid white;
+          border: 2px solid var(--color-surface-container-lowest);
         }
 
         .chip-name {
@@ -258,21 +210,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-        }
-
-        .add-avatar {
-          border: 2px dashed var(--color-outline-variant);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--color-text-muted);
-          background-color: var(--color-surface-container-low);
-        }
-
-        .add-more-chip:hover .add-avatar {
-          border-color: var(--color-blush);
-          color: var(--color-blush);
         }
 
         @keyframes spin {

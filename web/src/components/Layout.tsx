@@ -213,7 +213,7 @@ export default function Layout({ children }: LayoutProps) {
             left: 16px;
             right: 16px;
             height: 72px;
-            background-color: rgba(255, 248, 245, 0.9);
+            background-color: var(--nav-backdrop-bg);
             backdrop-filter: blur(12px);
             border-radius: 9999px;
             box-shadow: 0 15px 30px rgba(46, 42, 40, 0.12);
