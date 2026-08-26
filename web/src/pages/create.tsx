@@ -5,14 +5,15 @@ import Layout from '../components/Layout'
 import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
-import { MapPin, Users, Sparkles, Loader2, AlignLeft } from 'lucide-react'
-import { Button, TextArea, TextField, InlineAlert } from '../components/ui'
+import { Sparkles, Loader2, Users } from 'lucide-react'
+import { Button, InlineAlert, Select } from '../components/ui'
 import {
   GroupMemberProfile,
   Group,
   HangoutResponse,
   UploadedPhoto,
   PhotoUploaderSection,
+  TitleDescriptionInput,
   ParticipantSelector,
   DateTimeInput,
   LocationSection,
@@ -26,7 +27,6 @@ export default function CreateHangout() {
   // Form Fields
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [showDescription, setShowDescription] = useState(false)
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [showTimeInput, setShowTimeInput] = useState(false)
@@ -89,6 +89,7 @@ export default function CreateHangout() {
     async function loadGroupMembers() {
       if (!selectedGroupId) {
         setGroupMembers([])
+        setSelectedParticipants([])
         return
       }
 
@@ -335,72 +336,28 @@ export default function CreateHangout() {
 
             {/* Form Fields */}
             <div className="form-fields">
-              <TextField
-                label="Hangout Title"
-                required
-                placeholder="e.g. Friday Night Ramen"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+              {/* Title & Optional Collapsible Description */}
+              <TitleDescriptionInput
+                title={title}
+                description={description}
+                onTitleChange={setTitle}
+                onDescriptionChange={setDescription}
               />
 
-              {!showDescription && !description ? (
-                <div className="add-description-trigger-row">
-                  <button
-                    type="button"
-                    className="add-desc-btn"
-                    onClick={() => setShowDescription(true)}
-                  >
-                    <AlignLeft size={14} />
-                    <span>+ Add description</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="description-input-wrapper">
-                  <div className="label-row-with-action">
-                    <label className="field-label">
-                      <AlignLeft size={16} /> Description
-                    </label>
-                    <span
-                      className="action-text remove-desc-action"
-                      onClick={() => {
-                        setShowDescription(false)
-                        setDescription('')
-                      }}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      Remove
-                    </span>
-                  </div>
-                  <TextArea
-                    placeholder="What are we doing? Write down any notes, funny moments, or plans..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    autoFocus
-                  />
-                </div>
-              )}
-
               {/* Group Selection Dropdown */}
-              <div className="input-group">
-                <label className="field-label">
-                  <Users size={16} /> Group Circle
-                </label>
-                <div className="select-container">
-                  <select
-                    className="pill-input select-input"
-                    value={selectedGroupId}
-                    onChange={(e) => setSelectedGroupId(e.target.value)}
-                  >
-                    <option value="">Personal / Standalone Hangout (No Group)</option>
-                    {groups.map((grp) => (
-                      <option key={grp.id} value={grp.id}>
-                        {grp.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <Select
+                label="Group Circle"
+                icon={<Users size={16} />}
+                value={selectedGroupId}
+                onChange={(e) => setSelectedGroupId(e.target.value)}
+              >
+                <option value="">No group</option>
+                {groups.map((grp) => (
+                  <option key={grp.id} value={grp.id}>
+                    {grp.name}
+                  </option>
+                ))}
+              </Select>
 
               {/* Dynamic Attendees Participant Selector */}
               <ParticipantSelector
@@ -495,88 +452,6 @@ export default function CreateHangout() {
             display: flex;
             flex-direction: column;
             gap: 20px;
-          }
-
-          .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-          }
-
-          .field-label {
-            font-family: var(--font-display);
-            font-weight: 700;
-            font-size: 14px;
-            color: var(--color-text);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-          }
-
-          .add-description-trigger-row {
-            display: flex;
-            align-items: center;
-          }
-
-          .add-desc-btn {
-            background: none;
-            border: 1.5px dashed var(--color-surface-container-high);
-            border-radius: 9999px;
-            padding: 8px 16px;
-            font-family: var(--font-display);
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--color-text-muted);
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s ease;
-          }
-
-          .add-desc-btn:hover {
-            color: var(--color-blush);
-            border-color: var(--color-blush);
-            background-color: var(--color-surface-container-low);
-          }
-
-          .description-input-wrapper {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            animation: fadeIn 0.2s ease;
-          }
-
-          .label-row-with-action {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          }
-
-          .action-text {
-            font-size: 12px;
-            color: var(--color-sea);
-            font-weight: 700;
-            cursor: pointer;
-            transition: opacity 0.15s;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-          }
-
-          .action-text:hover {
-            opacity: 0.8;
-            text-decoration: underline;
-          }
-
-          .select-container {
-            position: relative;
-          }
-
-          .select-input {
-            appearance: none;
-            cursor: pointer;
-            padding-right: 36px;
           }
 
           .sticky-cta-footer {

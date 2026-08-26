@@ -9,7 +9,9 @@ export default function SearchInput({ inputClassName = '', placeholder = 'Search
   return (
     <>
       <div className="search-wrapper">
-        <Search className="search-icon" size={20} />
+        <div className="search-icon-wrapper" aria-hidden="true">
+          <Search size={18} />
+        </div>
         <input
           type="text"
           className={`pill-input search-input ${inputClassName}`}
@@ -25,42 +27,25 @@ export default function SearchInput({ inputClassName = '', placeholder = 'Search
           width: 100%;
         }
 
-        .search-icon {
+        .search-icon-wrapper {
           position: absolute;
-          left: 18px;
+          left: 16px;
           color: var(--color-text-muted);
           z-index: 1;
           pointer-events: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           transition: color 0.2s ease;
         }
 
-        .search-wrapper:focus-within .search-icon {
+        .search-wrapper:focus-within .search-icon-wrapper {
           color: var(--color-blush);
         }
 
         .search-input {
           width: 100%;
-          padding: 14px 20px 14px 48px;
-          background-color: var(--color-surface-container-lowest);
-          border: 1px solid var(--color-surface-container-high);
-          box-shadow: var(--shadow-ambient);
-          color: var(--color-text);
-          font-family: var(--font-body);
-          font-size: 15px;
-          border-radius: 9999px;
-          outline: none;
-          transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-        }
-
-        .search-input::placeholder {
-          color: var(--color-text-muted);
-          opacity: 0.75;
-        }
-
-        .search-input:focus {
-          border-color: var(--color-blush);
-          background-color: var(--color-surface-container-lowest);
-          box-shadow: 0 0 0 3px var(--tint-blush);
+          padding-left: 44px;
         }
       `}</style>
     </>

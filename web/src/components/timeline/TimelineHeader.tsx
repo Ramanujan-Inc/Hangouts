@@ -1,4 +1,5 @@
 import React from 'react'
+import Link from 'next/link'
 import { Avatar } from '../ui'
 
 interface TimelineHeaderProps {
@@ -22,9 +23,9 @@ export const TimelineHeader: React.FC<TimelineHeaderProps> = ({
             : 'Welcome to your hangout scrapbook'}
         </p>
       </div>
-      <div className="header-avatar">
+      <Link href="/profile" className="header-avatar-link" aria-label="Go to profile" title="View profile">
         <Avatar src={userAvatar} alt={userName} size={52} />
-      </div>
+      </Link>
 
       <style jsx>{`
         .timeline-header {
@@ -45,6 +46,21 @@ export const TimelineHeader: React.FC<TimelineHeaderProps> = ({
           color: var(--color-text-muted);
           margin-top: 4px;
           margin-bottom: 0;
+        }
+
+        .header-avatar-link {
+          display: inline-flex;
+          border-radius: 9999px;
+          cursor: pointer;
+          transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .header-avatar-link:hover {
+          transform: scale(1.08);
+        }
+
+        .header-avatar-link:active {
+          transform: scale(0.95);
         }
       `}</style>
     </header>
