@@ -107,3 +107,5 @@ def authenticated_client(client: TestClient, primary_user: Dict[str, Any]) -> Te
     client.headers.update(primary_user["headers"])
     return client
 
+
+

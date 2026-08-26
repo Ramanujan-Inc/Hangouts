@@ -37,6 +37,8 @@ def test_upload_photo_and_video(authenticated_client: TestClient, primary_user: 
     assert photo_data["caption"] == "Sunset at the beach"
     assert photo_data["is_shared"] is True
     assert photo_data["uploader"]["id"] == primary_user["id"]
+    assert photo_data["url"].startswith("http")
+    assert photo_data["thumbnail_url"].startswith("http")
 
     # 2. Upload video
     fake_video_bytes = b"\x00\x00\x00\x1cftypisom\x00\x00\x02\x00isomiso2mp41"
@@ -50,6 +52,8 @@ def test_upload_photo_and_video(authenticated_client: TestClient, primary_user: 
     video_data = video_res.json()
     assert video_data["media_type"] == "video"
     assert video_data["caption"] == "Beach volleyball match"
+    assert video_data["url"].startswith("http")
+    assert video_data["thumbnail_url"].startswith("http")
 
 
 def test_upload_invalid_mime_type(authenticated_client: TestClient):
