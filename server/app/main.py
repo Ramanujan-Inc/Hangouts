@@ -37,6 +37,17 @@ if settings.CORS_ORIGINS:
     )
 
 
+@app.get("/", tags=["Root"])
+def root():
+    """Root endpoint providing service status and quick links."""
+    return {
+        "message": f"Welcome to {settings.PROJECT_NAME}",
+        "docs": "/docs",
+        "health": "/health",
+        "api_v1": settings.API_V1_STR,
+    }
+
+
 @app.get("/health", tags=["Health"])
 def health_check():
     """Health check endpoint to verify server is operational."""
