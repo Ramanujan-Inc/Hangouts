@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Sparkles, Lock, User as UserIcon } from 'lucide-react'
 import { Button, InlineAlert, PasswordInput, TextField } from '../ui'
 
@@ -19,6 +19,20 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 }) => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showColdStartNotice, setShowColdStartNotice] = useState(false)
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout
+    if (submitting) {
+      // Show notice only if login takes longer than 3 seconds (server waking from idle)
+      timer = setTimeout(() => {
+        setShowColdStartNotice(true)
+      }, 3000)
+    } else {
+      setShowColdStartNotice(false)
+    }
+    return () => clearTimeout(timer)
+  }, [submitting])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -56,7 +70,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       />
 
       <Button type="submit" disabled={submitting} fullWidth>
-        {submitting ? 'Logging In...' : 'Log In'}
+        {submitting
+          ? showColdStartNotice
+            ? 'Waking up server...'
+            : 'Logging In...'
+          : 'Log In'}
       </Button>
 
       <div className="form-divider">
@@ -71,6 +89,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       <div className="footer-link">
         Don't have an account yet? <span onClick={onSwitchToSignup}>Sign up</span>
       </div>
+
+      {showColdStartNotice && (
+        <div className="server-notice animate-fade-in">
+          <span>⚡ Backend is waking up from idle mode (Render free tier). This may take up to ~45s...</span>
+        </div>
+      )}
 
       <style jsx>{`
         .auth-form {
@@ -140,6 +164,33 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
         .footer-link span:hover {
           text-decoration: underline;
+        }
+
+        .server-notice {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          margin-top: 4px;
+          padding: 8px 14px;
+          border-radius: 999px;
+          background-color: var(--color-surface-container);
+          color: var(--color-text-muted);
+          font-size: 11.5px;
+          line-height: 1.35;
+          text-align: center;
+          animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(4px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
       `}</style>
     </form>
