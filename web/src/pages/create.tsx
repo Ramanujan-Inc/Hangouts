@@ -18,6 +18,8 @@ import {
   DateTimeInput,
   LocationSection,
 } from '../components/create'
+import { extractBatchPhotoMetadata } from '../lib/exif'
+import { resolveBatchLocation } from '../lib/geocoding'
 
 export default function CreateHangout() {
   const router = useRouter()
@@ -126,9 +128,11 @@ export default function CreateHangout() {
     const files = e.target.files
     if (!files || files.length === 0) return
 
+    const rawFiles: File[] = []
     const newPhotos: UploadedPhoto[] = []
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
+      rawFiles.push(file)
       const previewUrl = URL.createObjectURL(file)
       newPhotos.push({
         id: `${Date.now()}-${i}-${Math.random().toString(36).substring(2, 7)}`,
@@ -144,6 +148,35 @@ export default function CreateHangout() {
       }
       return updated
     })
+
+    // Extract EXIF metadata to auto-prefill Date & Location only if currently empty
+    extractBatchPhotoMetadata(rawFiles).then(async (meta) => {
+      // 1. Auto-prefill Date only if date is blank
+      if (meta.date) {
+        setDate((currentDate) => (currentDate ? currentDate : meta.date!))
+      }
+
+      // 2. Auto-prefill Location via clustering + majority vote if location is blank
+      if (meta.gpsPoints.length > 0 && !locationName && latitude === null) {
+        try {
+          const geo = await resolveBatchLocation(meta.gpsPoints)
+          if (geo) {
+            setLocationName((current) => current || geo.locationName)
+            setFormattedAddress((current) => current || geo.formattedAddress)
+            setLatitude((current) => (current !== null ? current : geo.latitude))
+            setLongitude((current) => (current !== null ? current : geo.longitude))
+            if (geo.placeId) {
+              setPlaceId((current) => current || geo.placeId!)
+            }
+          }
+        } catch (err) {
+          console.warn('Auto cluster reverse-geocode error:', err)
+        }
+      }
+    }).catch((err) => {
+      console.warn('Metadata extraction failed:', err)
+    })
+
     e.target.value = ''
   }
 
