@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, ZoomControl, useMap } from 'react-leaf
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useTheme } from '../context/ThemeContext'
+import { CARTO_VOYAGER_TILE_URL, CARTO_ATTRIBUTION } from '../lib/map'
 
 export interface HangoutPin {
   id: string
@@ -104,8 +105,8 @@ export default function MapComponent({
         <MapController center={mapCenter} zoom={zoom} />
         <ZoomControl position="bottomright" />
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution={CARTO_ATTRIBUTION}
+          url={CARTO_VOYAGER_TILE_URL}
         />
         {pins.map((pin) => {
           const isSelected = selectedPin?.id === pin.id

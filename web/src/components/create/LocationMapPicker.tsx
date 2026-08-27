@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { CARTO_VOYAGER_TILE_URL, CARTO_ATTRIBUTION } from '../../lib/map'
 
 interface LocationMapPickerProps {
   lat: number | null
@@ -101,8 +102,8 @@ export default function LocationMapPicker({
         style={{ width: '100%', height: '100%', borderRadius: 'inherit' }}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution={CARTO_ATTRIBUTION}
+          url={CARTO_VOYAGER_TILE_URL}
         />
 
         <MapRecenterController lat={lat} lng={lng} />
