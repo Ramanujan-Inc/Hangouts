@@ -29,6 +29,9 @@ export interface UploadedPhoto {
   id: string
   file: File
   previewUrl: string
+  thumbnailBlob?: Blob
+  thumbnailUrl?: string
+  isVideo?: boolean
   caption?: string
 }
 
