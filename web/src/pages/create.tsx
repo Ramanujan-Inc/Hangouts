@@ -18,6 +18,9 @@ import {
   DateTimeInput,
   LocationSection,
 } from '../components/create'
+import { extractBatchPhotoMetadata } from '../lib/exif'
+import { resolveBatchLocation } from '../lib/geocoding'
+import { generateVideoThumbnail } from '../lib/video'
 
 export default function CreateHangout() {
   const router = useRouter()
@@ -46,6 +49,7 @@ export default function CreateHangout() {
   // Photos
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([])
   const [selectedCoverIndex, setSelectedCoverIndex] = useState<number>(-1)
+  const [activePhotoIndex, setActivePhotoIndex] = useState<number>(0)
 
   // Status
   const [submitting, setSubmitting] = useState(false)
@@ -121,29 +125,92 @@ export default function CreateHangout() {
     loadGroupMembers()
   }, [selectedGroupId, groups, user?.id])
 
-  // Photo handlers
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Media handlers (photos and videos)
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
 
-    const newPhotos: UploadedPhoto[] = []
+    const rawFiles: File[] = []
+    const newMediaItems: UploadedPhoto[] = []
+    const videoThumbPromises: Promise<void>[] = []
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
+      rawFiles.push(file)
       const previewUrl = URL.createObjectURL(file)
-      newPhotos.push({
+      const isVideo = file.type.startsWith('video/')
+
+      const mediaItem: UploadedPhoto = {
         id: `${Date.now()}-${i}-${Math.random().toString(36).substring(2, 7)}`,
         file,
         previewUrl,
-      })
+        isVideo,
+      }
+
+      if (isVideo) {
+        // Asynchronously extract video thumbnail at 0.5s via Canvas
+        videoThumbPromises.push(
+          generateVideoThumbnail(file, 0.5)
+            .then((thumb) => {
+              mediaItem.thumbnailBlob = thumb.blob
+              mediaItem.thumbnailUrl = thumb.url
+            })
+            .catch((thumbErr) => {
+              console.warn('Video thumbnail extraction failed:', thumbErr)
+            })
+        )
+      }
+
+      newMediaItems.push(mediaItem)
     }
 
+    // Set media items in state
     setUploadedPhotos((prev) => {
-      const updated = [...prev, ...newPhotos]
+      const updated = [...prev, ...newMediaItems]
       if (selectedCoverIndex === -1 && updated.length > 0) {
         setSelectedCoverIndex(0)
       }
       return updated
     })
+
+    // When video thumbnails resolve, update state so thumbnails show up
+    if (videoThumbPromises.length > 0) {
+      Promise.all(videoThumbPromises).then(() => {
+        setUploadedPhotos((prev) => [...prev])
+      })
+    }
+
+    // Extract EXIF metadata for images only to auto-prefill Date & Location if empty
+    const imageFiles = rawFiles.filter((f) => f.type.startsWith('image/'))
+    if (imageFiles.length > 0) {
+      extractBatchPhotoMetadata(imageFiles).then(async (meta) => {
+        // 1. Auto-prefill Date only if date is blank
+        if (meta.date) {
+          setDate((currentDate) => (currentDate ? currentDate : meta.date!))
+        }
+
+        // 2. Auto-prefill Location via clustering + majority vote if location is blank
+        if (meta.gpsPoints.length > 0 && !locationName && latitude === null) {
+          try {
+            const geo = await resolveBatchLocation(meta.gpsPoints)
+            if (geo) {
+              setLocationName((current) => current || geo.locationName)
+              setFormattedAddress((current) => current || geo.formattedAddress)
+              setLatitude((current) => (current !== null ? current : geo.latitude))
+              setLongitude((current) => (current !== null ? current : geo.longitude))
+              if (geo.placeId) {
+                setPlaceId((current) => current || geo.placeId!)
+              }
+            }
+          } catch (err) {
+            console.warn('Auto cluster reverse-geocode error:', err)
+          }
+        }
+      }).catch((err) => {
+        console.warn('Metadata extraction failed:', err)
+      })
+    }
+
     e.target.value = ''
   }
 
@@ -153,10 +220,22 @@ export default function CreateHangout() {
       const updated = prev.filter((_, idx) => idx !== indexToRemove)
       if (updated.length === 0) {
         setSelectedCoverIndex(-1)
-      } else if (selectedCoverIndex === indexToRemove) {
-        setSelectedCoverIndex(0)
-      } else if (selectedCoverIndex > indexToRemove) {
-        setSelectedCoverIndex(selectedCoverIndex - 1)
+        setActivePhotoIndex(0)
+      } else {
+        if (selectedCoverIndex === indexToRemove) {
+          setSelectedCoverIndex(0)
+        } else if (selectedCoverIndex > indexToRemove) {
+          setSelectedCoverIndex((curr) => curr - 1)
+        }
+
+        setActivePhotoIndex((curr) => {
+          if (curr >= updated.length) {
+            return updated.length - 1
+          } else if (curr > indexToRemove) {
+            return curr - 1
+          }
+          return curr
+        })
       }
       return updated
     })
@@ -222,9 +301,13 @@ export default function CreateHangout() {
       // 1. Resolve Cover Photo URL
       let coverPhotoUrl: string | undefined = undefined
       if (selectedCoverIndex >= 0 && uploadedPhotos[selectedCoverIndex]) {
-        const coverPhoto = uploadedPhotos[selectedCoverIndex]
+        const coverMedia = uploadedPhotos[selectedCoverIndex]
         const coverForm = new FormData()
-        coverForm.append('file', coverPhoto.file)
+        if (coverMedia.isVideo && coverMedia.thumbnailBlob) {
+          coverForm.append('file', coverMedia.thumbnailBlob, 'cover-thumbnail.jpg')
+        } else {
+          coverForm.append('file', coverMedia.file)
+        }
         const coverRes = await api.post<{ url: string }>('/hangouts/cover', coverForm)
         coverPhotoUrl = coverRes.url
       }
@@ -309,8 +392,10 @@ export default function CreateHangout() {
             <PhotoUploaderSection
               uploadedPhotos={uploadedPhotos}
               selectedCoverIndex={selectedCoverIndex}
+              activePhotoIndex={activePhotoIndex}
               onPhotoSelect={handlePhotoSelect}
               onSelectCover={(idx) => setSelectedCoverIndex(idx)}
+              onSelectActivePhoto={(idx) => setActivePhotoIndex(idx)}
               onRemovePhoto={handleRemovePhoto}
               onCaptionChange={handleCaptionChange}
             />

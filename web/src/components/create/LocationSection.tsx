@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { MapPin, Navigation, Search, Edit3, Loader2 } from 'lucide-react'
 import { useMapsLibrary } from '@vis.gl/react-google-maps'
+import { reverseGeocodeCoordinates, stripPlusCodes } from '../../lib/geocoding'
 
 // Dynamically import client-only Leaflet map picker
 const LocationMapPicker = dynamic(() => import('./LocationMapPicker'), {
@@ -80,11 +81,12 @@ export const LocationSection: React.FC<LocationSectionProps> = ({
             ? Number(place.geometry.location.lng())
             : Number(place.geometry.location.lng)
 
-        const name =
+        const rawName =
           place.name ||
           (place.formatted_address ? place.formatted_address.split(',')[0].trim() : '') ||
           'Selected Location'
-        const address = place.formatted_address || ''
+        const address = stripPlusCodes(place.formatted_address || '')
+        const name = stripPlusCodes(rawName) || (address ? address.split(',')[0].trim() : 'Selected Location')
         const pId = place.place_id || undefined
 
         // Clear search input so it stays clean for next search
@@ -114,99 +116,12 @@ export const LocationSection: React.FC<LocationSectionProps> = ({
   // Reverse geocoding helper
   const reverseGeocode = async (lat: number, lng: number) => {
     setResolving(true)
-    let foundName = ''
-    let foundAddress = ''
-    let foundPlaceId: string | undefined = undefined
-
-    // Helper to strip Plus Codes (e.g. "G5P3+H5W, ") from addresses and venue names
-    const isPlusCode = (str: string) =>
-      /^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}$/i.test(str.trim()) || (str.includes('+') && !str.includes(' '))
-
-    const cleanAddress = (raw: string) =>
-      raw.replace(/^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4},\s*/i, '').trim()
-
-    // 1. Google Maps Geocoder API
-    if (typeof window !== 'undefined' && (window as any).google?.maps?.Geocoder) {
-      try {
-        const geocoder = new (window as any).google.maps.Geocoder()
-        const geoRes = await geocoder.geocode({ location: { lat, lng } })
-        if (geoRes.results && geoRes.results.length > 0) {
-          const first = geoRes.results[0]
-          const rawAddress = first.formatted_address || ''
-          foundAddress = cleanAddress(rawAddress) || rawAddress
-          foundPlaceId = first.place_id || undefined
-
-          // Check for POI / establishment / landmark
-          const poi = first.address_components?.find((c: any) =>
-            c.types?.includes('point_of_interest') ||
-            c.types?.includes('establishment') ||
-            c.types?.includes('premise') ||
-            c.types?.includes('natural_feature')
-          )
-          if (poi && poi.long_name && !isPlusCode(poi.long_name)) {
-            foundName = poi.long_name
-          } else {
-            // Check for street route or neighborhood
-            const streetOrArea = first.address_components?.find((c: any) =>
-              c.types?.includes('route') ||
-              c.types?.includes('neighborhood') ||
-              c.types?.includes('sublocality')
-            )
-            if (streetOrArea && streetOrArea.long_name && !isPlusCode(streetOrArea.long_name)) {
-              foundName = streetOrArea.long_name
-            } else if (foundAddress) {
-              const parts = foundAddress.split(',')
-              foundName = parts[0].trim()
-            }
-          }
-        }
-      } catch (gErr) {
-        console.warn('Google reverse geocode warning:', gErr)
-      }
+    try {
+      const result = await reverseGeocodeCoordinates(lat, lng)
+      onLocationChange(result)
+    } finally {
+      setResolving(false)
     }
-
-    // 2. OpenStreetMap Nominatim Fallback
-    if (!foundName || !foundAddress || isPlusCode(foundName)) {
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-          { headers: { 'Accept-Language': 'en' } }
-        )
-        if (res.ok) {
-          const data = await res.json()
-          const osmName =
-            data.name ||
-            data.address?.amenity ||
-            data.address?.building ||
-            data.address?.tourism ||
-            data.address?.shop ||
-            data.address?.leisure ||
-            data.address?.road ||
-            data.display_name?.split(',')[0]
-          if ((!foundName || isPlusCode(foundName)) && osmName) foundName = osmName
-          if (!foundAddress && data.display_name) foundAddress = data.display_name
-        }
-      } catch (osmErr) {
-        console.warn('OSM reverse geocode warning:', osmErr)
-      }
-    }
-
-    if (isPlusCode(foundName)) {
-      foundName = foundAddress ? foundAddress.split(',')[0].trim() : ''
-    }
-
-    const finalName =
-      foundName ||
-      (foundAddress ? foundAddress.split(',')[0].trim() : `Pinned Spot (${lat.toFixed(4)}, ${lng.toFixed(4)})`)
-
-    onLocationChange({
-      locationName: finalName,
-      formattedAddress: foundAddress || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-      latitude: lat,
-      longitude: lng,
-      placeId: foundPlaceId,
-    })
-    setResolving(false)
   }
 
   // Handle map click/drag
