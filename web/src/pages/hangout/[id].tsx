@@ -314,6 +314,7 @@ function HangoutDetailContent() {
           longitude={hangout.longitude ?? undefined}
           placeId={hangout.place_id || undefined}
           participants={participantsList}
+          inviteCode={hangout.invite_code}
           onBack={() => router.push('/timeline')}
         />
 

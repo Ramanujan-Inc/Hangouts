@@ -29,6 +29,7 @@ export interface HangoutDetailData {
   latitude?: number | null
   longitude?: number | null
   cover_photo_url?: string | null
+  invite_code?: string | null
   created_by: string
   created_at: string
   updated_at: string

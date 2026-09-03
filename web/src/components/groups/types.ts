@@ -18,6 +18,7 @@ export interface Group {
   id: string
   name: string
   cover_image_url?: string
+  invite_code?: string
   created_by: string
   created_at: string
   members?: GroupMember[]

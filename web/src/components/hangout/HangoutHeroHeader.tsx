@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { ArrowLeft, Share2, Calendar, MapPin } from 'lucide-react'
-import { AvatarStack, Badge } from '../ui'
+import { AvatarStack, Badge, ShareLinkModal } from '../ui'
 import { formatDate } from '../../lib/format'
 import { members } from '../../data/mock'
 import { getAvatarUrl } from '../../lib/avatar'
@@ -15,6 +15,7 @@ interface HangoutHeroHeaderProps {
   longitude?: number
   placeId?: string
   participants: (string | { id?: string; user_id?: string; profile?: { username?: string; avatar_url?: string | null } | null })[]
+  inviteCode?: string | null
   onBack: () => void
 }
 
@@ -28,8 +29,11 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
   longitude,
   placeId,
   participants,
+  inviteCode,
   onBack,
 }) => {
+  const [showShareModal, setShowShareModal] = useState(false)
+
   const avatarList = participants.map((p) => {
     if (typeof p === 'string') {
       const mem = members[p]
@@ -72,6 +76,7 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
             className="frosted-btn"
             aria-label="Share hangout"
             type="button"
+            onClick={() => setShowShareModal(true)}
           >
             <Share2 size={18} />
           </button>
@@ -123,6 +128,16 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
           </div>
         </div>
       </section>
+
+      {inviteCode && (
+        <ShareLinkModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          title="Share Hangout"
+          subtitle={`Invite friends to "${title}"`}
+          shareUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/join/hangout/${inviteCode}`}
+        />
+      )}
 
       <style jsx>{`
         .hangout-hero-header {

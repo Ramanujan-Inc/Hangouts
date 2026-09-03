@@ -15,9 +15,14 @@ export default function Onboarding() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  const getRedirectUrl = () => {
+    const redirect = router.query.redirect
+    return (typeof redirect === 'string' && redirect.startsWith('/')) ? redirect : '/timeline'
+  }
+
   useEffect(() => {
     if (user && token) {
-      router.push('/timeline')
+      router.push(getRedirectUrl())
     }
   }, [user, token, router])
 
@@ -26,7 +31,7 @@ export default function Onboarding() {
     setSubmitting(true)
     try {
       await loginDemoUser()
-      router.push('/timeline')
+      router.push(getRedirectUrl())
     } catch (err: any) {
       setError(err?.message || 'Failed to authenticate demo user.')
     } finally {
@@ -39,7 +44,7 @@ export default function Onboarding() {
     setSubmitting(true)
     try {
       await signup(name, email, password)
-      router.push('/timeline')
+      router.push(getRedirectUrl())
     } catch (err: any) {
       if (err instanceof ApiError) {
         setError(err.message)
@@ -56,7 +61,7 @@ export default function Onboarding() {
     setSubmitting(true)
     try {
       await login(email, password)
-      router.push('/timeline')
+      router.push(getRedirectUrl())
     } catch (err: any) {
       if (err instanceof ApiError) {
         setError(err.message)
