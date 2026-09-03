@@ -99,5 +99,19 @@ def require_group_access():
     return dependency
 
 
+def get_optional_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Client = Depends(get_db),
+) -> Optional[dict]:
+    """Dependency that extracts user if Bearer token is provided, or returns None if omitted/invalid."""
+    if not credentials or not credentials.credentials:
+        return None
+    try:
+        return get_current_user(credentials=credentials, db=db)
+    except HTTPException:
+        return None
+
+
+
 
 

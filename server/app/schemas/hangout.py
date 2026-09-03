@@ -52,11 +52,29 @@ class ParticipantResponse(BaseModel):
 
 class HangoutResponse(HangoutBase):
     id: UUID
+    invite_code: Optional[str] = None
     created_by: UUID
     created_at: datetime
     updated_at: datetime
     creator: Optional[ProfileResponse] = None
     participants: Optional[List[ParticipantResponse]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HangoutJoinPreviewResponse(BaseModel):
+    id: UUID
+    title: str
+    description: Optional[str] = None
+    hangout_date: date
+    hangout_time: Optional[time] = None
+    location_name: Optional[str] = None
+    formatted_address: Optional[str] = None
+    cover_photo_url: Optional[str] = None
+    invite_code: str
+    creator: Optional[ProfileResponse] = None
+    participant_count: int = 0
+    is_participant: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

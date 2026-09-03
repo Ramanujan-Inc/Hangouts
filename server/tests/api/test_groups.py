@@ -1,6 +1,8 @@
 import uuid
 from typing import Dict, Any
 from fastapi.testclient import TestClient
+from app.main import app
+
 
 
 def test_create_group(authenticated_client: TestClient, primary_user: Dict[str, Any]):
@@ -274,3 +276,87 @@ def test_upload_group_cover_image(
     data = response.json()
     assert "url" in data
     assert data["url"].startswith("http")
+
+
+def test_group_invite_code_generated(authenticated_client: TestClient):
+    """Creating a group generates a valid invite_code."""
+    response = authenticated_client.post(
+        "/api/v1/groups",
+        json={"name": "Invite Code Club"},
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert "invite_code" in data
+    assert data["invite_code"] is not None
+    assert len(data["invite_code"]) >= 8
+
+
+def test_get_group_join_preview(authenticated_client: TestClient):
+    """Public and unauthenticated clients can preview group by invite code."""
+    create_res = authenticated_client.post(
+        "/api/v1/groups",
+        json={"name": "Public Preview Group"},
+    )
+    invite_code = create_res.json()["invite_code"]
+
+    # Unauthenticated request with fresh client
+    with TestClient(app) as unauth_client:
+        response = unauth_client.get(f"/api/v1/groups/join/{invite_code}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Public Preview Group"
+        assert data["invite_code"] == invite_code
+        assert data["member_count"] == 1
+        assert data["user_status"] is None
+
+    # Authenticated creator viewing preview reports 'accepted'
+    auth_res = authenticated_client.get(f"/api/v1/groups/join/{invite_code}")
+    assert auth_res.status_code == 200
+    assert auth_res.json()["user_status"] == "accepted"
+
+
+def test_join_group_via_invite_code(
+    client: TestClient,
+    authenticated_client: TestClient,
+    secondary_user: Dict[str, Any],
+):
+    """Authenticated secondary user joins a group using invite code."""
+    create_res = authenticated_client.post(
+        "/api/v1/groups",
+        json={"name": "Open Hangout Friends"},
+    )
+    invite_code = create_res.json()["invite_code"]
+
+    sec_client = client
+    sec_client.headers.update(secondary_user["headers"])
+
+    # Preview shows user_status as None initially
+    preview_res = sec_client.get(f"/api/v1/groups/join/{invite_code}")
+    assert preview_res.status_code == 200
+    assert preview_res.json()["user_status"] is None
+
+    # Join group
+    join_res = sec_client.post(f"/api/v1/groups/join/{invite_code}")
+    assert join_res.status_code == 200
+    group_data = join_res.json()
+    assert any(m["user_id"] == secondary_user["id"] and m["status"] == "accepted" for m in group_data["members"])
+
+    # Preview now shows user_status as 'accepted'
+    preview_res2 = sec_client.get(f"/api/v1/groups/join/{invite_code}")
+    assert preview_res2.status_code == 200
+    assert preview_res2.json()["user_status"] == "accepted"
+
+    # Idempotent re-join succeeds without error
+    rejoin_res = sec_client.post(f"/api/v1/groups/join/{invite_code}")
+    assert rejoin_res.status_code == 200
+
+
+def test_join_group_invalid_code_returns_404(authenticated_client: TestClient):
+    """Attempting to preview or join with invalid code returns 404."""
+    with TestClient(app) as unauth_client:
+        preview_res = unauth_client.get("/api/v1/groups/join/nonexistent123")
+        assert preview_res.status_code == 404
+
+    join_res = authenticated_client.post("/api/v1/groups/join/nonexistent123")
+    assert join_res.status_code == 404
+

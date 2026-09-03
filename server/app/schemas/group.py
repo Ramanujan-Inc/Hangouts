@@ -42,6 +42,7 @@ class GroupInviteRespond(BaseModel):
 
 class GroupResponse(GroupBase):
     id: UUID
+    invite_code: Optional[str] = None
     created_by: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
@@ -59,3 +60,17 @@ class GroupInviteResponse(BaseModel):
     inviter: Optional[ProfileResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class GroupJoinPreviewResponse(BaseModel):
+    id: UUID
+    name: str
+    cover_image_url: Optional[str] = None
+    invite_code: str
+    created_at: datetime
+    creator: Optional[ProfileResponse] = None
+    member_count: int = 0
+    user_status: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+

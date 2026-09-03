@@ -35,9 +35,11 @@ def upload_group_cover_image(db: Client, file: UploadFile) -> Dict[str, str]:
 def create_group(db: Client, group_create: GroupCreate, user_id: str) -> Dict[str, Any]:
     """Create a new group and assign the creator as the initial accepted member."""
     now = datetime.now(timezone.utc).isoformat()
+    invite_code = uuid.uuid4().hex[:12]
     group_data = {
         "name": group_create.name,
         "cover_image_url": group_create.cover_image_url,
+        "invite_code": invite_code,
         "created_by": user_id,
         "created_at": now,
         "updated_at": now,
@@ -79,6 +81,10 @@ def get_user_groups(db: Client, user_id: str) -> List[Dict[str, Any]]:
         for item in response.data:
             group_info = item.get("groups")
             if group_info:
+                if not group_info.get("invite_code"):
+                    new_code = uuid.uuid4().hex[:12]
+                    db.table("groups").update({"invite_code": new_code}).eq("id", group_info["id"]).execute()
+                    group_info["invite_code"] = new_code
                 group_info["user_status"] = item.get("status")
                 group_info["members"] = get_group_members(db=db, group_id=group_info["id"])
                 groups.append(group_info)
@@ -122,7 +128,12 @@ def get_group_by_id(db: Client, group_id: str) -> Optional[Dict[str, Any]]:
     """Fetch group details by group UUID."""
     response = db.table("groups").select("*").eq("id", group_id).execute()
     if response.data and len(response.data) > 0:
-        return response.data[0]
+        group = response.data[0]
+        if not group.get("invite_code"):
+            new_code = uuid.uuid4().hex[:12]
+            db.table("groups").update({"invite_code": new_code}).eq("id", group["id"]).execute()
+            group["invite_code"] = new_code
+        return group
     return None
 
 
@@ -263,3 +274,78 @@ def remove_group_member(
 
     db.table("group_members").delete().eq("group_id", group_id).eq("user_id", target_user_id).execute()
     return True
+
+
+def get_group_by_invite_code(db: Client, invite_code: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Retrieve public group preview by invite code."""
+    clean_code = invite_code.strip()
+    response = db.table("groups").select("*").eq("invite_code", clean_code).execute()
+    if not response.data or len(response.data) == 0:
+        raise NotFoundError("Group invite link not found or expired.")
+
+    group = response.data[0]
+    group_id = group["id"]
+
+    # Fetch creator profile
+    creator_profile = None
+    if group.get("created_by"):
+        prof_res = db.table("profiles").select("*").eq("id", group["created_by"]).execute()
+        if prof_res.data and len(prof_res.data) > 0:
+            creator_profile = prof_res.data[0]
+
+    # Fetch accepted members count
+    members_res = (
+        db.table("group_members")
+        .select("id, status")
+        .eq("group_id", group_id)
+        .eq("status", "accepted")
+        .execute()
+    )
+    member_count = len(members_res.data) if members_res.data else 0
+
+    user_status = None
+    if user_id:
+        user_status = get_member_status(db, group_id, str(user_id))
+
+    return {
+        "id": group["id"],
+        "name": group["name"],
+        "cover_image_url": group.get("cover_image_url"),
+        "invite_code": group["invite_code"],
+        "created_at": group["created_at"],
+        "creator": creator_profile,
+        "member_count": member_count,
+        "user_status": user_status,
+    }
+
+
+def join_group_by_invite_code(db: Client, invite_code: str, user_id: str) -> Dict[str, Any]:
+    """Join a group using its unique invite code."""
+    clean_code = invite_code.strip()
+    response = db.table("groups").select("*").eq("invite_code", clean_code).execute()
+    if not response.data or len(response.data) == 0:
+        raise NotFoundError("Group invite link not found or expired.")
+
+    group = response.data[0]
+    group_id = group["id"]
+
+    existing_status = get_member_status(db, group_id, str(user_id))
+    now = datetime.now(timezone.utc).isoformat()
+
+    if existing_status == "accepted":
+        return get_full_group_details(db, group_id)
+
+    if existing_status in ["pending", "declined"]:
+        db.table("group_members").update({"status": "accepted", "joined_at": now}).eq("group_id", group_id).eq("user_id", str(user_id)).execute()
+    else:
+        member_data = {
+            "group_id": group_id,
+            "user_id": str(user_id),
+            "status": "accepted",
+            "invited_by": None,
+            "joined_at": now,
+        }
+        db.table("group_members").insert(member_data).execute()
+
+    return get_full_group_details(db, group_id)
+
