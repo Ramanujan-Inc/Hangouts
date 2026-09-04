@@ -1,6 +1,6 @@
-import React from 'react'
-import { Users, UserPlus, LogOut } from 'lucide-react'
-import { Modal, Button, Badge } from '../ui'
+import React, { useState } from 'react'
+import { Users, UserPlus, LogOut, Share2 } from 'lucide-react'
+import { Modal, Button, Badge, ShareLinkModal } from '../ui'
 import { getAvatarUrl } from '../../lib/avatar'
 import { Group } from './types'
 
@@ -19,9 +19,11 @@ export const GroupDetailModal: React.FC<GroupDetailModalProps> = ({
   onOpenInvite,
   onLeaveGroup,
 }) => {
+  const [showShareModal, setShowShareModal] = useState(false)
   if (!group) return null
 
   const members = group.members || []
+
 
   return (
     <Modal title={group.name} onClose={onClose}>
@@ -56,14 +58,28 @@ export const GroupDetailModal: React.FC<GroupDetailModalProps> = ({
         <div className="detail-members-section">
           <div className="section-title-row">
             <h4>Members ({members.length})</h4>
-            <Button
-              variant="secondary"
-              size="small"
-              onClick={() => onOpenInvite(group)}
-            >
-              <UserPlus size={14} />
-              <span>Invite</span>
-            </Button>
+            <div className="section-actions">
+              {group.invite_code && (
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={() => setShowShareModal(true)}
+                  type="button"
+                >
+                  <Share2 size={14} />
+                  <span>Share Link</span>
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={() => onOpenInvite(group)}
+                type="button"
+              >
+                <UserPlus size={14} />
+                <span>Invite</span>
+              </Button>
+            </div>
           </div>
 
           <div className="members-list">
@@ -118,6 +134,16 @@ export const GroupDetailModal: React.FC<GroupDetailModalProps> = ({
         </div>
       </div>
 
+      {group.invite_code && (
+        <ShareLinkModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          title="Share Group"
+          subtitle={`Invite friends to join "${group.name}"`}
+          shareUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/join/group/${group.invite_code}`}
+        />
+      )}
+
       <style jsx>{`
         .group-detail-modal {
           display: flex;
@@ -160,6 +186,12 @@ export const GroupDetailModal: React.FC<GroupDetailModalProps> = ({
           display: flex;
           justify-content: space-between;
           align-items: center;
+        }
+
+        .section-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
 
         .section-title-row h4 {

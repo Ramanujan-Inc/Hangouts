@@ -1,7 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, status, Query, File, UploadFile
 from supabase import Client
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_current_user, get_optional_current_user, get_db
 from app.schemas.hangout import (
     HangoutCreate,
     HangoutUpdate,
@@ -10,6 +10,7 @@ from app.schemas.hangout import (
     ParticipantResponse,
     RatingCreate,
     RatingResponse,
+    HangoutJoinPreviewResponse,
 )
 from app.services import hangouts as hangout_service
 
@@ -81,6 +82,31 @@ def get_hangouts_map(
         max_lat=max_lat,
         min_lng=min_lng,
         max_lng=max_lng,
+    )
+
+
+@router.get("/join/{invite_code}", response_model=HangoutJoinPreviewResponse)
+def get_hangout_join_preview(
+    invite_code: str,
+    current_user: Optional[dict] = Depends(get_optional_current_user),
+    db: Client = Depends(get_db),
+):
+    """Get public preview of a hangout by its invite code."""
+    user_id = current_user["id"] if current_user else None
+    return hangout_service.get_hangout_by_invite_code(db=db, invite_code=invite_code, user_id=user_id)
+
+
+@router.post("/join/{invite_code}", response_model=HangoutResponse)
+def join_hangout_via_invite(
+    invite_code: str,
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """Join a hangout using its invite code (authenticated)."""
+    return hangout_service.join_hangout_by_invite_code(
+        db=db,
+        invite_code=invite_code,
+        user_id=current_user["id"],
     )
 
 

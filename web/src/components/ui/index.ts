@@ -16,3 +16,5 @@ export { default as Spinner } from './Spinner'
 export { default as TextArea } from './TextArea'
 export { default as TextField } from './TextField'
 export { default as Toast } from './Toast'
+export { default as ShareLinkModal } from './ShareLinkModal'
+

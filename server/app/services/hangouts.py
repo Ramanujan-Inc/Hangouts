@@ -45,6 +45,8 @@ def create_hangout(db: Client, hangout_create: HangoutCreate, user_id: str) -> D
     if hangout_dict.get("group_id"):
         hangout_dict["group_id"] = str(hangout_dict["group_id"])
 
+    invite_code = uuid.uuid4().hex[:12]
+    hangout_dict["invite_code"] = invite_code
     hangout_dict["created_by"] = user_id
     hangout_dict["created_at"] = now
     hangout_dict["updated_at"] = now
@@ -74,6 +76,12 @@ def get_hangout_by_id(db: Client, hangout_id: str, user_id: Optional[str] = None
         raise NotFoundError("Hangout not found.")
 
     hangout = response.data[0]
+
+    # Ensure invite_code exists
+    if not hangout.get("invite_code"):
+        new_code = uuid.uuid4().hex[:12]
+        db.table("hangouts").update({"invite_code": new_code}).eq("id", hangout_id).execute()
+        hangout["invite_code"] = new_code
 
     # Fetch creator profile
     creator_res = db.table("profiles").select("*").eq("id", hangout["created_by"]).execute()
@@ -394,3 +402,72 @@ def get_user_hangout_rating(
         .execute()
     )
     return res.data[0] if res.data and len(res.data) > 0 else None
+
+
+def get_hangout_by_invite_code(db: Client, invite_code: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Retrieve public sanitized hangout preview by invite code."""
+    clean_code = invite_code.strip()
+    response = db.table("hangouts").select("*").eq("invite_code", clean_code).execute()
+    if not response.data or len(response.data) == 0:
+        raise NotFoundError("Hangout invite link not found or expired.")
+
+    hangout = response.data[0]
+    hangout_id = hangout["id"]
+
+    # Fetch creator profile
+    creator_res = db.table("profiles").select("*").eq("id", hangout["created_by"]).execute()
+    creator = creator_res.data[0] if creator_res.data else None
+
+    # Fetch participant count and check if current user is participant
+    participants = get_hangout_participants(db=db, hangout_id=hangout_id)
+    participant_count = len(participants)
+
+    is_participant = False
+    if user_id:
+        is_participant = (
+            str(hangout.get("created_by")) == str(user_id)
+            or any(str(p.get("user_id")) == str(user_id) for p in participants)
+        )
+
+    return {
+        "id": hangout["id"],
+        "title": hangout["title"],
+        "description": hangout.get("description"),
+        "hangout_date": hangout["hangout_date"],
+        "hangout_time": hangout.get("hangout_time"),
+        "location_name": hangout.get("location_name"),
+        "formatted_address": hangout.get("formatted_address"),
+        "cover_photo_url": hangout.get("cover_photo_url"),
+        "invite_code": hangout["invite_code"],
+        "creator": creator,
+        "participant_count": participant_count,
+        "is_participant": is_participant,
+    }
+
+
+def join_hangout_by_invite_code(db: Client, invite_code: str, user_id: str) -> Dict[str, Any]:
+    """Join a hangout using its unique invite code."""
+    clean_code = invite_code.strip()
+    response = db.table("hangouts").select("*").eq("invite_code", clean_code).execute()
+    if not response.data or len(response.data) == 0:
+        raise NotFoundError("Hangout invite link not found or expired.")
+
+    hangout = response.data[0]
+    hangout_id = hangout["id"]
+
+    # Check if already a participant or creator
+    participants = get_hangout_participants(db=db, hangout_id=hangout_id)
+    is_already_participant = (
+        str(hangout.get("created_by")) == str(user_id)
+        or any(str(p.get("user_id")) == str(user_id) for p in participants)
+    )
+
+    if not is_already_participant:
+        participant_data = {
+            "hangout_id": hangout_id,
+            "user_id": str(user_id),
+        }
+        db.table("hangout_participants").insert(participant_data).execute()
+
+    return get_hangout_by_id(db=db, hangout_id=hangout_id, user_id=user_id)
+

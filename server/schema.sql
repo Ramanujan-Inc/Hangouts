@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS groups (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     cover_image_url TEXT,
+    invite_code VARCHAR(64) UNIQUE DEFAULT substr(md5(random()::text || gen_random_uuid()::text), 1, 12),
     created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -48,6 +49,7 @@ CREATE TABLE IF NOT EXISTS hangouts (
     latitude NUMERIC(9, 6),
     longitude NUMERIC(9, 6),
     cover_photo_url TEXT,
+    invite_code VARCHAR(64) UNIQUE DEFAULT substr(md5(random()::text || gen_random_uuid()::text), 1, 12),
     created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
