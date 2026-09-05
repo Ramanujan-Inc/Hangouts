@@ -6,6 +6,7 @@ import useSWR from 'swr'
 import Layout from '../components/Layout'
 import { MapPin, Calendar, ArrowRight, ChevronDown, RefreshCw, Users, Check } from 'lucide-react'
 import { formatDate } from '../lib/format'
+import { getHangoutUrl } from '../lib/hangoutUrl'
 import { HangoutPin } from '../components/MapComponent'
 import { Group } from '../components/groups/types'
 
@@ -223,7 +224,7 @@ export default function GroupMap() {
                     <MapPin size={14} className="loc-pin" />
                     <span>{selectedPin.location_name || 'Manila'}</span>
                   </div>
-                  <Link href={`/hangout/${selectedPin.id}`} className="view-link">
+                  <Link href={getHangoutUrl(selectedPin)} className="view-link">
                     <span>View Hangout</span>
                     <ArrowRight size={14} />
                   </Link>

@@ -182,6 +182,58 @@ def test_get_google_auth_url_with_custom_redirect(client: TestClient):
     assert custom_target in data["url"]
 
 
+def test_oauth_user_first_name_extraction(db: Client):
+    """Test handle_new_user trigger extracts first name only for OAuth metadata."""
+    unique_suffix = uuid.uuid4().hex[:6]
+    first_name = f"Alex{unique_suffix}"
+    full_name = f"{first_name} Morgan"
+    email = f"{first_name.lower()}@gmail.com"
+
+    # Simulate OAuth user with given_name and full_name in user_metadata
+    user_res = db.auth.admin.create_user({
+        "email": email,
+        "password": "TemporaryPassword123!",
+        "email_confirm": True,
+        "user_metadata": {
+            "given_name": first_name,
+            "family_name": "Morgan",
+            "full_name": full_name,
+            "name": full_name,
+            "picture": "https://example.com/avatar.png",
+        },
+    })
+    user_id = str(user_res.user.id)
+
+    try:
+        profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
+        assert len(profile_res.data) == 1
+        # Username must be the first name only
+        assert profile_res.data[0]["username"] == first_name
+
+        # Test collision: another user signing in with identical given_name
+        email2 = f"another_{first_name.lower()}@gmail.com"
+        user2_res = db.auth.admin.create_user({
+            "email": email2,
+            "password": "TemporaryPassword123!",
+            "email_confirm": True,
+            "user_metadata": {
+                "given_name": first_name,
+                "full_name": f"{first_name} Smith",
+            },
+        })
+        user2_id = str(user2_res.user.id)
+        try:
+            profile2_res = db.table("profiles").select("*").eq("id", user2_id).execute()
+            assert len(profile2_res.data) == 1
+            # Must have random collision suffix
+            assert profile2_res.data[0]["username"].startswith(f"{first_name}_")
+        finally:
+            db.auth.admin.delete_user(user2_id)
+    finally:
+        db.auth.admin.delete_user(user_id)
+
+
+
 
 
 

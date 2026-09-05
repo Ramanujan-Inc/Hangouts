@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS hangouts (
     longitude NUMERIC(9, 6),
     cover_photo_url TEXT,
     invite_code VARCHAR(64) UNIQUE DEFAULT substr(md5(random()::text || gen_random_uuid()::text), 1, 12),
+    short_id VARCHAR(16) UNIQUE DEFAULT substr(gen_random_uuid()::text, 1, 8),
     created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -139,8 +140,9 @@ BEGIN
   base_username := COALESCE(
     NULLIF(TRIM(new.raw_user_meta_data->>'username'), ''),
     NULLIF(TRIM(new.raw_user_meta_data->>'preferred_username'), ''),
-    NULLIF(TRIM(REGEXP_REPLACE(new.raw_user_meta_data->>'full_name', '[^a-zA-Z0-9._-]', '', 'g')), ''),
-    NULLIF(TRIM(REGEXP_REPLACE(new.raw_user_meta_data->>'name', '[^a-zA-Z0-9._-]', '', 'g')), ''),
+    NULLIF(TRIM(REGEXP_REPLACE(new.raw_user_meta_data->>'given_name', '[^a-zA-Z0-9._-]', '', 'g')), ''),
+    NULLIF(TRIM(REGEXP_REPLACE(split_part(TRIM(new.raw_user_meta_data->>'full_name'), ' ', 1), '[^a-zA-Z0-9._-]', '', 'g')), ''),
+    NULLIF(TRIM(REGEXP_REPLACE(split_part(TRIM(new.raw_user_meta_data->>'name'), ' ', 1), '[^a-zA-Z0-9._-]', '', 'g')), ''),
     NULLIF(TRIM(REGEXP_REPLACE(split_part(new.email, '@', 1), '[^a-zA-Z0-9._-]', '', 'g')), ''),
     'user'
   );

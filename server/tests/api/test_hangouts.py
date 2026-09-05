@@ -125,18 +125,28 @@ def test_get_hangout_details(
             "hangout_date": "2026-10-10",
         },
     )
-    hangout_id = create_res.json()["id"]
+    create_json = create_res.json()
+    hangout_id = create_json["id"]
+    short_id = create_json.get("short_id")
+    assert short_id is not None
+    assert len(short_id) == 8
 
-    # Creator (participant) fetches hangout details -> 200 OK
+    # Creator (participant) fetches hangout details by full UUID -> 200 OK
     response = authenticated_client.get(f"/api/v1/hangouts/{hangout_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == hangout_id
+    assert data["short_id"] == short_id
     assert data["creator"]["id"] == primary_user["id"]
     assert len(data["participants"]) >= 1
 
+    # Creator fetches hangout details by short_id -> 200 OK
+    short_res = authenticated_client.get(f"/api/v1/hangouts/{short_id}")
+    assert short_res.status_code == 200
+    assert short_res.json()["id"] == hangout_id
+
     # Non-participant attempts to fetch hangout details -> 403 Forbidden
-    non_part_res = client.get(f"/api/v1/hangouts/{hangout_id}", headers=secondary_user["headers"])
+    non_part_res = client.get(f"/api/v1/hangouts/{short_id}", headers=secondary_user["headers"])
     assert non_part_res.status_code == 403
 
     # Add secondary user as participant -> now 200 OK

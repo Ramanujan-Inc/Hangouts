@@ -4,6 +4,7 @@ import { MapPin, Calendar } from 'lucide-react'
 import { AvatarStack, Badge } from '../ui'
 import { formatDate } from '../../lib/format'
 import { getAvatarUrl } from '../../lib/avatar'
+import { getHangoutUrl } from '../../lib/hangoutUrl'
 import { Hangout, DEFAULT_COVER } from './types'
 
 interface HangoutCardProps {
@@ -24,7 +25,7 @@ export const HangoutCard: React.FC<HangoutCardProps> = ({ hangout, index }) => {
   })
 
   return (
-    <Link href={`/hangout/${hangout.id}`} className="hangout-card-link">
+    <Link href={getHangoutUrl(hangout)} className="hangout-card-link">
       <div
         className="polaroid-card hangout-card"
         style={{
