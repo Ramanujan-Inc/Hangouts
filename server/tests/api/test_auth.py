@@ -151,5 +151,15 @@ def test_signup_duplicate_username_returns_400(client: TestClient, create_test_u
     assert response.json()["detail"] == "Username is already taken."
 
 
+def test_resend_confirmation_route(client: TestClient):
+    """Test resending confirmation email."""
+    response = client.post(
+        "/api/v1/auth/resend-confirmation",
+        json={"email": "resend_test@example.com"},
+    )
+    # Even if unconfigured or unconfirmed locally, the endpoint must be handled cleanly (200 or 400 with detail)
+    assert response.status_code in [200, 400, 429]
+
+
 
 

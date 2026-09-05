@@ -17,7 +17,7 @@ export default function Button({
   return (
     <button
       type={type}
-      className={`pill-button pill-button-${variant} ${size !== 'default' ? size : ''} ${fullWidth ? 'full-width' : ''} ${className}`}
+      className={`pill-button pill-button-${variant} ${size !== 'default' ? size : ''} ${fullWidth ? 'full-width' : ''} ${props.disabled ? 'disabled' : ''} ${className}`}
       {...props}
     />
   )

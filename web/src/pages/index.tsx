@@ -4,16 +4,20 @@ import { useRouter } from 'next/router'
 import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../lib/api'
-import { AuthWelcome, LoginForm, SignupForm } from '../components/auth'
+import { AuthWelcome, LoginForm, SignupForm, VerificationPending } from '../components/auth'
 
-type AuthStep = 'welcome' | 'signup' | 'login'
+type AuthStep = 'welcome' | 'signup' | 'login' | 'verification-pending'
 
 export default function Onboarding() {
   const router = useRouter()
-  const { user, token, login, signup, loginDemoUser } = useAuth()
+  const { user, token, login, signup, resendConfirmation, loginDemoUser } = useAuth()
   const [step, setStep] = useState<AuthStep>('welcome')
   const [error, setError] = useState<string | null>(null)
+  const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null)
+  const [pendingEmail, setPendingEmail] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null)
 
   const getRedirectUrl = () => {
     const redirect = router.query.redirect
@@ -26,8 +30,21 @@ export default function Onboarding() {
     }
   }, [user, token, router])
 
+  // Handle feedback parameters from callback redirects (e.g. ?error=... or ?confirmed=true)
+  useEffect(() => {
+    if (router.query.error && typeof router.query.error === 'string') {
+      setError(router.query.error)
+      setStep('login')
+    }
+    if (router.query.confirmed === 'true' || router.query.verified === 'true') {
+      setConfirmationNotice('Your email has been verified successfully! You can now log in.')
+      setStep('login')
+    }
+  }, [router.query])
+
   const handleGoogleDemo = async () => {
     setError(null)
+    setConfirmationNotice(null)
     setSubmitting(true)
     try {
       await loginDemoUser()
@@ -41,10 +58,17 @@ export default function Onboarding() {
 
   const handleSignup = async (name: string, email: string, password: string) => {
     setError(null)
+    setConfirmationNotice(null)
     setSubmitting(true)
     try {
-      await signup(name, email, password)
-      router.push(getRedirectUrl())
+      const res = await signup(name, email, password)
+      if (res.access_token) {
+        router.push(getRedirectUrl())
+      } else {
+        setPendingEmail(email)
+        setResendSuccess(null)
+        setStep('verification-pending')
+      }
     } catch (err: any) {
       if (err instanceof ApiError) {
         setError(err.message)
@@ -58,6 +82,7 @@ export default function Onboarding() {
 
   const handleLogin = async (email: string, password: string) => {
     setError(null)
+    setConfirmationNotice(null)
     setSubmitting(true)
     try {
       await login(email, password)
@@ -73,8 +98,25 @@ export default function Onboarding() {
     }
   }
 
+  const handleResendConfirmation = async (targetEmail: string) => {
+    if (!targetEmail) return
+    setResending(true)
+    setResendSuccess(null)
+    setError(null)
+    try {
+      await resendConfirmation(targetEmail)
+      setResendSuccess('Verification email sent! Please check your inbox.')
+    } catch (err: any) {
+      setError(err?.message || 'Failed to resend confirmation email.')
+    } finally {
+      setResending(false)
+    }
+  }
+
   const changeStep = (nextStep: AuthStep) => {
     setError(null)
+    setConfirmationNotice(null)
+    setResendSuccess(null)
     setStep(nextStep)
   }
 
@@ -84,7 +126,7 @@ export default function Onboarding() {
         <title>Hangout - Your group's shared memory, together</title>
       </Head>
 
-      <div className="card-container">
+      <div className={`card-container ${step === 'verification-pending' ? 'card-compact' : ''}`}>
         {step !== 'welcome' && (
           <button className="back-btn" onClick={() => changeStep('welcome')} aria-label="Go back">
             <ArrowLeft size={20} />
@@ -111,12 +153,32 @@ export default function Onboarding() {
         )}
 
         {step === 'login' && (
-          <LoginForm
-            onSubmit={handleLogin}
-            onGoogleDemo={handleGoogleDemo}
-            onSwitchToSignup={() => changeStep('signup')}
+          <>
+            {confirmationNotice && (
+              <div className="confirmation-notice">
+                {confirmationNotice}
+              </div>
+            )}
+            <LoginForm
+              onSubmit={handleLogin}
+              onGoogleDemo={handleGoogleDemo}
+              onSwitchToSignup={() => changeStep('signup')}
+              error={error}
+              submitting={submitting}
+              onResendConfirmation={handleResendConfirmation}
+              resendingConfirmation={resending}
+            />
+          </>
+        )}
+
+        {step === 'verification-pending' && (
+          <VerificationPending
+            email={pendingEmail}
+            onResend={() => handleResendConfirmation(pendingEmail)}
+            onBackToLogin={() => changeStep('login')}
+            resending={resending}
+            resendSuccess={resendSuccess}
             error={error}
-            submitting={submitting}
           />
         )}
       </div>
@@ -144,6 +206,11 @@ export default function Onboarding() {
           display: flex;
           flex-direction: column;
           border: 1px solid var(--color-surface-container-high);
+          transition: min-height 0.25s ease;
+        }
+
+        .card-container.card-compact {
+          min-height: auto;
         }
 
         .back-btn {
@@ -160,6 +227,17 @@ export default function Onboarding() {
 
         .back-btn:hover {
           color: var(--color-text);
+        }
+
+        .confirmation-notice {
+          background: rgba(34, 197, 94, 0.12);
+          border: 1px solid rgba(34, 197, 94, 0.4);
+          color: #16a34a;
+          padding: 0.75rem 1rem;
+          border-radius: 12px;
+          font-size: 0.875rem;
+          text-align: center;
+          margin-bottom: 1rem;
         }
       `}</style>
     </div>

@@ -1,6 +1,7 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from fastapi import HTTPException, status
 from supabase import Client
+from app.core.config import settings
 from app.schemas.auth import UserSignUp, UserLogin
 
 
@@ -17,6 +18,7 @@ def sign_up_user(db: Client, user_in: UserSignUp) -> Dict[str, Any]:
         )
 
     avatar_url_val = user_in.avatar_url or "/avatars/mika.svg"
+    redirect_target = (user_in.redirect_url or f"{settings.FRONTEND_URL}/auth/callback").strip()
 
     try:
         auth_response = db.auth.sign_up(
@@ -27,7 +29,8 @@ def sign_up_user(db: Client, user_in: UserSignUp) -> Dict[str, Any]:
                     "data": {
                         "username": username_val,
                         "avatar_url": avatar_url_val,
-                    }
+                    },
+                    "email_redirect_to": redirect_target,
                 },
             }
         )
@@ -45,13 +48,17 @@ def sign_up_user(db: Client, user_in: UserSignUp) -> Dict[str, Any]:
 
     user_id = str(auth_response.user.id)
     email = auth_response.user.email
-    access_token = auth_response.session.access_token if auth_response.session else ""
+    has_session = bool(auth_response.session and auth_response.session.access_token)
+    access_token = auth_response.session.access_token if has_session else None
+    email_confirmed = bool(auth_response.user.email_confirmed_at or has_session)
 
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "user_id": user_id,
         "email": email,
+        "email_confirmed": email_confirmed,
+        "message": "Registration successful. Please check your email to confirm your account." if not email_confirmed else None,
     }
 
 
@@ -78,7 +85,13 @@ def login_user(db: Client, user_in: UserLogin) -> Dict[str, Any]:
                 "password": user_in.password,
             }
         )
-    except Exception:
+    except Exception as e:
+        err_msg = str(e).lower()
+        if "email not confirmed" in err_msg:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Email not confirmed. Please check your inbox or resend the confirmation link.",
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password.",
@@ -98,4 +111,31 @@ def login_user(db: Client, user_in: UserLogin) -> Dict[str, Any]:
         "token_type": "bearer",
         "user_id": user_id,
         "email": email,
+        "email_confirmed": True,
+        "message": None,
     }
+
+
+def resend_confirmation_email(db: Client, email: str, redirect_url: Optional[str] = None) -> Dict[str, str]:
+    """Resend signup confirmation email via Supabase Auth."""
+    redirect_target = (redirect_url or f"{settings.FRONTEND_URL}/auth/callback").strip()
+    try:
+        db.auth.resend({
+            "type": "signup",
+            "email": email,
+            "options": {
+                "email_redirect_to": redirect_target,
+            },
+        })
+    except Exception as e:
+        err_msg = str(e)
+        if "rate limit" in err_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Rate limit exceeded. Please wait a few moments before trying again.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to resend confirmation email: {err_msg}",
+        )
+    return {"message": "Confirmation email resent successfully."}

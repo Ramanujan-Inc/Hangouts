@@ -299,11 +299,11 @@ a:hover {
   font-weight: 700;
   font-size: 16px;
   cursor: pointer;
-  transition: transform 0.2s, opacity 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s, opacity 0.2s, box-shadow 0.2s, background-color 0.2s;
   gap: 8px;
 }
 
-.pill-button:active {
+.pill-button:active:not(:disabled):not(.disabled) {
   transform: scale(0.95);
 }
 
@@ -313,7 +313,7 @@ a:hover {
   box-shadow: 0 4px 10px rgba(227, 104, 136, 0.2);
 }
 
-.pill-button-primary:hover {
+.pill-button-primary:hover:not(:disabled):not(.disabled) {
   background-color: var(--color-blush-hover);
 }
 
@@ -323,7 +323,7 @@ a:hover {
   box-shadow: 0 4px 10px rgba(102, 152, 204, 0.2);
 }
 
-.pill-button-secondary:hover {
+.pill-button-secondary:hover:not(:disabled):not(.disabled) {
   background-color: var(--color-sea-hover);
 }
 
@@ -333,8 +333,31 @@ a:hover {
   color: var(--color-sea);
 }
 
-.pill-button-outline:hover {
+.pill-button-outline:hover:not(:disabled):not(.disabled) {
   background-color: var(--tint-sea);
+}
+
+.pill-button:disabled,
+.pill-button[disabled],
+.pill-button.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.pill-button:disabled:hover,
+.pill-button:disabled:active,
+.pill-button.disabled:hover,
+.pill-button.disabled:active {
+  transform: none;
+  box-shadow: none;
+}
+
+.pill-button:disabled *,
+.pill-button[disabled] *,
+.pill-button.disabled * {
+  pointer-events: none;
 }
 
 .pill-button.compact {

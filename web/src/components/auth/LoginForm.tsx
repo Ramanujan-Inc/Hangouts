@@ -8,6 +8,8 @@ interface LoginFormProps {
   onSwitchToSignup: () => void
   error: string | null
   submitting?: boolean
+  onResendConfirmation?: (email: string) => void
+  resendingConfirmation?: boolean
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({
@@ -16,6 +18,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   onSwitchToSignup,
   error,
   submitting = false,
+  onResendConfirmation,
+  resendingConfirmation = false,
 }) => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -49,7 +53,32 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         <p>Access your group's memory archive</p>
       </div>
 
-      {error && <InlineAlert>{error}</InlineAlert>}
+      {error && (
+        <div>
+          <InlineAlert>{error}</InlineAlert>
+          {error.toLowerCase().includes('email not confirmed') && onResendConfirmation && (
+            <div style={{ textAlign: 'center', marginTop: '-6px', marginBottom: '10px' }}>
+              <button
+                type="button"
+                onClick={() => onResendConfirmation(email)}
+                disabled={resendingConfirmation}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--color-sea)',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  cursor: resendingConfirmation ? 'not-allowed' : 'pointer',
+                  opacity: resendingConfirmation ? 0.6 : 1,
+                  textDecoration: 'underline',
+                }}
+              >
+                {resendingConfirmation ? 'Resending verification email...' : 'Resend verification email'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <TextField
         label="Username or Email"
