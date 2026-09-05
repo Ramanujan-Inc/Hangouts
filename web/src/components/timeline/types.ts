@@ -22,6 +22,7 @@ export interface Hangout {
   latitude?: number | null
   longitude?: number | null
   cover_photo_url?: string | null
+  short_id?: string | null
   group_id?: string | null
   created_by: string
   created_at: string

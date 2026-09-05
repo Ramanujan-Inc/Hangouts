@@ -7,6 +7,7 @@ import { useAuth } from '../../../context/AuthContext'
 import { api } from '../../../lib/api'
 import { getAvatarUrl } from '../../../lib/avatar'
 import { formatDate } from '../../../lib/format'
+import { getHangoutUrl } from '../../../lib/hangoutUrl'
 import { Button, Card, Spinner, Toast } from '../../../components/ui'
 
 interface HangoutPreview {
@@ -19,6 +20,7 @@ interface HangoutPreview {
   formatted_address?: string | null
   cover_photo_url?: string | null
   invite_code: string
+  short_id?: string | null
   creator?: {
     id: string
     username: string
@@ -90,7 +92,7 @@ export default function JoinHangoutPage({ code, initialData }: JoinHangoutPagePr
       const res = await api.post<any>(`/hangouts/join/${code}`)
       setToastMessage(`You joined "${hangout?.title || 'Hangout'}"!`)
       setTimeout(() => {
-        router.push(`/hangout/${res.id || hangout?.id}`)
+        router.push(getHangoutUrl(res || hangout))
       }, 800)
     } catch (err: any) {
       setError(err.message || 'Failed to join hangout.')
@@ -246,7 +248,7 @@ export default function JoinHangoutPage({ code, initialData }: JoinHangoutPagePr
                     <Button
                       size="default"
                       fullWidth
-                      onClick={() => router.push(`/hangout/${hangout.id}`)}
+                      onClick={() => router.push(getHangoutUrl(hangout))}
                     >
                       View Hangout
                     </Button>

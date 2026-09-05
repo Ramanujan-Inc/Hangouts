@@ -46,7 +46,9 @@ def create_hangout(db: Client, hangout_create: HangoutCreate, user_id: str) -> D
         hangout_dict["group_id"] = str(hangout_dict["group_id"])
 
     invite_code = uuid.uuid4().hex[:12]
+    short_id = uuid.uuid4().hex[:8]
     hangout_dict["invite_code"] = invite_code
+    hangout_dict["short_id"] = short_id
     hangout_dict["created_by"] = user_id
     hangout_dict["created_at"] = now
     hangout_dict["updated_at"] = now
@@ -69,18 +71,65 @@ def create_hangout(db: Client, hangout_create: HangoutCreate, user_id: str) -> D
     return get_hangout_by_id(db=db, hangout_id=hangout_id)
 
 
+def resolve_hangout_id(db: Client, hangout_id: str) -> str:
+    """Resolve a full UUID or short_id to the canonical UUID of the hangout."""
+    try:
+        uuid.UUID(str(hangout_id))
+        return str(hangout_id)
+    except (ValueError, AttributeError):
+        pass
+
+    clean_id = str(hangout_id).strip()
+    res = db.table("hangouts").select("id").eq("short_id", clean_id).execute()
+    if res.data and len(res.data) > 0:
+        return str(res.data[0]["id"])
+
+    if "-" in clean_id:
+        cand = clean_id.rsplit("-", 1)[-1]
+        res = db.table("hangouts").select("id").eq("short_id", cand).execute()
+        if res.data and len(res.data) > 0:
+            return str(res.data[0]["id"])
+
+    raise NotFoundError("Hangout not found.")
+
+
 def get_hangout_by_id(db: Client, hangout_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:
     """Fetch detailed hangout view with creator profile and participant list, validating user access."""
-    response = db.table("hangouts").select("*").eq("id", hangout_id).execute()
+    is_uuid = False
+    try:
+        uuid.UUID(str(hangout_id))
+        is_uuid = True
+    except (ValueError, AttributeError):
+        is_uuid = False
+
+    clean_id = str(hangout_id).strip()
+    if is_uuid:
+        response = db.table("hangouts").select("*").eq("id", clean_id).execute()
+    else:
+        response = db.table("hangouts").select("*").eq("short_id", clean_id).execute()
+        if not response.data and "-" in clean_id:
+            cand = clean_id.rsplit("-", 1)[-1]
+            response = db.table("hangouts").select("*").eq("short_id", cand).execute()
+
     if not response.data or len(response.data) == 0:
         raise NotFoundError("Hangout not found.")
 
     hangout = response.data[0]
+    canonical_id = hangout["id"]
+
+    # Ensure short_id exists
+    if not hangout.get("short_id"):
+        new_short_id = str(canonical_id)[:8]
+        try:
+            db.table("hangouts").update({"short_id": new_short_id}).eq("id", canonical_id).execute()
+        except Exception:
+            pass
+        hangout["short_id"] = new_short_id
 
     # Ensure invite_code exists
     if not hangout.get("invite_code"):
         new_code = uuid.uuid4().hex[:12]
-        db.table("hangouts").update({"invite_code": new_code}).eq("id", hangout_id).execute()
+        db.table("hangouts").update({"invite_code": new_code}).eq("id", canonical_id).execute()
         hangout["invite_code"] = new_code
 
     # Fetch creator profile
@@ -88,7 +137,7 @@ def get_hangout_by_id(db: Client, hangout_id: str, user_id: Optional[str] = None
     hangout["creator"] = creator_res.data[0] if creator_res.data else None
 
     # Fetch participants with profiles
-    participants = get_hangout_participants(db=db, hangout_id=hangout_id)
+    participants = get_hangout_participants(db=db, hangout_id=canonical_id)
     hangout["participants"] = participants
 
     if user_id:
@@ -219,6 +268,8 @@ def get_hangouts(
 
     # Populate creator and participants for each hangout
     for hangout in hangouts:
+        if not hangout.get("short_id") and hangout.get("id"):
+            hangout["short_id"] = str(hangout["id"])[:8]
         creator_res = db.table("profiles").select("*").eq("id", hangout["created_by"]).execute()
         hangout["creator"] = creator_res.data[0] if creator_res.data else None
         hangout["participants"] = get_hangout_participants(db=db, hangout_id=hangout["id"])
@@ -259,6 +310,8 @@ def get_hangouts_map(
     hangouts = response.data if response.data else []
 
     for hangout in hangouts:
+        if not hangout.get("short_id") and hangout.get("id"):
+            hangout["short_id"] = str(hangout["id"])[:8]
         creator_res = db.table("profiles").select("*").eq("id", hangout["created_by"]).execute()
         hangout["creator"] = creator_res.data[0] if creator_res.data else None
         hangout["participants"] = get_hangout_participants(db=db, hangout_id=hangout["id"])
@@ -275,6 +328,7 @@ def update_hangout(
 ) -> Dict[str, Any]:
     """Update hangout details (creator only)."""
     hangout = get_hangout_by_id(db=db, hangout_id=hangout_id)
+    canonical_id = hangout["id"]
 
     if str(hangout["created_by"]) != str(user_id):
         raise ForbiddenError("Only the creator can update this hangout.")
@@ -292,18 +346,19 @@ def update_hangout(
 
     update_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    db.table("hangouts").update(update_dict).eq("id", hangout_id).execute()
-    return get_hangout_by_id(db=db, hangout_id=hangout_id)
+    db.table("hangouts").update(update_dict).eq("id", canonical_id).execute()
+    return get_hangout_by_id(db=db, hangout_id=canonical_id)
 
 
 def delete_hangout(db: Client, hangout_id: str, user_id: str) -> None:
     """Delete a hangout (creator only)."""
     hangout = get_hangout_by_id(db=db, hangout_id=hangout_id)
+    canonical_id = hangout["id"]
 
     if str(hangout["created_by"]) != str(user_id):
         raise ForbiddenError("Only the creator can delete this hangout.")
 
-    db.table("hangouts").delete().eq("id", hangout_id).execute()
+    db.table("hangouts").delete().eq("id", canonical_id).execute()
 
 
 def add_participant(
@@ -314,6 +369,7 @@ def add_participant(
 ) -> Dict[str, Any]:
     """Add participant to hangout (allowed by any active participant or creator)."""
     hangout = get_hangout_by_id(db=db, hangout_id=hangout_id)
+    canonical_id = hangout["id"]
 
     # Check if requesting user is active participant or creator
     participants = hangout.get("participants", [])
@@ -332,7 +388,7 @@ def add_participant(
 
     # Insert into hangout_participants
     participant_data = {
-        "hangout_id": hangout_id,
+        "hangout_id": canonical_id,
         "user_id": str(target_user_id),
     }
     res = db.table("hangout_participants").insert(participant_data).execute()
@@ -354,6 +410,7 @@ def remove_participant(
 ) -> None:
     """Remove participant (creator can kick; participants can leave/remove self)."""
     hangout = get_hangout_by_id(db=db, hangout_id=hangout_id)
+    canonical_id = hangout["id"]
 
     is_self_removal = str(target_user_id) == str(requesting_user_id)
     is_creator = str(hangout["created_by"]) == str(requesting_user_id)
@@ -361,7 +418,7 @@ def remove_participant(
     if not (is_self_removal or is_creator):
         raise ForbiddenError("You do not have permission to remove this participant.")
 
-    db.table("hangout_participants").delete().eq("hangout_id", hangout_id).eq("user_id", str(target_user_id)).execute()
+    db.table("hangout_participants").delete().eq("hangout_id", canonical_id).eq("user_id", str(target_user_id)).execute()
 
 
 def upsert_hangout_rating(
@@ -373,10 +430,11 @@ def upsert_hangout_rating(
     """Upsert individual rating for a hangout."""
     if not (1 <= rating <= 5):
         raise BadRequestError("Rating must be between 1 and 5.")
-    get_hangout_by_id(db=db, hangout_id=hangout_id, user_id=user_id)
+    hangout = get_hangout_by_id(db=db, hangout_id=hangout_id, user_id=user_id)
+    canonical_id = hangout["id"]
     now = datetime.now(timezone.utc).isoformat()
     data = {
-        "hangout_id": str(hangout_id),
+        "hangout_id": str(canonical_id),
         "user_id": str(user_id),
         "rating": rating,
         "updated_at": now,
@@ -393,11 +451,12 @@ def get_user_hangout_rating(
     user_id: str,
 ) -> Optional[Dict[str, Any]]:
     """Get the current user's individual rating for a hangout."""
-    get_hangout_by_id(db=db, hangout_id=hangout_id, user_id=user_id)
+    hangout = get_hangout_by_id(db=db, hangout_id=hangout_id, user_id=user_id)
+    canonical_id = hangout["id"]
     res = (
         db.table("hangout_ratings")
         .select("*")
-        .eq("hangout_id", str(hangout_id))
+        .eq("hangout_id", str(canonical_id))
         .eq("user_id", str(user_id))
         .execute()
     )
@@ -439,6 +498,7 @@ def get_hangout_by_invite_code(db: Client, invite_code: str, user_id: Optional[s
         "formatted_address": hangout.get("formatted_address"),
         "cover_photo_url": hangout.get("cover_photo_url"),
         "invite_code": hangout["invite_code"],
+        "short_id": hangout.get("short_id") or str(hangout["id"])[:8],
         "creator": creator,
         "participant_count": participant_count,
         "is_participant": is_participant,

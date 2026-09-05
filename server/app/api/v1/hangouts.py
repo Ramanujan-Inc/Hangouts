@@ -116,7 +116,7 @@ def get_hangout_details(
     current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
 ):
-    """Get detailed hangout information with creator profile and participant list."""
+    """Get detailed hangout information by full UUID or 8-character short_id."""
     return hangout_service.get_hangout_by_id(db=db, hangout_id=id, user_id=current_user["id"])
 
 

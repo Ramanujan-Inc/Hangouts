@@ -53,6 +53,7 @@ class ParticipantResponse(BaseModel):
 class HangoutResponse(HangoutBase):
     id: UUID
     invite_code: Optional[str] = None
+    short_id: Optional[str] = None
     created_by: UUID
     created_at: datetime
     updated_at: datetime
@@ -72,6 +73,7 @@ class HangoutJoinPreviewResponse(BaseModel):
     formatted_address: Optional[str] = None
     cover_photo_url: Optional[str] = None
     invite_code: str
+    short_id: Optional[str] = None
     creator: Optional[ProfileResponse] = None
     participant_count: int = 0
     is_participant: bool = False

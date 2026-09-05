@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
@@ -8,6 +8,7 @@ import { ProtectedRoute } from '../../components/ProtectedRoute'
 import { useAuth } from '../../context/AuthContext'
 import { Smile, Film, FileText, DollarSign } from 'lucide-react'
 import { api } from '../../lib/api'
+import { getHangoutShortId } from '../../lib/hangoutUrl'
 import { SegmentedTabs, Spinner } from '../../components/ui'
 import {
   HangoutTab,
@@ -52,30 +53,41 @@ function HangoutDetailContent() {
     mutate: mutateHangout,
   } = useSWR<HangoutDetailData>(hangoutId ? `/hangouts/${hangoutId}` : null)
 
+  const canonicalId = hangout?.id || hangoutId
+
+  // Normalize URL to short ID in address bar
+  useEffect(() => {
+    if (!hangout) return
+    const canonicalShortId = getHangoutShortId(hangout)
+    if (canonicalShortId && router.query.id && router.query.id !== canonicalShortId) {
+      window.history.replaceState(null, '', `/hangout/${canonicalShortId}`)
+    }
+  }, [hangout, router.query.id])
+
   const {
     data: mediaData,
     mutate: mutateMedia,
-  } = useSWR<HangoutMedia[]>(hangoutId ? `/hangouts/${hangoutId}/media` : null)
+  } = useSWR<HangoutMedia[]>(canonicalId ? `/hangouts/${canonicalId}/media` : null)
 
   const {
     data: ratingData,
     mutate: mutateRating,
-  } = useSWR<{ rating: number } | null>(hangoutId ? `/hangouts/${hangoutId}/ratings` : null)
+  } = useSWR<{ rating: number } | null>(canonicalId ? `/hangouts/${canonicalId}/ratings` : null)
 
   const {
     data: notesData,
     mutate: mutateNotes,
-  } = useSWR<HangoutNote[]>(hangoutId ? `/hangouts/${hangoutId}/notes` : null)
+  } = useSWR<HangoutNote[]>(canonicalId ? `/hangouts/${canonicalId}/notes` : null)
 
   const {
     data: expensesData,
     mutate: mutateExpenses,
-  } = useSWR<HangoutExpense[]>(hangoutId ? `/hangouts/${hangoutId}/expenses` : null)
+  } = useSWR<HangoutExpense[]>(canonicalId ? `/hangouts/${canonicalId}/expenses` : null)
 
   const {
     data: expenseSummaryData,
     mutate: mutateSummary,
-  } = useSWR<ExpenseSummary>(hangoutId ? `/hangouts/${hangoutId}/expenses/summary` : null)
+  } = useSWR<ExpenseSummary>(canonicalId ? `/hangouts/${canonicalId}/expenses/summary` : null)
 
   const media = mediaData || []
   const rating = ratingData?.rating || 4
@@ -101,10 +113,10 @@ function HangoutDetailContent() {
 
   // Overview Tab Rating Handler
   const handleRatingChange = async (newRating: number) => {
-    if (!hangoutId) return
+    if (!canonicalId) return
     mutateRating({ rating: newRating }, false)
     try {
-      await api.post(`/hangouts/${hangoutId}/ratings`, { rating: newRating })
+      await api.post(`/hangouts/${canonicalId}/ratings`, { rating: newRating })
       mutateRating()
     } catch (err) {
       console.error('Failed to save rating:', err)
@@ -117,7 +129,7 @@ function HangoutDetailContent() {
     items: { file: File; caption?: string }[],
     isShared: boolean = true
   ) => {
-    if (!hangoutId || items.length === 0) return
+    if (!canonicalId || items.length === 0) return
     try {
       setIsUploadingMedia(true)
       const formData = new FormData()
@@ -128,7 +140,7 @@ function HangoutDetailContent() {
       formData.append('captions_json', JSON.stringify(captionsList))
       formData.append('is_shared', String(isShared))
 
-      const uploadedItems = await api.upload<HangoutMedia[]>(`/hangouts/${hangoutId}/media/bulk`, formData)
+      const uploadedItems = await api.upload<HangoutMedia[]>(`/hangouts/${canonicalId}/media/bulk`, formData)
       const newItems = Array.isArray(uploadedItems) ? uploadedItems : [uploadedItems]
       mutateMedia([...newItems, ...media], false)
       setShowUploadMenu(false)
@@ -194,10 +206,10 @@ function HangoutDetailContent() {
 
   // Notes Tab Handlers
   const handleAddNote = async (text: string, isShared: boolean, type: NoteType) => {
-    if (!hangoutId) return
+    if (!canonicalId) return
     try {
       setIsSubmittingNote(true)
-      const newNote = await api.post<HangoutNote>(`/hangouts/${hangoutId}/notes`, {
+      const newNote = await api.post<HangoutNote>(`/hangouts/${canonicalId}/notes`, {
         content: text,
         color: type,
         is_shared: isShared,
@@ -230,10 +242,10 @@ function HangoutDetailContent() {
     paidBy: string,
     splitType: 'equal' | 'personal'
   ) => {
-    if (!hangoutId) return
+    if (!canonicalId) return
     try {
       setIsSubmittingExpense(true)
-      await api.post<HangoutExpense>(`/hangouts/${hangoutId}/expenses`, {
+      await api.post<HangoutExpense>(`/hangouts/${canonicalId}/expenses`, {
         description,
         total_amount: amount,
         split_type: splitType,
@@ -250,7 +262,7 @@ function HangoutDetailContent() {
   }
 
   const handleDeleteExpense = async (expenseId: string) => {
-    if (!hangoutId) return
+    if (!canonicalId) return
     try {
       await api.delete(`/expenses/${expenseId}`)
       mutateExpenses(expenses.filter((e) => e.id !== expenseId), false)

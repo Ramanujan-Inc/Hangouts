@@ -21,6 +21,7 @@ import {
 import { extractBatchPhotoMetadata } from '../lib/exif'
 import { resolveBatchLocation } from '../lib/geocoding'
 import { generateVideoThumbnail } from '../lib/video'
+import { getHangoutUrl } from '../lib/hangoutUrl'
 
 export default function CreateHangout() {
   const router = useRouter()
@@ -357,7 +358,7 @@ export default function CreateHangout() {
         }
       }
 
-      router.push(`/hangout/${hangoutId}`)
+      router.push(getHangoutUrl(createdHangout))
     } catch (err: any) {
       console.error('Failed to create hangout:', err)
       const errorDetail =

@@ -13,6 +13,7 @@ export interface HangoutPin {
   longitude: number
   hangout_date?: string
   cover_photo_url?: string
+  short_id?: string | null
   group_id?: string | null
 }
 

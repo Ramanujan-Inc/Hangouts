@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Heart, MapPin, Sparkles, ArrowRight } from 'lucide-react'
 import { Badge, AvatarStack } from '../ui'
 import { getAvatarUrl } from '../../lib/avatar'
+import { getHangoutUrl } from '../../lib/hangoutUrl'
 import { Memory, DEFAULT_COVER } from './types'
 
 interface MemoryHeroBannerProps {
@@ -73,14 +74,14 @@ export const MemoryHeroBanner: React.FC<MemoryHeroBannerProps> = ({
             )}
           </div>
 
-          <Link href={`/hangout/${memory.id}`} className="memory-cta-btn">
+          <Link href={getHangoutUrl(memory)} className="memory-cta-btn">
             <Sparkles size={15} />
             <span>Relive this memory</span>
             <ArrowRight size={14} className="cta-arrow" />
           </Link>
         </div>
 
-        <Link href={`/hangout/${memory.id}`} className="memory-banner-polaroid" aria-label={`View ${memory.title}`}>
+        <Link href={getHangoutUrl(memory)} className="memory-banner-polaroid" aria-label={`View ${memory.title}`}>
           <div className="polaroid-inset">
             <div className="washi-tape" />
             <img
