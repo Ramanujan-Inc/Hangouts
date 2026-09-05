@@ -30,3 +30,9 @@ class TokenResponse(BaseModel):
 class ResendConfirmationRequest(BaseModel):
     email: EmailStr
     redirect_url: Optional[str] = None
+
+
+class OAuthUrlResponse(BaseModel):
+    url: str
+    provider: str = "google"
+

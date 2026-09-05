@@ -182,6 +182,146 @@ def test_personal_expense_isolation(
     assert balances[user_mika["id"]]["is_owed"] == 300.0
 
 
+def test_personal_expenses_visibility_restricted_to_owner(
+    authenticated_client: TestClient,
+    create_test_user: Callable[..., Dict[str, Any]],
+    primary_user: Dict[str, Any],
+):
+    """Personal expenses must be visible only to the user who owns that expense.
+    
+    Checks:
+    1. primary_user cannot see secondary_user's personal expense in expenses list.
+    2. secondary_user cannot see primary_user's personal expense in expenses list.
+    3. Summary for each user does not leak other users' personal expenses in totals or member balances.
+    4. Non-owners (even hangout creators) cannot delete another user's personal expense.
+    5. Users cannot log a personal expense under someone else's paid_by ID.
+    """
+    user_mika = primary_user
+    user_jam = create_test_user(username="Expense_Jam_Visibility")
+
+    hangout_id = _create_test_hangout(authenticated_client)
+
+    # Add Jam as participant
+    authenticated_client.post(
+        f"/api/v1/hangouts/{hangout_id}/participants",
+        json={"user_id": user_jam["id"]},
+    )
+
+    # 1. Mika logs shared lunch: ₱600
+    shared_res = authenticated_client.post(
+        f"/api/v1/hangouts/{hangout_id}/expenses",
+        json={"description": "Shared Lunch", "total_amount": 600.0, "split_type": "equal"},
+    )
+    assert shared_res.status_code == 201
+    shared_id = shared_res.json()["id"]
+
+    # 2. Mika logs personal coffee: ₱150
+    mika_pers_res = authenticated_client.post(
+        f"/api/v1/hangouts/{hangout_id}/expenses",
+        json={"description": "Mika Coffee", "total_amount": 150.0, "split_type": "personal"},
+    )
+    assert mika_pers_res.status_code == 201
+    mika_pers_id = mika_pers_res.json()["id"]
+
+    # 3. Jam logs personal souvenir: ₱250
+    jam_pers_res = authenticated_client.post(
+        f"/api/v1/hangouts/{hangout_id}/expenses",
+        json={"description": "Jam Souvenir", "total_amount": 250.0, "split_type": "personal"},
+        headers=user_jam["headers"],
+    )
+    assert jam_pers_res.status_code == 201
+    jam_pers_id = jam_pers_res.json()["id"]
+
+    # 4. Jam lists expenses -> should see Shared Lunch and Jam Souvenir, but NOT Mika Coffee
+    jam_list_res = authenticated_client.get(
+        f"/api/v1/hangouts/{hangout_id}/expenses",
+        headers=user_jam["headers"],
+    )
+    assert jam_list_res.status_code == 200
+    jam_expenses = jam_list_res.json()
+    jam_exp_ids = [e["id"] for e in jam_expenses]
+
+    assert shared_id in jam_exp_ids
+    assert jam_pers_id in jam_exp_ids
+    assert mika_pers_id not in jam_exp_ids
+    assert len(jam_expenses) == 2
+
+    # 5. Mika lists expenses -> should see Shared Lunch and Mika Coffee, but NOT Jam Souvenir
+    mika_list_res = authenticated_client.get(f"/api/v1/hangouts/{hangout_id}/expenses")
+    assert mika_list_res.status_code == 200
+    mika_expenses = mika_list_res.json()
+    mika_exp_ids = [e["id"] for e in mika_expenses]
+
+    assert shared_id in mika_exp_ids
+    assert mika_pers_id in mika_exp_ids
+    assert jam_pers_id not in mika_exp_ids
+    assert len(mika_expenses) == 2
+
+    # 6. Jam checks summary:
+    # Visible total spent for Jam should be 600 (shared) + 250 (Jam's personal) = 850
+    # Mika's total_paid seen by Jam should only be 600 (Mika's personal 150 is hidden)
+    # Jam's total_paid should be 250
+    jam_sum_res = authenticated_client.get(
+        f"/api/v1/hangouts/{hangout_id}/expenses/summary",
+        headers=user_jam["headers"],
+    )
+    assert jam_sum_res.status_code == 200
+    jam_sum = jam_sum_res.json()
+    assert jam_sum["total_expenses"] == 850.0
+    assert jam_sum["expense_count"] == 2
+    assert jam_sum["equal_split_total"] == 600.0
+    assert jam_sum["per_person_share"] == 300.0
+    jam_sum_balances = {b["user_id"]: b for b in jam_sum["member_balances"]}
+    assert jam_sum_balances[user_mika["id"]]["total_paid"] == 600.0
+    assert jam_sum_balances[user_jam["id"]]["total_paid"] == 250.0
+
+    # 7. Mika checks summary:
+    # Visible total spent for Mika should be 600 (shared) + 150 (Mika's personal) = 750
+    # Mika's total_paid should be 750 (600 + 150)
+    # Jam's total_paid seen by Mika should be 0 (Jam's personal 250 is hidden)
+    mika_sum_res = authenticated_client.get(f"/api/v1/hangouts/{hangout_id}/expenses/summary")
+    assert mika_sum_res.status_code == 200
+    mika_sum = mika_sum_res.json()
+    assert mika_sum["total_expenses"] == 750.0
+    assert mika_sum["expense_count"] == 2
+    assert mika_sum["equal_split_total"] == 600.0
+    assert mika_sum["per_person_share"] == 300.0
+    mika_sum_balances = {b["user_id"]: b for b in mika_sum["member_balances"]}
+    assert mika_sum_balances[user_mika["id"]]["total_paid"] == 750.0
+    assert mika_sum_balances[user_jam["id"]]["total_paid"] == 0.0
+
+    # 8. Deletion privacy:
+    # Mika (even as hangout creator) cannot delete Jam's personal expense
+    mika_del_res = authenticated_client.delete(f"/api/v1/expenses/{jam_pers_id}")
+    assert mika_del_res.status_code == 404
+
+    # Jam cannot delete Mika's personal expense
+    jam_del_res = authenticated_client.delete(
+        f"/api/v1/expenses/{mika_pers_id}",
+        headers=user_jam["headers"],
+    )
+    assert jam_del_res.status_code == 404
+
+    # Owner can delete their own personal expense
+    jam_own_del = authenticated_client.delete(
+        f"/api/v1/expenses/{jam_pers_id}",
+        headers=user_jam["headers"],
+    )
+    assert jam_own_del.status_code == 204
+
+    # 9. Cannot log a personal expense on behalf of someone else
+    bad_log_res = authenticated_client.post(
+        f"/api/v1/hangouts/{hangout_id}/expenses",
+        json={
+            "description": "Fraudulent Personal Expense",
+            "total_amount": 50.0,
+            "split_type": "personal",
+            "paid_by": user_jam["id"],
+        },
+    )
+    assert bad_log_res.status_code == 400
+
+
 def test_delete_expense_permissions(
     authenticated_client: TestClient,
     create_test_user: Callable[..., Dict[str, Any]],

@@ -10,7 +10,7 @@ type AuthStep = 'welcome' | 'signup' | 'login' | 'verification-pending'
 
 export default function Onboarding() {
   const router = useRouter()
-  const { user, token, login, signup, resendConfirmation, loginDemoUser } = useAuth()
+  const { user, token, login, signup, resendConfirmation, signInWithGoogle } = useAuth()
   const [step, setStep] = useState<AuthStep>('welcome')
   const [error, setError] = useState<string | null>(null)
   const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null)
@@ -42,16 +42,14 @@ export default function Onboarding() {
     }
   }, [router.query])
 
-  const handleGoogleDemo = async () => {
+  const handleGoogleSignIn = async () => {
     setError(null)
     setConfirmationNotice(null)
     setSubmitting(true)
     try {
-      await loginDemoUser()
-      router.push(getRedirectUrl())
+      await signInWithGoogle(getRedirectUrl())
     } catch (err: any) {
-      setError(err?.message || 'Failed to authenticate demo user.')
-    } finally {
+      setError(err?.message || 'Failed to initiate Google sign in.')
       setSubmitting(false)
     }
   }
@@ -135,7 +133,7 @@ export default function Onboarding() {
 
         {step === 'welcome' && (
           <AuthWelcome
-            onGoogleDemo={handleGoogleDemo}
+            onGoogleSignIn={handleGoogleSignIn}
             onSignUp={() => changeStep('signup')}
             onLogIn={() => changeStep('login')}
             loading={submitting}
@@ -145,7 +143,7 @@ export default function Onboarding() {
         {step === 'signup' && (
           <SignupForm
             onSubmit={handleSignup}
-            onGoogleDemo={handleGoogleDemo}
+            onGoogleSignIn={handleGoogleSignIn}
             onSwitchToLogin={() => changeStep('login')}
             error={error}
             submitting={submitting}
@@ -161,7 +159,7 @@ export default function Onboarding() {
             )}
             <LoginForm
               onSubmit={handleLogin}
-              onGoogleDemo={handleGoogleDemo}
+              onGoogleSignIn={handleGoogleSignIn}
               onSwitchToSignup={() => changeStep('signup')}
               error={error}
               submitting={submitting}

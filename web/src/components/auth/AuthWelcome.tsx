@@ -4,14 +4,14 @@ import { Button } from '../ui'
 import { useTheme } from '../../context/ThemeContext'
 
 interface AuthWelcomeProps {
-  onGoogleDemo: () => void
+  onGoogleSignIn: () => void
   onSignUp: () => void
   onLogIn: () => void
   loading?: boolean
 }
 
 export const AuthWelcome: React.FC<AuthWelcomeProps> = ({
-  onGoogleDemo,
+  onGoogleSignIn,
   onSignUp,
   onLogIn,
   loading = false,
@@ -35,7 +35,7 @@ export const AuthWelcome: React.FC<AuthWelcomeProps> = ({
       </div>
 
       <div className="button-stack">
-        <Button onClick={onGoogleDemo} disabled={loading} fullWidth>
+        <Button onClick={onGoogleSignIn} disabled={loading} fullWidth>
           <Sparkles size={18} />
           Continue with Google
         </Button>

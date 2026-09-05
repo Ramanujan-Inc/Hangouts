@@ -28,42 +28,90 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
   onOpenAddExpense,
   onDeleteExpense,
 }) => {
-  const displayTotal = summary?.total_expenses ?? totalSpent
+  const sharedExpenses = expenses.filter((e) => e.split_type !== 'personal')
+  const myExpenses = expenses.filter((e) => String(e.paid_by) === String(currentUserId))
+  const myPersonalExpenses = myExpenses.filter((e) => e.split_type === 'personal')
+  const mySharedExpenses = myExpenses.filter((e) => e.split_type !== 'personal')
+
+  const myPersonalTotal = myPersonalExpenses.reduce((s, e) => s + e.total_amount, 0)
+  const mySharedPaid = mySharedExpenses.reduce((s, e) => s + e.total_amount, 0)
+  const myTotalSpent = myPersonalTotal + mySharedPaid
+
+  const sharedTotal = summary?.equal_split_total ?? sharedExpenses.reduce((s, e) => s + e.total_amount, 0)
+  const perPersonShare = summary?.per_person_share ?? 0
+  const participantCount = summary?.participant_count ?? 1
+
+  const memberBalances = summary?.member_balances || []
+  const currentUserBalance = memberBalances.find((mb) => String(mb.user_id) === String(currentUserId))
+  const myNetBalance = currentUserBalance?.net_balance ?? 0
+
   const displayDebts = summary?.simplified_debts && summary.simplified_debts.length > 0
     ? summary.simplified_debts
     : debtsList
-  const memberBalances = summary?.member_balances || []
+
+  let myBalanceBadge = null
+  if (currentUserBalance && (sharedTotal > 0 || myNetBalance !== 0)) {
+    if (myNetBalance > 0) {
+      myBalanceBadge = (
+        <Badge variant="surface" size="sm">
+          +₱{Math.round(myNetBalance).toLocaleString()} to collect
+        </Badge>
+      )
+    } else if (myNetBalance < 0) {
+      myBalanceBadge = (
+        <Badge variant="blush" size="sm">
+          -₱{Math.round(Math.abs(myNetBalance)).toLocaleString()} to pay
+        </Badge>
+      )
+    } else {
+      myBalanceBadge = (
+        <Badge variant="surface" size="sm">
+          Settled
+        </Badge>
+      )
+    }
+  }
 
   return (
     <div className="expenses-tab">
-      {/* Summary Card */}
-      <Card variant="default" padding="md" className="expense-summary-card">
-        <div className="summary-left">
-          <span className="summary-lbl">Total Spent</span>
-          <h3>₱{displayTotal.toLocaleString()}</h3>
-          <span className="summary-sub">
-            {summary?.per_person_share !== undefined && summary.per_person_share > 0 ? (
+      {/* Your Spending Header (Unboxed & Clean) */}
+      <div className="spending-header">
+        <div className="spending-info">
+          <div className="spending-top-row">
+            <span className="spending-lbl">Your Spending</span>
+            {myBalanceBadge}
+          </div>
+          <h2 className="spending-amount">₱{myTotalSpent.toLocaleString()}</h2>
+          <span className="spending-sub">
+            {myPersonalTotal > 0 && mySharedPaid > 0 ? (
               <>
-                ₱{summary.per_person_share.toLocaleString()} / person • across {expenses.length} payments
+                ₱{myPersonalTotal.toLocaleString()} personal • ₱{mySharedPaid.toLocaleString()} paid for group
               </>
+            ) : myPersonalTotal > 0 ? (
+              <>₱{myPersonalTotal.toLocaleString()} personal expenses</>
+            ) : mySharedPaid > 0 ? (
+              <>₱{mySharedPaid.toLocaleString()} paid for group</>
             ) : (
-              `across ${expenses.length} payment${expenses.length === 1 ? '' : 's'}`
+              `₱0 personal • ₱0 paid for group`
             )}
           </span>
         </div>
         <Button onClick={onOpenAddExpense}>
           <Plus size={18} /> Log Expense
         </Button>
-      </Card>
+      </div>
 
       {/* Spend Chart Breakdown */}
       {(memberBalances.length > 0 || Object.keys(balances).length > 0) && (
         <Card variant="default" padding="md" className="spend-chart-section">
-          <h4>Member Spending & Net Balances</h4>
+          <h4>Shared Member Spending & Net Balances</h4>
           <div className="chart-bars-list">
             {memberBalances.length > 0
               ? memberBalances.map((mb) => {
-                  const pct = displayTotal > 0 ? (mb.total_paid / displayTotal) * 100 : 0
+                  const sharedPaid = mb.total_paid_equal ?? sharedExpenses
+                    .filter((e) => String(e.paid_by) === String(mb.user_id))
+                    .reduce((s, e) => s + e.total_amount, 0)
+                  const pct = sharedTotal > 0 ? (sharedPaid / sharedTotal) * 100 : 0
                   const isPositive = mb.net_balance > 0
                   const isNegative = mb.net_balance < 0
                   const username = mb.profile?.username || mb.user_id
@@ -82,7 +130,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
                             backgroundColor: isPositive ? 'var(--color-sea)' : 'var(--color-blush)',
                           }}
                         />
-                        <span className="bar-val">₱{mb.total_paid.toLocaleString()}</span>
+                        <span className="bar-val">₱{sharedPaid.toLocaleString()}</span>
                       </div>
                       <div className="net-balance-tag">
                         {isPositive && (
@@ -105,10 +153,10 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
                   )
                 })
               : Object.entries(balances).map(([user, bal]) => {
-                  const totalPaid = expenses
+                  const totalPaid = sharedExpenses
                     .filter((e) => e.paid_by === user)
                     .reduce((s, e) => s + e.total_amount, 0)
-                  const pct = displayTotal > 0 ? (totalPaid / displayTotal) * 100 : 0
+                  const pct = sharedTotal > 0 ? (totalPaid / sharedTotal) * 100 : 0
 
                   return (
                     <div key={user} className="chart-row">
@@ -178,7 +226,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
               const payerName = exp.payer?.username || exp.paid_by || 'Member'
               const isPayerOrCreator =
                 String(exp.paid_by) === String(currentUserId) ||
-                String(creatorId) === String(currentUserId)
+                (exp.split_type !== 'personal' && String(creatorId) === String(currentUserId))
               const dateLabel = exp.created_at ? formatDate(exp.created_at, 'short') : ''
 
               return (
@@ -222,20 +270,34 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
           gap: 20px;
         }
 
-        :global(.expense-summary-card) {
+        .spending-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          background: linear-gradient(135deg, var(--tint-blush), var(--tint-butter)) !important;
-          border: 1px solid rgba(227, 104, 136, 0.2) !important;
+          padding: 4px 2px 2px 2px;
+          gap: 16px;
         }
 
-        .summary-left {
+        @media (max-width: 540px) {
+          .spending-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+          }
+        }
+
+        .spending-info {
           display: flex;
           flex-direction: column;
         }
 
-        .summary-lbl {
+        .spending-top-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .spending-lbl {
           font-size: 13px;
           font-weight: 700;
           color: var(--color-text-muted);
@@ -243,13 +305,15 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
           letter-spacing: 0.5px;
         }
 
-        .summary-left h3 {
-          font-size: 32px;
+        .spending-amount {
+          font-size: 34px;
+          font-weight: 800;
           color: var(--color-text);
-          margin: 2px 0;
+          margin: 4px 0 4px 0;
+          line-height: 1.1;
         }
 
-        .summary-sub {
+        .spending-sub {
           font-size: 13px;
           color: var(--color-text-muted);
         }

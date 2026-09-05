@@ -39,10 +39,11 @@ def list_hangout_expenses(
     current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
 ):
-    """Retrieve all logged expenses for a hangout in chronological order."""
+    """Retrieve logged expenses for a hangout in chronological order. Personal expenses visible only to owner."""
     return expense_service.get_hangout_expenses(
         db=db,
         hangout_id=id,
+        user_id=current_user["id"],
     )
 
 
@@ -60,6 +61,7 @@ def get_expense_summary(
     return expense_service.get_expense_summary(
         db=db,
         hangout_id=id,
+        user_id=current_user["id"],
     )
 
 
