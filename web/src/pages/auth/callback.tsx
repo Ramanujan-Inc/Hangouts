@@ -19,39 +19,38 @@ export default function AuthCallback() {
     const nextParam = query.next || query.redirect
     const nextPath = typeof nextParam === 'string' && nextParam.startsWith('/') ? nextParam : '/timeline'
 
-    // 1. Check for error description in hash (#error=...&error_description=...)
-    if (hash && hash.includes('error_description=')) {
-      const params = new URLSearchParams(hash.replace(/^#/, ''))
-      const errorDesc = params.get('error_description')
-      const message = errorDesc
-        ? decodeURIComponent(errorDesc.replace(/\+/g, ' '))
-        : 'Authentication failed. Please try again.'
+    // Extract params from hash or search query
+    const hashContent = hash.replace(/^#/, '')
+    const searchContent = window.location.search.replace(/^\?/, '')
+    const hashParams = new URLSearchParams(hashContent)
+    const searchParams = new URLSearchParams(searchContent)
+
+    // 1. Check for error description in hash or query
+    const errorDesc = hashParams.get('error_description') || searchParams.get('error_description')
+    if (errorDesc) {
+      const message = decodeURIComponent(errorDesc.replace(/\+/g, ' '))
       setErrorMessage(message)
       router.replace(`/?error=${encodeURIComponent(message)}`)
       return
     }
 
-    // 2. Check for access_token in hash (#access_token=...)
-    if (hash && hash.includes('access_token=')) {
-      const params = new URLSearchParams(hash.replace(/^#/, ''))
-      const accessToken = params.get('access_token')
-
-      if (accessToken) {
-        setAuthToken(accessToken)
-          .then(() => {
-            router.replace(nextPath)
-          })
-          .catch((err) => {
-            console.error('Failed to establish session in callback:', err)
-            const msg = 'Verification succeeded, but could not load profile. Please log in.'
-            router.replace(`/?error=${encodeURIComponent(msg)}`)
-          })
-        return
-      }
+    // 2. Check for access_token in hash or query
+    const accessToken = hashParams.get('access_token') || searchParams.get('access_token')
+    if (accessToken) {
+      setAuthToken(accessToken)
+        .then(() => {
+          router.replace(nextPath)
+        })
+        .catch((err) => {
+          console.error('Failed to establish session in callback:', err)
+          const msg = 'Verification succeeded, but could not load profile. Please log in.'
+          router.replace(`/?error=${encodeURIComponent(msg)}`)
+        })
+      return
     }
 
-    // 3. Fallback if no hash found and router is ready
-    if (router.isReady && !hash) {
+    // 3. Fallback if no token found and router is ready
+    if (router.isReady && !hash && !searchParams.get('code')) {
       router.replace('/')
     }
   }, [router.isReady, router.query, setAuthToken, router])

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { Sparkles, Lock, User as UserIcon } from 'lucide-react'
+import { Lock, Sparkles, User as UserIcon } from 'lucide-react'
 import { Button, InlineAlert, PasswordInput, TextField } from '../ui'
 
 interface LoginFormProps {
   onSubmit: (email: string, password: string) => Promise<void>
-  onGoogleDemo: () => void
+  onGoogleSignIn: () => void
   onSwitchToSignup: () => void
   error: string | null
   submitting?: boolean
@@ -14,7 +14,7 @@ interface LoginFormProps {
 
 export const LoginForm: React.FC<LoginFormProps> = ({
   onSubmit,
-  onGoogleDemo,
+  onGoogleSignIn,
   onSwitchToSignup,
   error,
   submitting = false,
@@ -110,7 +110,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         <span>or</span>
       </div>
 
-      <Button variant="outline" fullWidth onClick={onGoogleDemo} type="button">
+      <Button variant="outline" fullWidth onClick={onGoogleSignIn} type="button">
         <Sparkles size={18} />
         Continue with Google
       </Button>

@@ -28,7 +28,7 @@ interface AuthContextType {
   signup: (username: string, email: string, password: string) => Promise<TokenResponse>;
   resendConfirmation: (email: string) => Promise<void>;
   setAuthToken: (token: string) => Promise<void>;
-  loginDemoUser: () => Promise<void>;
+  signInWithGoogle: (redirectPath?: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -142,13 +142,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await api.post('/auth/resend-confirmation', { email, redirect_url: redirectUrl });
   }, []);
 
-  const loginDemoUser = useCallback(async () => {
-    try {
-      await login('mika@example.com', 'demo123456');
-    } catch {
-      await signup('Mika', 'mika@example.com', 'demo123456');
+  const signInWithGoogle = useCallback(async (redirectPath?: string) => {
+    if (typeof window === 'undefined') return;
+    const callbackUrl = `${window.location.origin}/auth/callback${redirectPath ? `?next=${encodeURIComponent(redirectPath)}` : ''}`;
+    const res = await api.get<{ url: string; provider: string }>(
+      `/auth/google/url?redirect_to=${encodeURIComponent(callbackUrl)}`
+    );
+    if (res?.url) {
+      window.location.href = res.url;
     }
-  }, [login, signup]);
+  }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem('hangout_token');
@@ -164,7 +167,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [fetchProfile]);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, signup, resendConfirmation, setAuthToken, loginDemoUser, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, signup, resendConfirmation, setAuthToken, signInWithGoogle, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

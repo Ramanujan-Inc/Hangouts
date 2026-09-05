@@ -161,5 +161,27 @@ def test_resend_confirmation_route(client: TestClient):
     assert response.status_code in [200, 400, 429]
 
 
+def test_get_google_auth_url(client: TestClient):
+    """Test GET /api/v1/auth/google/url returns valid Supabase OAuth authorize URL."""
+    response = client.get("/api/v1/auth/google/url")
+    assert response.status_code == 200
+    data = response.json()
+    assert "url" in data
+    assert data["provider"] == "google"
+    assert "/auth/v1/authorize" in data["url"]
+    assert "provider=google" in data["url"]
+    assert "redirect_to=" in data["url"]
+
+
+def test_get_google_auth_url_with_custom_redirect(client: TestClient):
+    """Test GET /api/v1/auth/google/url preserves custom redirect_to parameter."""
+    custom_target = "http://localhost:3000/auth/callback?next=/groups"
+    response = client.get("/api/v1/auth/google/url", params={"redirect_to": custom_target})
+    assert response.status_code == 200
+    data = response.json()
+    assert custom_target in data["url"]
+
+
+
 
 

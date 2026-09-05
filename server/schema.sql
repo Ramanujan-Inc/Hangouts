@@ -124,15 +124,46 @@ CREATE TABLE IF NOT EXISTS expenses (
 -- 10. Auth User Trigger Function & Trigger
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
+DECLARE
+  base_username text;
+  candidate_username text;
+  username_exists boolean;
+  avatar text;
 BEGIN
+  avatar := COALESCE(
+    NULLIF(TRIM(new.raw_user_meta_data->>'avatar_url'), ''),
+    NULLIF(TRIM(new.raw_user_meta_data->>'picture'), ''),
+    '/avatars/mika.svg'
+  );
+
+  base_username := COALESCE(
+    NULLIF(TRIM(new.raw_user_meta_data->>'username'), ''),
+    NULLIF(TRIM(new.raw_user_meta_data->>'preferred_username'), ''),
+    NULLIF(TRIM(REGEXP_REPLACE(new.raw_user_meta_data->>'full_name', '[^a-zA-Z0-9._-]', '', 'g')), ''),
+    NULLIF(TRIM(REGEXP_REPLACE(new.raw_user_meta_data->>'name', '[^a-zA-Z0-9._-]', '', 'g')), ''),
+    NULLIF(TRIM(REGEXP_REPLACE(split_part(new.email, '@', 1), '[^a-zA-Z0-9._-]', '', 'g')), ''),
+    'user'
+  );
+
+  candidate_username := base_username;
+
+  SELECT EXISTS(
+    SELECT 1 FROM public.profiles WHERE LOWER(username) = LOWER(candidate_username)
+  ) INTO username_exists;
+
+  IF username_exists THEN
+    candidate_username := base_username || '_' || substr(md5(random()::text || clock_timestamp()::text), 1, 4);
+  END IF;
+
   INSERT INTO public.profiles (id, email, username, avatar_url)
   VALUES (
     new.id,
     new.email,
-    COALESCE(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
-    COALESCE(new.raw_user_meta_data->>'avatar_url', '/avatars/mika.svg')
+    candidate_username,
+    avatar
   )
   ON CONFLICT (id) DO NOTHING;
+
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

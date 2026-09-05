@@ -1,7 +1,8 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, status
 from supabase import Client
 from app.api.deps import get_db
-from app.schemas.auth import UserSignUp, UserLogin, TokenResponse, ResendConfirmationRequest
+from app.schemas.auth import UserSignUp, UserLogin, TokenResponse, ResendConfirmationRequest, OAuthUrlResponse
 from app.services import auth as auth_service
 
 router = APIRouter()
@@ -32,3 +33,10 @@ def resend_confirmation(
 ):
     """Resend verification email for signup confirmation."""
     return auth_service.resend_confirmation_email(db=db, email=body.email, redirect_url=body.redirect_url)
+
+
+@router.get("/google/url", response_model=OAuthUrlResponse)
+def get_google_auth_url(redirect_to: Optional[str] = None):
+    """Retrieve the Supabase Google OAuth authorization URL."""
+    return auth_service.get_oauth_authorization_url(provider="google", redirect_to=redirect_to)
+

@@ -5,7 +5,7 @@ import { PasswordStrengthMeter } from './PasswordStrengthMeter'
 
 interface SignupFormProps {
   onSubmit: (name: string, email: string, password: string) => Promise<void>
-  onGoogleDemo: () => void
+  onGoogleSignIn: () => void
   onSwitchToLogin: () => void
   error: string | null
   submitting?: boolean
@@ -13,7 +13,7 @@ interface SignupFormProps {
 
 export const SignupForm: React.FC<SignupFormProps> = ({
   onSubmit,
-  onGoogleDemo,
+  onGoogleSignIn,
   onSwitchToLogin,
   error,
   submitting = false,
@@ -77,7 +77,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({
         <span>or</span>
       </div>
 
-      <Button variant="outline" fullWidth onClick={onGoogleDemo} type="button">
+      <Button variant="outline" fullWidth onClick={onGoogleSignIn} type="button">
         <Sparkles size={18} />
         Continue with Google
       </Button>
