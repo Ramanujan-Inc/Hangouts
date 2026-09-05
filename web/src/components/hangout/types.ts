@@ -84,6 +84,7 @@ export interface MemberBalance {
   user_id: string
   profile?: UserProfile | null
   total_paid: number
+  total_paid_equal?: number
   net_balance: number
   owes: number
   is_owed: number

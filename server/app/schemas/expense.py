@@ -29,6 +29,7 @@ class MemberBalanceResponse(BaseModel):
     user_id: UUID
     profile: Optional[ProfileResponse] = None
     total_paid: float
+    total_paid_equal: float = 0.0
     net_balance: float
     owes: float
     is_owed: float
