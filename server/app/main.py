@@ -26,7 +26,7 @@ async def value_error_handler(request: Request, exc: ValueError):
         content={"detail": str(exc)},
     )
 
-# Set up CORS middleware with configurable origins from .env
+# Set up CORS middleware with configurable origins from settings / .env
 if settings.CORS_ORIGINS:
     app.add_middleware(
         CORSMiddleware,

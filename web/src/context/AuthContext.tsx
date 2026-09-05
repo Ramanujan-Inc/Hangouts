@@ -12,10 +12,12 @@ export interface UserProfile {
 }
 
 export interface TokenResponse {
-  access_token: string;
+  access_token?: string | null;
   token_type: string;
   user_id: string;
   email: string;
+  email_confirmed?: boolean;
+  message?: string | null;
 }
 
 interface AuthContextType {
@@ -23,7 +25,9 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (usernameOrEmail: string, password: string) => Promise<void>;
-  signup: (username: string, email: string, password: string) => Promise<void>;
+  signup: (username: string, email: string, password: string) => Promise<TokenResponse>;
+  resendConfirmation: (email: string) => Promise<void>;
+  setAuthToken: (token: string) => Promise<void>;
   loginDemoUser: () => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -50,13 +54,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('hangout_token');
-    if (savedToken) {
-      setToken(savedToken);
+    let initialToken: string | null = null;
+    if (typeof window !== 'undefined') {
+      initialToken = localStorage.getItem('hangout_token');
+
+      // Check if user arrived via email confirmation or OAuth link (#access_token=...)
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token=')) {
+        const params = new URLSearchParams(hash.replace(/^#/, ''));
+        const hashToken = params.get('access_token');
+        if (hashToken) {
+          initialToken = hashToken;
+          localStorage.setItem('hangout_token', hashToken);
+          // Strip token from browser URL bar cleanly
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+      }
+    }
+
+    if (initialToken) {
+      setToken(initialToken);
       fetchProfile().finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
+  }, [fetchProfile]);
+
+  // Synchronize authentication state across multiple browser tabs
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'hangout_token') {
+        if (e.newValue) {
+          // Another tab confirmed email or logged in
+          setToken(e.newValue);
+          fetchProfile();
+        } else {
+          // Another tab logged out
+          setToken(null);
+          setUser(null);
+          mutate(() => true, undefined, { revalidate: false });
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [fetchProfile]);
+
+  const setAuthToken = useCallback(async (newToken: string) => {
+    localStorage.setItem('hangout_token', newToken);
+    setToken(newToken);
+    await fetchProfile();
   }, [fetchProfile]);
 
   const login = useCallback(async (usernameOrEmail: string, password: string) => {
@@ -64,21 +114,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       username_or_email: usernameOrEmail,
       password,
     });
-    localStorage.setItem('hangout_token', res.access_token);
-    setToken(res.access_token);
-    await fetchProfile();
+    if (res.access_token) {
+      localStorage.setItem('hangout_token', res.access_token);
+      setToken(res.access_token);
+      await fetchProfile();
+    }
   }, [fetchProfile]);
 
-  const signup = useCallback(async (username: string, email: string, password: string) => {
+  const signup = useCallback(async (username: string, email: string, password: string): Promise<TokenResponse> => {
+    const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
     const res = await api.post<TokenResponse>('/auth/signup', {
       username,
       email,
       password,
+      redirect_url: redirectUrl,
     });
-    localStorage.setItem('hangout_token', res.access_token);
-    setToken(res.access_token);
-    await fetchProfile();
+    if (res.access_token) {
+      localStorage.setItem('hangout_token', res.access_token);
+      setToken(res.access_token);
+      await fetchProfile();
+    }
+    return res;
   }, [fetchProfile]);
+
+  const resendConfirmation = useCallback(async (email: string) => {
+    const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
+    await api.post('/auth/resend-confirmation', { email, redirect_url: redirectUrl });
+  }, []);
 
   const loginDemoUser = useCallback(async () => {
     try {
@@ -102,7 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [fetchProfile]);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, signup, loginDemoUser, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, signup, resendConfirmation, setAuthToken, loginDemoUser, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

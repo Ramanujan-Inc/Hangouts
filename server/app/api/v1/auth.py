@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from supabase import Client
 from app.api.deps import get_db
-from app.schemas.auth import UserSignUp, UserLogin, TokenResponse
+from app.schemas.auth import UserSignUp, UserLogin, TokenResponse, ResendConfirmationRequest
 from app.services import auth as auth_service
 
 router = APIRouter()
@@ -23,3 +23,12 @@ def login(
 ):
     """Authenticate user with email/password and return Bearer token."""
     return auth_service.login_user(db=db, user_in=user_in)
+
+
+@router.post("/resend-confirmation")
+def resend_confirmation(
+    body: ResendConfirmationRequest,
+    db: Client = Depends(get_db),
+):
+    """Resend verification email for signup confirmation."""
+    return auth_service.resend_confirmation_email(db=db, email=body.email, redirect_url=body.redirect_url)

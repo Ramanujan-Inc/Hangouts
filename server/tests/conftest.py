@@ -37,29 +37,28 @@ def create_test_user(db: Client) -> Generator[Callable[..., Dict[str, Any]], Non
 
         user_name = username or f"user_{uuid.uuid4().hex[:8]}"
 
-        auth_res = db.auth.sign_up({
+        admin_client = get_supabase_client()
+        user_res = admin_client.auth.admin.create_user({
             "email": email,
             "password": password,
-            "options": {
-                "data": {
-                    "username": user_name,
-                }
+            "email_confirm": True,
+            "user_metadata": {
+                "username": user_name,
             },
         })
 
-        if not auth_res.user:
+        if not user_res.user:
             raise RuntimeError("Failed to create test user in Supabase Auth")
 
-        user_id = str(auth_res.user.id)
+        user_id = str(user_res.user.id)
         created_users.append(user_id)
 
-        access_token = auth_res.session.access_token if auth_res.session else ""
-        if not access_token:
-            session_res = db.auth.sign_in_with_password({
-                "email": email,
-                "password": password,
-            })
-            access_token = session_res.session.access_token
+        auth_client = get_supabase_client()
+        session_res = auth_client.auth.sign_in_with_password({
+            "email": email,
+            "password": password,
+        })
+        access_token = session_res.session.access_token
 
         return {
             "id": user_id,

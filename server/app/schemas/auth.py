@@ -8,6 +8,7 @@ class UserSignUp(BaseModel):
     password: str = Field(..., min_length=8, description="Password must be at least 8 characters long")
     username: Optional[str] = None
     avatar_url: Optional[str] = None
+    redirect_url: Optional[str] = None
 
 
 
@@ -18,7 +19,14 @@ class UserLogin(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    access_token: str
+    access_token: Optional[str] = None
     token_type: str = "bearer"
     user_id: UUID
     email: str
+    email_confirmed: bool = True
+    message: Optional[str] = None
+
+
+class ResendConfirmationRequest(BaseModel):
+    email: EmailStr
+    redirect_url: Optional[str] = None

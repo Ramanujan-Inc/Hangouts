@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     ]
 
     ENVIRONMENT: str = "development"
+    FRONTEND_URL: str = "http://localhost:3000"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
