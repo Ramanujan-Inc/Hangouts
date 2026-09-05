@@ -51,8 +51,8 @@ export const HangoutCard: React.FC<HangoutCardProps> = ({ hangout, index }) => {
 
           <div className="card-footer">
             <div className="card-location">
-              <MapPin size={14} />
-              <span>{hangout.location_name || 'Somewhere fun'}</span>
+              <MapPin size={14} className="location-pin-icon" />
+              <span className="location-name">{hangout.location_name || 'Somewhere fun'}</span>
             </div>
             {avatarStackItems.length > 0 && (
               <AvatarStack size={28} overlap={8} avatars={avatarStackItems} />
@@ -108,6 +108,7 @@ export const HangoutCard: React.FC<HangoutCardProps> = ({ hangout, index }) => {
           justify-content: space-between;
           align-items: center;
           margin-top: 6px;
+          gap: 10px;
         }
 
         .card-location {
@@ -117,10 +118,18 @@ export const HangoutCard: React.FC<HangoutCardProps> = ({ hangout, index }) => {
           font-size: 13px;
           color: var(--color-text-muted);
           font-weight: 600;
+          min-width: 0;
+          flex: 1;
+        }
+
+        :global(.location-pin-icon) {
+          flex-shrink: 0;
+        }
+
+        .location-name {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          flex: 1;
         }
       `}</style>
     </Link>
