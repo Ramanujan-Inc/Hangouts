@@ -140,8 +140,9 @@ BEGIN
   base_username := COALESCE(
     NULLIF(TRIM(new.raw_user_meta_data->>'username'), ''),
     NULLIF(TRIM(new.raw_user_meta_data->>'preferred_username'), ''),
-    NULLIF(TRIM(REGEXP_REPLACE(new.raw_user_meta_data->>'full_name', '[^a-zA-Z0-9._-]', '', 'g')), ''),
-    NULLIF(TRIM(REGEXP_REPLACE(new.raw_user_meta_data->>'name', '[^a-zA-Z0-9._-]', '', 'g')), ''),
+    NULLIF(TRIM(REGEXP_REPLACE(new.raw_user_meta_data->>'given_name', '[^a-zA-Z0-9._-]', '', 'g')), ''),
+    NULLIF(TRIM(REGEXP_REPLACE(split_part(TRIM(new.raw_user_meta_data->>'full_name'), ' ', 1), '[^a-zA-Z0-9._-]', '', 'g')), ''),
+    NULLIF(TRIM(REGEXP_REPLACE(split_part(TRIM(new.raw_user_meta_data->>'name'), ' ', 1), '[^a-zA-Z0-9._-]', '', 'g')), ''),
     NULLIF(TRIM(REGEXP_REPLACE(split_part(new.email, '@', 1), '[^a-zA-Z0-9._-]', '', 'g')), ''),
     'user'
   );
