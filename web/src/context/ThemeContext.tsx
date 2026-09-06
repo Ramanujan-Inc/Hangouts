@@ -20,7 +20,7 @@ function getSystemTheme(): ResolvedTheme {
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>('light')
+  const [theme, setThemeState] = useState<Theme>('system')
   const [systemTheme, setSystemTheme] = useState<ResolvedTheme>('light')
   const [mounted, setMounted] = useState(false)
 
@@ -30,6 +30,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null
     if (stored && (stored === 'light' || stored === 'dark' || stored === 'system')) {
       setThemeState(stored)
+    } else {
+      setThemeState('system')
     }
 
     const currentSysTheme = getSystemTheme()

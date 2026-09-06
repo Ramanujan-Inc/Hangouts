@@ -15,7 +15,9 @@ export default function Document() {
                   var theme = 'light';
                   if (stored === 'dark') {
                     theme = 'dark';
-                  } else if (stored === 'system') {
+                  } else if (stored === 'light') {
+                    theme = 'light';
+                  } else {
                     theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
                   }
                   document.documentElement.setAttribute('data-theme', theme);
