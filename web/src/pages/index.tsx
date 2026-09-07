@@ -24,7 +24,7 @@ export default function Onboarding() {
 
   const getRedirectUrl = () => {
     const redirect = router.query.redirect
-    return (typeof redirect === 'string' && redirect.startsWith('/')) ? redirect : '/timeline'
+    return (typeof redirect === 'string' && redirect.startsWith('/') && redirect !== '/') ? redirect : '/timeline'
   }
 
   // Check if server is reachable on website load; if sleeping on Render, freeze screen with modal

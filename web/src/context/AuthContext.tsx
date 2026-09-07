@@ -66,8 +66,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (hashToken) {
           initialToken = hashToken;
           localStorage.setItem('hangout_token', hashToken);
-          // Strip token from browser URL bar cleanly
-          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          // Strip token from browser URL bar cleanly (unless on /auth/callback so the callback page can process it)
+          if (!window.location.pathname.startsWith('/auth/callback')) {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
         }
       }
     }

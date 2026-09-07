@@ -17,7 +17,7 @@ export default function AuthCallback() {
 
     // Target redirect destination (defaults to /timeline)
     const nextParam = query.next || query.redirect
-    const nextPath = typeof nextParam === 'string' && nextParam.startsWith('/') ? nextParam : '/timeline'
+    const nextPath = typeof nextParam === 'string' && nextParam.startsWith('/') && nextParam !== '/' ? nextParam : '/timeline'
 
     // Extract params from hash or search query
     const hashContent = hash.replace(/^#/, '')
@@ -34,8 +34,9 @@ export default function AuthCallback() {
       return
     }
 
-    // 2. Check for access_token in hash or query
-    const accessToken = hashParams.get('access_token') || searchParams.get('access_token')
+    // 2. Check for access_token in hash, search params, or localStorage (if AuthProvider already captured it)
+    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('hangout_token') : null
+    const accessToken = hashParams.get('access_token') || searchParams.get('access_token') || storedToken
     if (accessToken) {
       setAuthToken(accessToken)
         .then(() => {
@@ -50,7 +51,7 @@ export default function AuthCallback() {
     }
 
     // 3. Fallback if no token found and router is ready
-    if (router.isReady && !hash && !searchParams.get('code')) {
+    if (router.isReady && !hash && !searchParams.get('code') && !storedToken) {
       router.replace('/')
     }
   }, [router.isReady, router.query, setAuthToken, router])
