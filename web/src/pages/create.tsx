@@ -329,6 +329,25 @@ export default function CreateHangout() {
         coverPhotoUrl = coverRes.url
       }
 
+      // 1b. Check storage quota upfront if photos/videos are attached
+      if (uploadedPhotos.length > 0) {
+        const totalPhotoBytes = uploadedPhotos.reduce((sum, p) => sum + p.file.size, 0)
+        try {
+          const usage = await api.get<{ used_bytes: number; max_bytes: number }>('/storage/usage')
+          if (usage && usage.used_bytes + totalPhotoBytes > usage.max_bytes) {
+            const availableMb = Math.max(0, (usage.max_bytes - usage.used_bytes) / (1024 * 1024)).toFixed(1)
+            const requiredMb = (totalPhotoBytes / (1024 * 1024)).toFixed(1)
+            setErrorMessage(
+              `Storage quota exceeded: Selected media requires ${requiredMb} MB, but you have ${availableMb} MB available. Please remove some photos or videos before creating.`
+            )
+            setSubmitting(false)
+            return
+          }
+        } catch {
+          // If storage check network call fails, proceed and let server-side check handle it
+        }
+      }
+
       // 2. Create the Hangout record
       const hangoutPayload = {
         title: title.trim(),
