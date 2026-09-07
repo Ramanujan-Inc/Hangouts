@@ -49,6 +49,7 @@ def root():
 
 
 @app.get("/health", tags=["Health"])
+@app.get(f"{settings.API_V1_STR}/health", tags=["Health"])
 def health_check():
     """Health check endpoint to verify server is operational."""
     return {

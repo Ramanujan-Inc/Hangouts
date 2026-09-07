@@ -1,6 +1,6 @@
 import React from 'react'
 import { Sparkles } from 'lucide-react'
-import { Button } from '../ui'
+import { Button, InlineAlert } from '../ui'
 import { useTheme } from '../../context/ThemeContext'
 
 interface AuthWelcomeProps {
@@ -8,6 +8,7 @@ interface AuthWelcomeProps {
   onSignUp: () => void
   onLogIn: () => void
   loading?: boolean
+  error?: string | null
 }
 
 export const AuthWelcome: React.FC<AuthWelcomeProps> = ({
@@ -15,6 +16,7 @@ export const AuthWelcome: React.FC<AuthWelcomeProps> = ({
   onSignUp,
   onLogIn,
   loading = false,
+  error = null,
 }) => {
   const { resolvedTheme } = useTheme()
   const heroImageSrc = resolvedTheme === 'dark' ? '/images/auth-hero-night.svg' : '/images/auth-hero-day.svg'
@@ -34,10 +36,16 @@ export const AuthWelcome: React.FC<AuthWelcomeProps> = ({
         <p className="tagline">Your group's shared memory, together.</p>
       </div>
 
+      {error && (
+        <div style={{ width: '100%', marginBottom: '16px' }}>
+          <InlineAlert>{error}</InlineAlert>
+        </div>
+      )}
+
       <div className="button-stack">
         <Button onClick={onGoogleSignIn} disabled={loading} fullWidth>
           <Sparkles size={18} />
-          Continue with Google
+          {loading ? 'Connecting...' : 'Continue with Google'}
         </Button>
 
         <Button variant="outline" onClick={onSignUp} disabled={loading} fullWidth>

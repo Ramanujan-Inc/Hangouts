@@ -9,6 +9,7 @@ interface SignupFormProps {
   onSwitchToLogin: () => void
   error: string | null
   submitting?: boolean
+  googleSubmitting?: boolean
 }
 
 export const SignupForm: React.FC<SignupFormProps> = ({
@@ -17,6 +18,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({
   onSwitchToLogin,
   error,
   submitting = false,
+  googleSubmitting = false,
 }) => {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -69,7 +71,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({
         <PasswordStrengthMeter password={password} />
       </PasswordInput>
 
-      <Button type="submit" disabled={submitting} fullWidth>
+      <Button type="submit" disabled={submitting || googleSubmitting} fullWidth>
         {submitting ? 'Creating Account...' : 'Create Account'}
       </Button>
 
@@ -77,9 +79,15 @@ export const SignupForm: React.FC<SignupFormProps> = ({
         <span>or</span>
       </div>
 
-      <Button variant="outline" fullWidth onClick={onGoogleSignIn} type="button">
+      <Button
+        variant="outline"
+        fullWidth
+        onClick={onGoogleSignIn}
+        disabled={submitting || googleSubmitting}
+        type="button"
+      >
         <Sparkles size={18} />
-        Continue with Google
+        {googleSubmitting ? 'Connecting...' : 'Continue with Google'}
       </Button>
 
       <div className="footer-link">
