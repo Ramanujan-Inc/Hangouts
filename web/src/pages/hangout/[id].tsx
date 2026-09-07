@@ -327,6 +327,7 @@ function HangoutDetailContent() {
           placeId={hangout.place_id || undefined}
           participants={participantsList}
           inviteCode={hangout.invite_code}
+          externalAlbumUrl={hangout.external_album_url}
           onBack={() => router.push('/timeline')}
         />
 

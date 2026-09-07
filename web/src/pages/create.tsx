@@ -5,8 +5,8 @@ import Layout from '../components/Layout'
 import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
-import { Sparkles, Loader2, Users } from 'lucide-react'
-import { Button, InlineAlert, Select } from '../components/ui'
+import { Sparkles, Loader2, Users, FolderSymlink } from 'lucide-react'
+import { Button, InlineAlert, Select, ActionButton } from '../components/ui'
 import {
   GroupMemberProfile,
   Group,
@@ -38,6 +38,8 @@ export default function CreateHangout() {
   const [placeId, setPlaceId] = useState('')
   const [latitude, setLatitude] = useState<number | null>(null)
   const [longitude, setLongitude] = useState<number | null>(null)
+  const [externalAlbumUrl, setExternalAlbumUrl] = useState('')
+  const [showAlbumInput, setShowAlbumInput] = useState(false)
 
   // Group & Participant Management
   const [groups, setGroups] = useState<Group[]>([])
@@ -296,6 +298,19 @@ export default function CreateHangout() {
       return
     }
 
+    if (externalAlbumUrl.trim()) {
+      try {
+        const parsed = new URL(externalAlbumUrl.trim())
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          setErrorMessage('External album URL must start with http:// or https://')
+          return
+        }
+      } catch {
+        setErrorMessage('Please enter a valid external album URL (e.g. https://drive.google.com/...)')
+        return
+      }
+    }
+
     try {
       setSubmitting(true)
 
@@ -325,6 +340,7 @@ export default function CreateHangout() {
         latitude: latitude !== null ? latitude : undefined,
         longitude: longitude !== null ? longitude : undefined,
         cover_photo_url: coverPhotoUrl,
+        external_album_url: externalAlbumUrl.trim() || undefined,
         group_id: selectedGroupId || undefined,
       }
 
@@ -455,6 +471,47 @@ export default function CreateHangout() {
                 placeId={placeId}
                 onLocationChange={handleLocationChange}
               />
+
+              {/* Collapsible Shared Album Link - right above CTA */}
+              <div className="album-toggle-wrapper">
+                {!showAlbumInput && !externalAlbumUrl ? (
+                  <div className="album-action-row">
+                    <ActionButton
+                      icon={<FolderSymlink size={13} />}
+                      onClick={() => setShowAlbumInput(true)}
+                    >
+                      + Add shared album link
+                    </ActionButton>
+                  </div>
+                ) : (
+                  <div className="album-link-container">
+                    <div className="label-row-with-action">
+                      <label className="field-label">
+                        <FolderSymlink size={14} /> Shared Album / Drive Link
+                      </label>
+                      <ActionButton
+                        onClick={() => {
+                          setShowAlbumInput(false)
+                          setExternalAlbumUrl('')
+                        }}
+                      >
+                        Remove album link
+                      </ActionButton>
+                    </div>
+                    <input
+                      type="url"
+                      className="pill-input"
+                      placeholder="https://drive.google.com/... or https://photos.app.goo.gl/..."
+                      value={externalAlbumUrl}
+                      onChange={(e) => setExternalAlbumUrl(e.target.value)}
+                      autoFocus
+                    />
+                    <span className="field-hint">
+                      Link an external Google Drive, Google Photos, or Dropbox folder for large media collections.
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Submit Action CTA */}
@@ -510,6 +567,58 @@ export default function CreateHangout() {
             display: flex;
             flex-direction: column;
             gap: 20px;
+          }
+
+          .album-toggle-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 4px;
+          }
+
+          .album-action-row {
+            display: flex;
+            align-items: center;
+          }
+
+          .album-link-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            animation: fadeIn 0.2s ease;
+          }
+
+          .label-row-with-action {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+
+          .field-label {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--color-text);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          }
+
+          .field-hint {
+            font-size: 12px;
+            color: var(--color-text-muted);
+            padding-left: 2px;
+          }
+
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+              transform: translateY(-4px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
           }
 
           .sticky-cta-footer {

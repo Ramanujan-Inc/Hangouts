@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ArrowLeft, Share2, Calendar, MapPin } from 'lucide-react'
+import { ArrowLeft, Share2, Calendar, MapPin, FolderSymlink } from 'lucide-react'
 import { AvatarStack, Badge, ShareLinkModal } from '../ui'
 import { formatDate } from '../../lib/format'
 import { members } from '../../data/mock'
@@ -16,6 +16,7 @@ interface HangoutHeroHeaderProps {
   placeId?: string
   participants: (string | { id?: string; user_id?: string; profile?: { username?: string; avatar_url?: string | null } | null })[]
   inviteCode?: string | null
+  externalAlbumUrl?: string | null
   onBack: () => void
 }
 
@@ -30,6 +31,7 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
   placeId,
   participants,
   inviteCode,
+  externalAlbumUrl,
   onBack,
 }) => {
   const [showShareModal, setShowShareModal] = useState(false)
@@ -113,6 +115,19 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
               <span className="loc-full-address">{formattedAddress}</span>
             )}
           </div>
+          {externalAlbumUrl && (
+            <div className="meta-item">
+              <a
+                href={externalAlbumUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="album-link"
+              >
+                <FolderSymlink size={16} />
+                <span>Shared Album ↗</span>
+              </a>
+            </div>
+          )}
         </div>
 
         <div className="participants-row">
@@ -247,6 +262,21 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
         }
 
         .maps-ext-link:hover {
+          opacity: 0.8;
+          text-decoration: underline;
+        }
+
+        .album-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          color: var(--color-sea);
+          font-weight: 700;
+          text-decoration: none;
+          transition: opacity 0.15s;
+        }
+
+        .album-link:hover {
           opacity: 0.8;
           text-decoration: underline;
         }

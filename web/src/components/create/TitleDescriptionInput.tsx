@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { AlignLeft } from 'lucide-react'
-import { TextArea } from '../ui'
+import { TextArea, ActionButton } from '../ui'
 
 interface TitleDescriptionInputProps {
   title: string
@@ -23,26 +23,21 @@ export const TitleDescriptionInput: React.FC<TitleDescriptionInputProps> = ({
         <div className="label-row-with-action">
           <label className="field-label">Hangout Title</label>
           {!showDescription && !description ? (
-            <span
-              className="action-text add-desc-action"
+            <ActionButton
+              icon={<AlignLeft size={13} />}
               onClick={() => setShowDescription(true)}
-              role="button"
-              tabIndex={0}
             >
-              <AlignLeft size={13} /> + Add description
-            </span>
+              + Add description
+            </ActionButton>
           ) : (
-            <span
-              className="action-text remove-desc-action"
+            <ActionButton
               onClick={() => {
                 setShowDescription(false)
                 onDescriptionChange('')
               }}
-              role="button"
-              tabIndex={0}
             >
               Remove description
-            </span>
+            </ActionButton>
           )}
         </div>
         <input
@@ -92,22 +87,6 @@ export const TitleDescriptionInput: React.FC<TitleDescriptionInputProps> = ({
           display: flex;
           align-items: center;
           gap: 6px;
-        }
-
-        .action-text {
-          font-size: 12px;
-          color: var(--color-sea);
-          font-weight: 700;
-          cursor: pointer;
-          transition: opacity 0.15s;
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-        }
-
-        .action-text:hover {
-          opacity: 0.8;
-          text-decoration: underline;
         }
 
         .description-input-wrapper {

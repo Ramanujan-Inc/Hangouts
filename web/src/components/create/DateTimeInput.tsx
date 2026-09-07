@@ -1,6 +1,6 @@
 import React from 'react'
 import { Calendar, Clock } from 'lucide-react'
-import { TextField } from '../ui'
+import { TextField, ActionButton } from '../ui'
 
 interface DateTimeInputProps {
   date: string
@@ -26,22 +26,21 @@ export const DateTimeInput: React.FC<DateTimeInputProps> = ({
           <Calendar size={16} /> Date
         </label>
         {!showTimeInput ? (
-          <span
-            className="action-text add-time-action"
+          <ActionButton
+            icon={<Clock size={13} />}
             onClick={() => onToggleTimeInput(true)}
           >
-            <Clock size={13} /> + Add time
-          </span>
+            + Add time
+          </ActionButton>
         ) : (
-          <span
-            className="action-text remove-time-action"
+          <ActionButton
             onClick={() => {
               onToggleTimeInput(false)
               onTimeChange('')
             }}
           >
             Remove time
-          </span>
+          </ActionButton>
         )}
       </div>
 
@@ -97,22 +96,6 @@ export const DateTimeInput: React.FC<DateTimeInputProps> = ({
           display: flex;
           align-items: center;
           gap: 6px;
-        }
-
-        .action-text {
-          font-size: 12px;
-          color: var(--color-sea);
-          font-weight: 700;
-          cursor: pointer;
-          transition: opacity 0.15s;
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-        }
-
-        .action-text:hover {
-          opacity: 0.8;
-          text-decoration: underline;
         }
 
         .datetime-row {

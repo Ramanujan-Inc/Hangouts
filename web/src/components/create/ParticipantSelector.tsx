@@ -1,6 +1,7 @@
 import React from 'react'
-import { Users, Plus, Check, Loader2 } from 'lucide-react'
+import { Users, Check, Loader2 } from 'lucide-react'
 import { getAvatarUrl } from '../../lib/avatar'
+import { ActionButton } from '../ui'
 import { GroupMemberProfile } from './types'
 
 interface ParticipantSelectorProps {
@@ -30,9 +31,9 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
           <Users size={16} /> Attendees
         </label>
         {activeMembersList.length > 0 && (
-          <span className="action-text" onClick={onSelectAll}>
+          <ActionButton onClick={onSelectAll}>
             {isAllSelected ? 'Deselect All' : 'Select All'}
-          </span>
+          </ActionButton>
         )}
       </div>
 
@@ -99,19 +100,6 @@ export const ParticipantSelector: React.FC<ParticipantSelectorProps> = ({
           display: flex;
           align-items: center;
           gap: 6px;
-        }
-
-        .action-text {
-          font-size: 12px;
-          color: var(--color-sea);
-          font-weight: 700;
-          cursor: pointer;
-          transition: opacity 0.15s;
-        }
-
-        .action-text:hover {
-          opacity: 0.8;
-          text-decoration: underline;
         }
 
         .members-loading {

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Plus, Film, Video, Heart, Play } from 'lucide-react'
 import { Button, EmptyState, Badge } from '../ui'
 import { HangoutMedia } from './types'
@@ -22,20 +22,14 @@ export const MediaGalleryTab: React.FC<MediaGalleryTabProps> = ({
   onSelectMedia,
   onToggleFavorite,
 }) => {
-  const filteredMedia = media
-    .filter((item) => {
-      if (mediaFilter === 'favorites') {
-        return Boolean(item.is_favorited)
-      }
-      if (mediaFilter === 'videos') {
-        return item.media_type === 'video'
-      }
-      return true
-    })
-    .sort((a, b) => (b.favorites_count || 0) - (a.favorites_count || 0))
-
-  const favoritesCount = media.filter((m) => Boolean(m.is_favorited)).length
+  const favoritesCount = media.filter((m) => m.is_favorited).length
   const videosCount = media.filter((m) => m.media_type === 'video').length
+
+  const filteredMedia = media.filter((item) => {
+    if (mediaFilter === 'favorites') return item.is_favorited
+    if (mediaFilter === 'videos') return item.media_type === 'video'
+    return true
+  })
 
   return (
     <div className="photos-tab">
