@@ -266,6 +266,47 @@ def get_hangouts(
     return hangouts
 
 
+def get_timeline_feed(
+    db: Client,
+    user_id: str,
+    q: Optional[str] = None,
+    hangout_name: Optional[str] = None,
+    location_name: Optional[str] = None,
+    date: Optional[str] = None,
+    group_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Retrieve consolidated feed data for the timeline page in a single request:
+    hangouts, user groups, and 'On This Day' anniversary memory.
+    """
+    from app.services.groups import get_user_groups
+    from app.services.memories import find_anniversary_memories
+
+    hangouts = get_hangouts(
+        db=db,
+        user_id=user_id,
+        q=q,
+        hangout_name=hangout_name,
+        location_name=location_name,
+        date=date,
+        group_name=group_name,
+    )
+
+    groups = get_user_groups(db=db, user_id=user_id)
+
+    # Compute anniversary memory in-memory from hangouts without extra DB queries
+    memory = None
+    if not (q or hangout_name or location_name or date or group_name):
+        memories = find_anniversary_memories(hangouts)
+        if memories:
+            memory = memories[0]
+
+    return {
+        "hangouts": hangouts,
+        "groups": groups,
+        "memory": memory,
+    }
+
+
 def get_hangouts_map(
     db: Client,
     user_id: Optional[str] = None,

@@ -7,6 +7,7 @@ from app.schemas.hangout import (
     HangoutUpdate,
     HangoutResponse,
     HangoutFullResponse,
+    TimelineFeedResponse,
     ParticipantCreate,
     ParticipantResponse,
     RatingCreate,
@@ -54,6 +55,28 @@ def list_hangouts(
 ):
     """Search & filter hangouts matching hangout_name, location_name, date, group_name, or general q."""
     return hangout_service.get_hangouts(
+        db=db,
+        user_id=current_user["id"],
+        q=q,
+        hangout_name=hangout_name,
+        location_name=location_name,
+        date=date,
+        group_name=group_name,
+    )
+
+
+@router.get("/feed", response_model=TimelineFeedResponse)
+def get_timeline_feed(
+    q: Optional[str] = Query(None, description="General search string for title or location_name"),
+    hangout_name: Optional[str] = Query(None, description="Filter by hangout title/name"),
+    location_name: Optional[str] = Query(None, description="Filter by location name"),
+    date: Optional[str] = Query(None, description="Filter by exact or partial date (YYYY, YYYY-MM, YYYY-MM-DD)"),
+    group_name: Optional[str] = Query(None, description="Filter by group name"),
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """Consolidated feed endpoint for the Timeline page returning hangouts, user groups, and anniversary memory in a single network request."""
+    return hangout_service.get_timeline_feed(
         db=db,
         user_id=current_user["id"],
         q=q,
