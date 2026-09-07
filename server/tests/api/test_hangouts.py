@@ -507,3 +507,57 @@ def test_join_hangout_invalid_code_returns_404(authenticated_client: TestClient)
     join_res = authenticated_client.post("/api/v1/hangouts/join/invalidcode123")
     assert join_res.status_code == 404
 
+
+def test_create_hangout_with_external_album_url(authenticated_client: TestClient):
+    """Creating a hangout with a valid external_album_url succeeds."""
+    album_url = "https://drive.google.com/drive/folders/1a2b3c4d5e"
+    payload = {
+        "title": "Roadtrip Album Hangout",
+        "hangout_date": "2026-10-01",
+        "external_album_url": album_url,
+    }
+    res = authenticated_client.post("/api/v1/hangouts", json=payload)
+    assert res.status_code == 201
+    data = res.json()
+    assert data["external_album_url"] == album_url
+
+
+def test_create_hangout_with_invalid_external_album_url(authenticated_client: TestClient):
+    """Creating a hangout with an invalid URL schema returns 422 Unprocessable Entity."""
+    payload = {
+        "title": "Invalid URL Hangout",
+        "hangout_date": "2026-10-01",
+        "external_album_url": "not-a-valid-url",
+    }
+    res = authenticated_client.post("/api/v1/hangouts", json=payload)
+    assert res.status_code == 422
+
+
+def test_update_and_clear_external_album_url(authenticated_client: TestClient):
+    """Creator can update and clear the external_album_url via PATCH."""
+    # 1. Create hangout initially without external_album_url
+    create_res = authenticated_client.post(
+        "/api/v1/hangouts",
+        json={"title": "Beach Party", "hangout_date": "2026-10-15"},
+    )
+    assert create_res.status_code == 201
+    hangout_id = create_res.json()["id"]
+    assert create_res.json().get("external_album_url") is None
+
+    # 2. Update with valid external album url
+    new_url = "https://photos.app.goo.gl/xyz987"
+    update_res = authenticated_client.patch(
+        f"/api/v1/hangouts/{hangout_id}",
+        json={"external_album_url": new_url},
+    )
+    assert update_res.status_code == 200
+    assert update_res.json()["external_album_url"] == new_url
+
+    # 3. Clear the external album url by setting it to None
+    clear_res = authenticated_client.patch(
+        f"/api/v1/hangouts/{hangout_id}",
+        json={"external_album_url": None},
+    )
+    assert clear_res.status_code == 200
+    assert clear_res.json()["external_album_url"] is None
+

@@ -44,6 +44,8 @@ def create_hangout(db: Client, hangout_create: HangoutCreate, user_id: str) -> D
         hangout_dict["hangout_time"] = str(hangout_dict["hangout_time"])
     if hangout_dict.get("group_id"):
         hangout_dict["group_id"] = str(hangout_dict["group_id"])
+    if hangout_dict.get("external_album_url"):
+        hangout_dict["external_album_url"] = str(hangout_dict["external_album_url"])
 
     invite_code = uuid.uuid4().hex[:12]
     short_id = uuid.uuid4().hex[:8]
@@ -343,6 +345,8 @@ def update_hangout(
         update_dict["hangout_time"] = str(update_dict["hangout_time"])
     if update_dict.get("group_id"):
         update_dict["group_id"] = str(update_dict["group_id"])
+    if "external_album_url" in update_dict and update_dict["external_album_url"] is not None:
+        update_dict["external_album_url"] = str(update_dict["external_album_url"])
 
     update_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
 

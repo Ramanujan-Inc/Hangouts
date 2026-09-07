@@ -1,7 +1,7 @@
 from datetime import date, time, datetime
 from typing import Optional, List
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, HttpUrl
 from app.schemas.profile import ProfileResponse
 
 
@@ -16,6 +16,7 @@ class HangoutBase(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     cover_photo_url: Optional[str] = None
+    external_album_url: Optional[HttpUrl] = None
     group_id: Optional[UUID] = None
 
 
@@ -34,6 +35,7 @@ class HangoutUpdate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     cover_photo_url: Optional[str] = None
+    external_album_url: Optional[HttpUrl] = None
     group_id: Optional[UUID] = None
 
 

@@ -60,11 +60,15 @@ def create_test_user(db: Client) -> Generator[Callable[..., Dict[str, Any]], Non
         })
         access_token = session_res.session.access_token
 
+        # Query profile to get actual assigned username (e.g. if collision trigger appended a suffix)
+        profile_res = admin_client.table("profiles").select("username").eq("id", user_id).single().execute()
+        actual_username = profile_res.data.get("username") if profile_res.data else user_name
+
         return {
             "id": user_id,
             "email": email,
             "password": password,
-            "username": user_name,
+            "username": actual_username,
             "access_token": access_token,
             "headers": {"Authorization": f"Bearer {access_token}"},
         }

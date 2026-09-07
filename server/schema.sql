@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS hangouts (
     latitude NUMERIC(9, 6),
     longitude NUMERIC(9, 6),
     cover_photo_url TEXT,
+    external_album_url TEXT,
     invite_code VARCHAR(64) UNIQUE DEFAULT substr(md5(random()::text || gen_random_uuid()::text), 1, 12),
     short_id VARCHAR(16) UNIQUE DEFAULT substr(gen_random_uuid()::text, 1, 8),
     created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
