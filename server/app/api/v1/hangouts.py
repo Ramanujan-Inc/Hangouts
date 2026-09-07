@@ -6,6 +6,7 @@ from app.schemas.hangout import (
     HangoutCreate,
     HangoutUpdate,
     HangoutResponse,
+    HangoutFullResponse,
     ParticipantCreate,
     ParticipantResponse,
     RatingCreate,
@@ -108,6 +109,16 @@ def join_hangout_via_invite(
         invite_code=invite_code,
         user_id=current_user["id"],
     )
+
+
+@router.get("/{id}/full", response_model=HangoutFullResponse)
+def get_hangout_full(
+    id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """Retrieve complete hangout package in one consolidated request."""
+    return hangout_service.get_hangout_full_details(db=db, hangout_id=id, user_id=current_user["id"])
 
 
 @router.get("/{id}", response_model=HangoutResponse)

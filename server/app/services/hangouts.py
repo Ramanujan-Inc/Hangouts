@@ -535,3 +535,43 @@ def join_hangout_by_invite_code(db: Client, invite_code: str, user_id: str) -> D
 
     return get_hangout_by_id(db=db, hangout_id=hangout_id, user_id=user_id)
 
+
+def get_hangout_full_details(db: Client, hangout_id: str, user_id: str) -> Dict[str, Any]:
+    """Fetch complete hangout data package in a single call (hangout, media, rating, notes, expenses, summary)."""
+    # 1. Fetch hangout and verify user permission
+    hangout = get_hangout_by_id(db=db, hangout_id=hangout_id, user_id=user_id)
+    canonical_id = str(hangout["id"])
+
+    # 2. Fetch rating
+    rating_record = (
+        db.table("hangout_ratings")
+        .select("rating")
+        .eq("hangout_id", canonical_id)
+        .eq("user_id", str(user_id))
+        .execute()
+    )
+    user_rating = rating_record.data[0]["rating"] if rating_record.data else 4
+
+    # 3. Fetch media
+    from app.services import media as media_service
+    media_items = media_service.get_hangout_media(db=db, hangout_id=canonical_id, user_id=user_id)
+
+    # 4. Fetch notes
+    from app.services import notes as notes_service
+    notes_items = notes_service.get_hangout_notes(db=db, hangout_id=canonical_id, user_id=user_id)
+
+    # 5. Fetch expenses & summary
+    from app.services import expenses as expenses_service
+    expenses_items = expenses_service.get_hangout_expenses(db=db, hangout_id=canonical_id, user_id=user_id)
+    summary_data = expenses_service.get_expense_summary(db=db, hangout_id=canonical_id, user_id=user_id)
+
+    return {
+        "hangout": hangout,
+        "media": media_items,
+        "rating": user_rating,
+        "notes": notes_items,
+        "expenses": expenses_items,
+        "expense_summary": summary_data,
+    }
+
+

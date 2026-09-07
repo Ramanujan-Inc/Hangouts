@@ -112,3 +112,12 @@ export interface ExpenseSummary {
   member_balances: MemberBalance[]
   simplified_debts: DebtSettlement[]
 }
+
+export interface HangoutFullData {
+  hangout: HangoutDetailData
+  media: HangoutMedia[]
+  rating: number
+  notes: HangoutNote[]
+  expenses: HangoutExpense[]
+  expense_summary: ExpenseSummary | null
+}

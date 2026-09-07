@@ -3,6 +3,9 @@ from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, HttpUrl
 from app.schemas.profile import ProfileResponse
+from app.schemas.media import MediaResponse
+from app.schemas.note import NoteResponse
+from app.schemas.expense import ExpenseResponse, ExpenseSummaryResponse
 
 
 class HangoutBase(BaseModel):
@@ -99,6 +102,17 @@ class RatingResponse(BaseModel):
     rating: int
     created_at: datetime
     updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HangoutFullResponse(BaseModel):
+    hangout: HangoutResponse
+    media: List[MediaResponse] = []
+    rating: Optional[int] = 4
+    notes: List[NoteResponse] = []
+    expenses: List[ExpenseResponse] = []
+    expense_summary: Optional[ExpenseSummaryResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -13,6 +13,7 @@ import { SegmentedTabs, Spinner } from '../../components/ui'
 import {
   HangoutTab,
   HangoutDetailData,
+  HangoutFullData,
   HangoutMedia,
   HangoutNote,
   HangoutExpense,
@@ -45,15 +46,23 @@ function HangoutDetailContent() {
 
   const [activeTab, setActiveTab] = useState<HangoutTab>('overview')
 
-  // SWR Queries
+  // SWR Query for full consolidated hangout data
   const {
-    data: hangout,
-    error: hangoutError,
-    isLoading: hangoutLoading,
-    mutate: mutateHangout,
-  } = useSWR<HangoutDetailData>(hangoutId ? `/hangouts/${hangoutId}` : null)
+    data: fullData,
+    error: fullError,
+    isLoading: fullLoading,
+    mutate: mutateFullData,
+  } = useSWR<HangoutFullData>(hangoutId ? `/hangouts/${hangoutId}/full` : null)
 
+  const hangout = fullData?.hangout
   const canonicalId = hangout?.id || hangoutId
+  const media = fullData?.media || []
+  const rating = fullData?.rating ?? 4
+  const notes = fullData?.notes || []
+  const expenses = fullData?.expenses || []
+  const expenseSummary = fullData?.expense_summary || null
+  const loading = fullLoading && !fullData
+  const error = fullError?.message || null
 
   // Normalize URL to short ID in address bar
   useEffect(() => {
@@ -63,39 +72,6 @@ function HangoutDetailContent() {
       window.history.replaceState(null, '', `/hangout/${canonicalShortId}`)
     }
   }, [hangout, router.query.id])
-
-  const {
-    data: mediaData,
-    mutate: mutateMedia,
-  } = useSWR<HangoutMedia[]>(canonicalId ? `/hangouts/${canonicalId}/media` : null)
-
-  const {
-    data: ratingData,
-    mutate: mutateRating,
-  } = useSWR<{ rating: number } | null>(canonicalId ? `/hangouts/${canonicalId}/ratings` : null)
-
-  const {
-    data: notesData,
-    mutate: mutateNotes,
-  } = useSWR<HangoutNote[]>(canonicalId ? `/hangouts/${canonicalId}/notes` : null)
-
-  const {
-    data: expensesData,
-    mutate: mutateExpenses,
-  } = useSWR<HangoutExpense[]>(canonicalId ? `/hangouts/${canonicalId}/expenses` : null)
-
-  const {
-    data: expenseSummaryData,
-    mutate: mutateSummary,
-  } = useSWR<ExpenseSummary>(canonicalId ? `/hangouts/${canonicalId}/expenses/summary` : null)
-
-  const media = mediaData || []
-  const rating = ratingData?.rating || 4
-  const notes = notesData || []
-  const expenses = expensesData || []
-  const expenseSummary = expenseSummaryData || null
-  const loading = hangoutLoading && !hangout
-  const error = hangoutError?.message || null
 
   // Media states
   const [activeMedia, setActiveMedia] = useState<HangoutMedia | null>(null)
@@ -114,13 +90,15 @@ function HangoutDetailContent() {
   // Overview Tab Rating Handler
   const handleRatingChange = async (newRating: number) => {
     if (!canonicalId) return
-    mutateRating({ rating: newRating }, false)
+    if (fullData) {
+      mutateFullData({ ...fullData, rating: newRating }, false)
+    }
     try {
       await api.post(`/hangouts/${canonicalId}/ratings`, { rating: newRating })
-      mutateRating()
+      mutateFullData()
     } catch (err) {
       console.error('Failed to save rating:', err)
-      mutateRating()
+      mutateFullData()
     }
   }
 
@@ -142,9 +120,11 @@ function HangoutDetailContent() {
 
       const uploadedItems = await api.upload<HangoutMedia[]>(`/hangouts/${canonicalId}/media/bulk`, formData)
       const newItems = Array.isArray(uploadedItems) ? uploadedItems : [uploadedItems]
-      mutateMedia([...newItems, ...media], false)
+      if (fullData) {
+        mutateFullData({ ...fullData, media: [...newItems, ...media] }, false)
+      }
       setShowUploadMenu(false)
-      mutateMedia()
+      mutateFullData()
     } catch (err: any) {
       console.error('Failed to upload media:', err)
       throw err
@@ -170,7 +150,9 @@ function HangoutDetailContent() {
         ? { ...m, is_favorited: newFavorited, favorites_count: newCount }
         : m
     )
-    mutateMedia(updatedMedia, false)
+    if (fullData) {
+      mutateFullData({ ...fullData, media: updatedMedia }, false)
+    }
 
     if (activeMedia?.id === mediaId) {
       setActiveMedia((prev) =>
@@ -186,19 +168,21 @@ function HangoutDetailContent() {
       } else {
         await api.delete(`/media/${mediaId}/favorite`)
       }
-      mutateMedia()
+      mutateFullData()
     } catch (err) {
       console.error('Failed to toggle favorite:', err)
-      mutateMedia()
+      mutateFullData()
     }
   }
 
   const handleDeleteMedia = async (mediaId: string) => {
     try {
       await api.delete(`/media/${mediaId}`)
-      mutateMedia(media.filter((m) => m.id !== mediaId), false)
+      if (fullData) {
+        mutateFullData({ ...fullData, media: media.filter((m) => m.id !== mediaId) }, false)
+      }
       setActiveMedia(null)
-      mutateMedia()
+      mutateFullData()
     } catch (err) {
       console.error('Failed to delete media:', err)
     }
@@ -215,9 +199,11 @@ function HangoutDetailContent() {
         is_shared: isShared,
       })
       newNote.color = newNote.color || type
-      mutateNotes([newNote, ...notes], false)
+      if (fullData) {
+        mutateFullData({ ...fullData, notes: [newNote, ...notes] }, false)
+      }
       setShowAddNote(false)
-      mutateNotes()
+      mutateFullData()
     } catch (err) {
       console.error('Failed to add note:', err)
     } finally {
@@ -228,8 +214,10 @@ function HangoutDetailContent() {
   const handleDeleteNote = async (noteId: string) => {
     try {
       await api.delete(`/notes/${noteId}`)
-      mutateNotes(notes.filter((n) => n.id !== noteId), false)
-      mutateNotes()
+      if (fullData) {
+        mutateFullData({ ...fullData, notes: notes.filter((n) => n.id !== noteId) }, false)
+      }
+      mutateFullData()
     } catch (err) {
       console.error('Failed to delete note:', err)
     }
@@ -253,7 +241,7 @@ function HangoutDetailContent() {
       })
 
       setShowAddExpense(false)
-      await Promise.all([mutateExpenses(), mutateSummary()])
+      await mutateFullData()
     } catch (err) {
       console.error('Failed to create expense:', err)
     } finally {
@@ -265,8 +253,13 @@ function HangoutDetailContent() {
     if (!canonicalId) return
     try {
       await api.delete(`/expenses/${expenseId}`)
-      mutateExpenses(expenses.filter((e) => e.id !== expenseId), false)
-      await Promise.all([mutateExpenses(), mutateSummary()])
+      if (fullData) {
+        mutateFullData(
+          { ...fullData, expenses: expenses.filter((e) => e.id !== expenseId) },
+          false
+        )
+      }
+      await mutateFullData()
     } catch (err) {
       console.error('Failed to delete expense:', err)
     }
