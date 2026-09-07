@@ -134,28 +134,46 @@ def get_hangout_by_id(db: Client, hangout_id: str, user_id: Optional[str] = None
         db.table("hangouts").update({"invite_code": new_code}).eq("id", canonical_id).execute()
         hangout["invite_code"] = new_code
 
-    # Fetch creator profile
-    creator_res = db.table("profiles").select("*").eq("id", hangout["created_by"]).execute()
-    hangout["creator"] = creator_res.data[0] if creator_res.data else None
+    # Fetch creator profile, participants with profiles, and group membership concurrently
+    from concurrent.futures import ThreadPoolExecutor
+    from app.core.supabase import get_supabase_client
 
-    # Fetch participants with profiles
-    participants = get_hangout_participants(db=db, hangout_id=canonical_id)
-    hangout["participants"] = participants
+    def fetch_creator():
+        client = get_supabase_client()
+        c_res = client.table("profiles").select("*").eq("id", hangout["created_by"]).execute()
+        return c_res.data[0] if c_res.data else None
+
+    def fetch_parts():
+        client = get_supabase_client()
+        return get_hangout_participants(db=client, hangout_id=canonical_id)
+
+    def fetch_membership():
+        if not (user_id and hangout.get("group_id")):
+            return False
+        client = get_supabase_client()
+        m_res = (
+            client.table("group_members")
+            .select("status")
+            .eq("group_id", str(hangout["group_id"]))
+            .eq("user_id", str(user_id))
+            .eq("status", "accepted")
+            .execute()
+        )
+        return bool(m_res.data and len(m_res.data) > 0)
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        f_creator = executor.submit(fetch_creator)
+        f_parts = executor.submit(fetch_parts)
+        f_mem = executor.submit(fetch_membership)
+
+        hangout["creator"] = f_creator.result()
+        participants = f_parts.result()
+        hangout["participants"] = participants
+        is_group_member = f_mem.result()
 
     if user_id:
         is_creator = str(hangout.get("created_by")) == str(user_id)
         is_participant = any(str(p.get("user_id")) == str(user_id) for p in participants)
-        is_group_member = False
-        if hangout.get("group_id"):
-            member_res = (
-                db.table("group_members")
-                .select("status")
-                .eq("group_id", str(hangout["group_id"]))
-                .eq("user_id", str(user_id))
-                .eq("status", "accepted")
-                .execute()
-            )
-            is_group_member = bool(member_res.data and len(member_res.data) > 0)
 
         if not (is_creator or is_participant or is_group_member):
             raise ForbiddenError("You do not have access to view this hangout.")
@@ -537,40 +555,127 @@ def join_hangout_by_invite_code(db: Client, invite_code: str, user_id: str) -> D
 
 
 def get_hangout_full_details(db: Client, hangout_id: str, user_id: str) -> Dict[str, Any]:
-    """Fetch complete hangout data package in a single call (hangout, media, rating, notes, expenses, summary)."""
-    # 1. Fetch hangout and verify user permission
+    """Fetch complete hangout data package in parallel with zero duplicate queries and in-memory summary."""
+    from concurrent.futures import ThreadPoolExecutor
+    from app.core.supabase import get_supabase_client
+    from app.services.media import _sign_media_item
+    from app.services.expenses import compute_expense_summary_from_data
+
+    # 1. Fetch hangout, verify user permission, and get participants + creator in ONE call
     hangout = get_hangout_by_id(db=db, hangout_id=hangout_id, user_id=user_id)
     canonical_id = str(hangout["id"])
+    participants = hangout.get("participants") or []
+    creator_id = str(hangout.get("created_by")) if hangout.get("created_by") else None
 
-    # 2. Fetch rating
-    rating_record = (
-        db.table("hangout_ratings")
-        .select("rating")
-        .eq("hangout_id", canonical_id)
-        .eq("user_id", str(user_id))
-        .execute()
+    # 2. Concurrently fetch Rating, Media, Notes, and Expenses in parallel worker threads
+    def fetch_rating():
+        client = get_supabase_client()
+        rating_record = (
+            client.table("hangout_ratings")
+            .select("rating")
+            .eq("hangout_id", canonical_id)
+            .eq("user_id", str(user_id))
+            .execute()
+        )
+        return rating_record.data[0]["rating"] if rating_record.data else 4
+
+    def fetch_media():
+        client = get_supabase_client()
+        res = client.table("media").select("*").eq("hangout_id", canonical_id).order("created_at", desc=True).execute()
+        raw_items = res.data or []
+        visible_items = [
+            item for item in raw_items
+            if item.get("is_shared", True) or str(item.get("uploaded_by")) == str(user_id)
+        ]
+        uploader_ids = list({item["uploaded_by"] for item in visible_items if "uploaded_by" in item})
+        profiles_map = {}
+        if uploader_ids:
+            prof_res = client.table("profiles").select("*").in_("id", uploader_ids).execute()
+            if prof_res.data:
+                profiles_map = {p["id"]: p for p in prof_res.data}
+
+        media_ids = [item["id"] for item in visible_items if "id" in item]
+        favorited_ids = set()
+        if media_ids and user_id:
+            fav_res = client.table("media_favorites").select("media_id").in_("media_id", media_ids).eq("user_id", str(user_id)).execute()
+            if fav_res.data:
+                favorited_ids = {str(f["media_id"]) for f in fav_res.data}
+
+        for item in visible_items:
+            item["uploader"] = profiles_map.get(item.get("uploaded_by"))
+            item["is_favorited"] = str(item.get("id")) in favorited_ids
+
+        return [_sign_media_item(item) for item in visible_items]
+
+    def fetch_notes():
+        client = get_supabase_client()
+        res = client.table("notes").select("*").eq("hangout_id", canonical_id).order("created_at", desc=True).execute()
+        raw_notes = res.data or []
+        visible_notes = [
+            n for n in raw_notes
+            if n.get("is_shared", True) or str(n.get("created_by")) == str(user_id)
+        ]
+        author_ids = list({n["created_by"] for n in visible_notes if "created_by" in n})
+        profiles_map = {}
+        if author_ids:
+            prof_res = client.table("profiles").select("*").in_("id", author_ids).execute()
+            if prof_res.data:
+                profiles_map = {p["id"]: p for p in prof_res.data}
+
+        for n in visible_notes:
+            n["author"] = profiles_map.get(n.get("created_by"))
+
+        return visible_notes
+
+    def fetch_expenses():
+        client = get_supabase_client()
+        res = client.table("expenses").select("*").eq("hangout_id", canonical_id).order("created_at", desc=False).execute()
+        raw_expenses = res.data or []
+        for e in raw_expenses:
+            e["total_amount"] = float(e.get("total_amount") or 0)
+
+        visible_expenses = [
+            e for e in raw_expenses
+            if e.get("split_type") != "personal" or str(e.get("paid_by")) == str(user_id)
+        ]
+        payer_ids = list({e["paid_by"] for e in visible_expenses if "paid_by" in e})
+        profiles_map = {}
+        if payer_ids:
+            prof_res = client.table("profiles").select("*").in_("id", payer_ids).execute()
+            if prof_res.data:
+                profiles_map = {p["id"]: p for p in prof_res.data}
+
+        for e in visible_expenses:
+            e["payer"] = profiles_map.get(e.get("paid_by"))
+
+        return raw_expenses, visible_expenses
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        f_rating = executor.submit(fetch_rating)
+        f_media = executor.submit(fetch_media)
+        f_notes = executor.submit(fetch_notes)
+        f_expenses = executor.submit(fetch_expenses)
+
+        user_rating = f_rating.result()
+        media_items = f_media.result()
+        notes_items = f_notes.result()
+        all_expenses, visible_expenses = f_expenses.result()
+
+    # 3. Compute expense summary in-memory instantly (0ms, 0 extra DB roundtrips)
+    summary_data = compute_expense_summary_from_data(
+        hangout_id=canonical_id,
+        all_expenses=all_expenses,
+        participants=participants,
+        creator_id=creator_id,
+        user_id=user_id,
     )
-    user_rating = rating_record.data[0]["rating"] if rating_record.data else 4
-
-    # 3. Fetch media
-    from app.services import media as media_service
-    media_items = media_service.get_hangout_media(db=db, hangout_id=canonical_id, user_id=user_id)
-
-    # 4. Fetch notes
-    from app.services import notes as notes_service
-    notes_items = notes_service.get_hangout_notes(db=db, hangout_id=canonical_id, user_id=user_id)
-
-    # 5. Fetch expenses & summary
-    from app.services import expenses as expenses_service
-    expenses_items = expenses_service.get_hangout_expenses(db=db, hangout_id=canonical_id, user_id=user_id)
-    summary_data = expenses_service.get_expense_summary(db=db, hangout_id=canonical_id, user_id=user_id)
 
     return {
         "hangout": hangout,
         "media": media_items,
         "rating": user_rating,
         "notes": notes_items,
-        "expenses": expenses_items,
+        "expenses": visible_expenses,
         "expense_summary": summary_data,
     }
 
