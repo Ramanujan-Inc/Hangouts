@@ -43,6 +43,10 @@ export const LocationSection: React.FC<LocationSectionProps> = ({
   const autocompleteRef = useRef<any>(null)
   const [resolving, setResolving] = React.useState(false)
 
+  const hasResolvedLocation = Boolean(
+    locationName.trim() || formattedAddress.trim() || latitude !== null || longitude !== null
+  )
+
   // Attach Google Places Autocomplete to the search input
   useEffect(() => {
     if (typeof window === 'undefined' || !placesLib || !searchInputRef.current) return
@@ -185,38 +189,40 @@ export const LocationSection: React.FC<LocationSectionProps> = ({
         />
       </div>
 
-      {/* 3. Editable Location Name */}
-      <div className="location-name-card">
-        <div className="name-header-row">
-          <label className="name-field-label">
-            <Edit3 size={13} className="edit-icon" />
-            <span>Location / Venue Name</span>
-          </label>
-        </div>
-        <input
-          type="text"
-          className="location-name-input"
-          value={locationName}
-          onChange={(e) =>
-            onLocationChange({
-              locationName: e.target.value,
-              formattedAddress,
-              latitude: latitude || undefined,
-              longitude: longitude || undefined,
-              placeId,
-            })
-          }
-          placeholder="e.g. Wildflour Cafe, Sam's Rooftop, Secret Treehouse"
-        />
-
-        {/* 4. Formatted Address Preview */}
-        {formattedAddress && formattedAddress !== locationName && (
-          <div className="address-sub-row">
-            <MapPin size={13} className="address-sub-icon" />
-            <span className="address-sub-text">{formattedAddress}</span>
+      {/* 3. Editable Location Name - only shown when location has been resolved */}
+      {hasResolvedLocation && (
+        <div className="location-name-card">
+          <div className="name-header-row">
+            <label className="name-field-label">
+              <Edit3 size={13} className="edit-icon" />
+              <span>Location / Venue Name</span>
+            </label>
           </div>
-        )}
-      </div>
+          <input
+            type="text"
+            className="location-name-input"
+            value={locationName}
+            onChange={(e) =>
+              onLocationChange({
+                locationName: e.target.value,
+                formattedAddress,
+                latitude: latitude || undefined,
+                longitude: longitude || undefined,
+                placeId,
+              })
+            }
+            placeholder="e.g. Wildflour Cafe, Sam's Rooftop, Secret Treehouse"
+          />
+
+          {/* 4. Formatted Address Preview */}
+          {formattedAddress && formattedAddress !== locationName && (
+            <div className="address-sub-row">
+              <MapPin size={13} className="address-sub-icon" />
+              <span className="address-sub-text">{formattedAddress}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <style jsx>{`
         .location-section-container {
@@ -332,6 +338,18 @@ export const LocationSection: React.FC<LocationSectionProps> = ({
           border-radius: 14px;
           background-color: var(--color-surface-container-low);
           border: 1px solid var(--color-surface-container-high);
+          animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-4px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         .name-header-row {

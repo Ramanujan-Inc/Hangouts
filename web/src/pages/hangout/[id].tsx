@@ -322,9 +322,6 @@ function HangoutDetailContent() {
           date={hangout.hangout_date}
           location={hangout.location_name || 'No location set'}
           formattedAddress={hangout.formatted_address || undefined}
-          latitude={hangout.latitude ?? undefined}
-          longitude={hangout.longitude ?? undefined}
-          placeId={hangout.place_id || undefined}
           participants={participantsList}
           inviteCode={hangout.invite_code}
           externalAlbumUrl={hangout.external_album_url}

@@ -11,9 +11,6 @@ interface HangoutHeroHeaderProps {
   date: string
   location: string
   formattedAddress?: string
-  latitude?: number
-  longitude?: number
-  placeId?: string
   participants: (string | { id?: string; user_id?: string; profile?: { username?: string; avatar_url?: string | null } | null })[]
   inviteCode?: string | null
   externalAlbumUrl?: string | null
@@ -26,9 +23,6 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
   date,
   location,
   formattedAddress,
-  latitude,
-  longitude,
-  placeId,
   participants,
   inviteCode,
   externalAlbumUrl,
@@ -54,12 +48,6 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
     }
   })
 
-  const mapsUrl = placeId
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}&query_place_id=${placeId}`
-    : latitude != null && longitude != null
-    ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`
-    : null
-
   return (
     <div className="hangout-hero-header">
       {/* Cover Image Banner */}
@@ -76,7 +64,7 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
           </button>
           <button
             className="frosted-btn"
-            aria-label="Share hangout"
+            aria-label="Share hangout link"
             type="button"
             onClick={() => setShowShareModal(true)}
           >
@@ -100,16 +88,6 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
             <div className="location-title-row">
               <MapPin size={16} className="loc-pin" />
               <span className="loc-name">{location}</span>
-              {mapsUrl && (
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="maps-ext-link"
-                >
-                  Open in Maps ↗
-                </a>
-              )}
             </div>
             {formattedAddress && formattedAddress !== location && (
               <span className="loc-full-address">{formattedAddress}</span>
@@ -250,21 +228,6 @@ export const HangoutHeroHeader: React.FC<HangoutHeroHeaderProps> = ({
           color: var(--color-text);
         }
 
-        .maps-ext-link {
-          font-size: 11px;
-          font-weight: 700;
-          color: var(--color-sea);
-          background-color: var(--tint-sea);
-          padding: 2px 8px;
-          border-radius: 9999px;
-          text-decoration: none;
-          transition: opacity 0.2s;
-        }
-
-        .maps-ext-link:hover {
-          opacity: 0.8;
-          text-decoration: underline;
-        }
 
         .album-link {
           display: inline-flex;

@@ -38,6 +38,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
   const myTotalSpent = myPersonalTotal + mySharedPaid
 
   const sharedTotal = summary?.equal_split_total ?? sharedExpenses.reduce((s, e) => s + e.total_amount, 0)
+  const hasEqualSplitExpenses = sharedExpenses.length > 0 || (summary?.equal_split_total ?? 0) > 0
   const perPersonShare = summary?.per_person_share ?? 0
   const participantCount = summary?.participant_count ?? 1
 
@@ -102,7 +103,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
       </div>
 
       {/* Spend Chart Breakdown */}
-      {(memberBalances.length > 0 || Object.keys(balances).length > 0) && (
+      {hasEqualSplitExpenses && (memberBalances.length > 0 || Object.keys(balances).length > 0) && (
         <Card variant="default" padding="md" className="spend-chart-section">
           <h4>Shared Member Spending & Net Balances</h4>
           <div className="chart-bars-list">
