@@ -12,6 +12,7 @@ import {
   Hangout,
   Memory,
   Group,
+  TimelineFeedResponse,
   QuickFilter,
   TimelineHeader,
   TimelineFilterDrawer,
@@ -56,16 +57,16 @@ export default function Timeline() {
   if (dateQuery) params.set('date', dateQuery)
   if (groupNameQuery.trim()) params.set('group_name', groupNameQuery.trim())
 
-  const hangoutsEndpoint = user ? `/hangouts${params.toString() ? `?${params.toString()}` : ''}` : null
+  const feedEndpoint = user ? `/hangouts/feed${params.toString() ? `?${params.toString()}` : ''}` : null
 
-  // SWR queries
-  const { data: hangoutsData, isLoading: loadingHangouts } = useSWR<Hangout[]>(hangoutsEndpoint)
-  const { data: groupsData } = useSWR<Group[]>(user ? '/groups' : null)
-  const { data: memoriesData } = useSWR<Memory[]>(user ? '/memories/on-this-day' : null)
+  // Single consolidated SWR query for timeline feed
+  const { data: feedData, isLoading: loadingHangouts } = useSWR<TimelineFeedResponse>(feedEndpoint, {
+    keepPreviousData: true,
+  })
 
-  const hangoutsList = hangoutsData || []
-  const groupsList = groupsData || []
-  const memory = memoriesData && memoriesData.length > 0 ? memoriesData[0] : null
+  const hangoutsList = feedData?.hangouts || []
+  const groupsList = feedData?.groups || []
+  const memory = feedData?.memory || null
 
   const handleResetFilters = () => {
     setSearchQuery('')

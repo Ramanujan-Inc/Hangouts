@@ -105,13 +105,18 @@ def get_hangout_by_id(db: Client, hangout_id: str, user_id: Optional[str] = None
         is_uuid = False
 
     clean_id = str(hangout_id).strip()
+    select_clause = (
+        "*, creator:profiles!hangouts_created_by_fkey(*), "
+        "participants:hangout_participants(id, hangout_id, user_id, profile:profiles!hangout_participants_user_id_fkey(*))"
+    )
+
     if is_uuid:
-        response = db.table("hangouts").select("*").eq("id", clean_id).execute()
+        response = db.table("hangouts").select(select_clause).eq("id", clean_id).execute()
     else:
-        response = db.table("hangouts").select("*").eq("short_id", clean_id).execute()
+        response = db.table("hangouts").select(select_clause).eq("short_id", clean_id).execute()
         if not response.data and "-" in clean_id:
             cand = clean_id.rsplit("-", 1)[-1]
-            response = db.table("hangouts").select("*").eq("short_id", cand).execute()
+            response = db.table("hangouts").select(select_clause).eq("short_id", cand).execute()
 
     if not response.data or len(response.data) == 0:
         raise NotFoundError("Hangout not found.")
@@ -119,35 +124,19 @@ def get_hangout_by_id(db: Client, hangout_id: str, user_id: Optional[str] = None
     hangout = response.data[0]
     canonical_id = hangout["id"]
 
-    # Ensure short_id exists
+    # Ensure short_id exists in response
     if not hangout.get("short_id"):
-        new_short_id = str(canonical_id)[:8]
-        try:
-            db.table("hangouts").update({"short_id": new_short_id}).eq("id", canonical_id).execute()
-        except Exception:
-            pass
-        hangout["short_id"] = new_short_id
+        hangout["short_id"] = str(canonical_id)[:8]
 
-    # Ensure invite_code exists
-    if not hangout.get("invite_code"):
-        new_code = uuid.uuid4().hex[:12]
-        db.table("hangouts").update({"invite_code": new_code}).eq("id", canonical_id).execute()
-        hangout["invite_code"] = new_code
-
-    # Fetch creator profile
-    creator_res = db.table("profiles").select("*").eq("id", hangout["created_by"]).execute()
-    hangout["creator"] = creator_res.data[0] if creator_res.data else None
-
-    # Fetch participants with profiles
-    participants = get_hangout_participants(db=db, hangout_id=canonical_id)
-    hangout["participants"] = participants
-
+    # Verify access permissions
     if user_id:
         is_creator = str(hangout.get("created_by")) == str(user_id)
+        participants = hangout.get("participants") or []
         is_participant = any(str(p.get("user_id")) == str(user_id) for p in participants)
+
         is_group_member = False
-        if hangout.get("group_id"):
-            member_res = (
+        if not (is_creator or is_participant) and hangout.get("group_id"):
+            m_res = (
                 db.table("group_members")
                 .select("status")
                 .eq("group_id", str(hangout["group_id"]))
@@ -155,7 +144,7 @@ def get_hangout_by_id(db: Client, hangout_id: str, user_id: Optional[str] = None
                 .eq("status", "accepted")
                 .execute()
             )
-            is_group_member = bool(member_res.data and len(member_res.data) > 0)
+            is_group_member = bool(m_res.data and len(m_res.data) > 0)
 
         if not (is_creator or is_participant or is_group_member):
             raise ForbiddenError("You do not have access to view this hangout.")
@@ -208,8 +197,11 @@ def get_hangouts(
     date: Optional[str] = None,
     group_name: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Search & filter hangouts using user_id, hangout_name, location_name, date, group_name, or comprehensive omnisearch q."""
-    query = db.table("hangouts").select("*")
+    """Search & filter hangouts using single-query relational join."""
+    query = db.table("hangouts").select(
+        "*, creator:profiles!hangouts_created_by_fkey(*), "
+        "participants:hangout_participants(id, hangout_id, user_id, profile:profiles!hangout_participants_user_id_fkey(*))"
+    )
 
     if user_id:
         user_hangout_ids = get_user_hangout_ids(db, user_id)
@@ -265,18 +257,54 @@ def get_hangouts(
             return []
 
     response = query.order("hangout_date", desc=True).execute()
-
     hangouts = response.data if response.data else []
 
-    # Populate creator and participants for each hangout
-    for hangout in hangouts:
-        if not hangout.get("short_id") and hangout.get("id"):
-            hangout["short_id"] = str(hangout["id"])[:8]
-        creator_res = db.table("profiles").select("*").eq("id", hangout["created_by"]).execute()
-        hangout["creator"] = creator_res.data[0] if creator_res.data else None
-        hangout["participants"] = get_hangout_participants(db=db, hangout_id=hangout["id"])
+    for h in hangouts:
+        if not h.get("short_id") and h.get("id"):
+            h["short_id"] = str(h["id"])[:8]
 
     return hangouts
+
+
+def get_timeline_feed(
+    db: Client,
+    user_id: str,
+    q: Optional[str] = None,
+    hangout_name: Optional[str] = None,
+    location_name: Optional[str] = None,
+    date: Optional[str] = None,
+    group_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Retrieve consolidated feed data for the timeline page in a single request:
+    hangouts, user groups, and 'On This Day' anniversary memory.
+    """
+    from app.services.groups import get_user_groups
+    from app.services.memories import find_anniversary_memories
+
+    hangouts = get_hangouts(
+        db=db,
+        user_id=user_id,
+        q=q,
+        hangout_name=hangout_name,
+        location_name=location_name,
+        date=date,
+        group_name=group_name,
+    )
+
+    groups = get_user_groups(db=db, user_id=user_id)
+
+    # Compute anniversary memory in-memory from hangouts without extra DB queries
+    memory = None
+    if not (q or hangout_name or location_name or date or group_name):
+        memories = find_anniversary_memories(hangouts)
+        if memories:
+            memory = memories[0]
+
+    return {
+        "hangouts": hangouts,
+        "groups": groups,
+        "memory": memory,
+    }
 
 
 def get_hangouts_map(
@@ -288,8 +316,16 @@ def get_hangouts_map(
     min_lng: Optional[float] = None,
     max_lng: Optional[float] = None,
 ) -> List[Dict[str, Any]]:
-    """Fetch hangouts with non-null latitude and longitude, optionally filtered by user, group_id and bounding box."""
-    query = db.table("hangouts").select("*").not_.is_("latitude", "null").not_.is_("longitude", "null")
+    """Fetch hangouts with coordinates using single-query relational join."""
+    query = (
+        db.table("hangouts")
+        .select(
+            "*, creator:profiles!hangouts_created_by_fkey(*), "
+            "participants:hangout_participants(id, hangout_id, user_id, profile:profiles!hangout_participants_user_id_fkey(*))"
+        )
+        .not_.is_("latitude", "null")
+        .not_.is_("longitude", "null")
+    )
 
     if user_id:
         user_hangout_ids = get_user_hangout_ids(db, user_id)
@@ -311,12 +347,9 @@ def get_hangouts_map(
     response = query.order("hangout_date", desc=True).execute()
     hangouts = response.data if response.data else []
 
-    for hangout in hangouts:
-        if not hangout.get("short_id") and hangout.get("id"):
-            hangout["short_id"] = str(hangout["id"])[:8]
-        creator_res = db.table("profiles").select("*").eq("id", hangout["created_by"]).execute()
-        hangout["creator"] = creator_res.data[0] if creator_res.data else None
-        hangout["participants"] = get_hangout_participants(db=db, hangout_id=hangout["id"])
+    for h in hangouts:
+        if not h.get("short_id") and h.get("id"):
+            h["short_id"] = str(h["id"])[:8]
 
     return hangouts
 
@@ -468,21 +501,23 @@ def get_user_hangout_rating(
 
 
 def get_hangout_by_invite_code(db: Client, invite_code: str, user_id: Optional[str] = None) -> Dict[str, Any]:
-    """Retrieve public sanitized hangout preview by invite code."""
+    """Retrieve public sanitized hangout preview by invite code using single relational query."""
     clean_code = invite_code.strip()
-    response = db.table("hangouts").select("*").eq("invite_code", clean_code).execute()
+    response = (
+        db.table("hangouts")
+        .select(
+            "*, creator:profiles!hangouts_created_by_fkey(*), "
+            "participants:hangout_participants(id, user_id)"
+        )
+        .eq("invite_code", clean_code)
+        .execute()
+    )
     if not response.data or len(response.data) == 0:
         raise NotFoundError("Hangout invite link not found or expired.")
 
     hangout = response.data[0]
-    hangout_id = hangout["id"]
-
-    # Fetch creator profile
-    creator_res = db.table("profiles").select("*").eq("id", hangout["created_by"]).execute()
-    creator = creator_res.data[0] if creator_res.data else None
-
-    # Fetch participant count and check if current user is participant
-    participants = get_hangout_participants(db=db, hangout_id=hangout_id)
+    participants = hangout.get("participants") or []
+    creator = hangout.get("creator")
     participant_count = len(participants)
 
     is_participant = False
@@ -537,12 +572,17 @@ def join_hangout_by_invite_code(db: Client, invite_code: str, user_id: str) -> D
 
 
 def get_hangout_full_details(db: Client, hangout_id: str, user_id: str) -> Dict[str, Any]:
-    """Fetch complete hangout data package in a single call (hangout, media, rating, notes, expenses, summary)."""
-    # 1. Fetch hangout and verify user permission
+    """Fetch complete hangout data package sequentially on existing connection with in-memory summary."""
+    from app.services.media import _sign_media_item
+    from app.services.expenses import compute_expense_summary_from_data
+
+    # 1. Fetch hangout, verify user permission, and get participants + creator in ONE query
     hangout = get_hangout_by_id(db=db, hangout_id=hangout_id, user_id=user_id)
     canonical_id = str(hangout["id"])
+    participants = hangout.get("participants") or []
+    creator_id = str(hangout.get("created_by")) if hangout.get("created_by") else None
 
-    # 2. Fetch rating
+    # 2. Rating
     rating_record = (
         db.table("hangout_ratings")
         .select("rating")
@@ -552,25 +592,109 @@ def get_hangout_full_details(db: Client, hangout_id: str, user_id: str) -> Dict[
     )
     user_rating = rating_record.data[0]["rating"] if rating_record.data else 4
 
-    # 3. Fetch media
-    from app.services import media as media_service
-    media_items = media_service.get_hangout_media(db=db, hangout_id=canonical_id, user_id=user_id)
+    # 3. Media
+    media_res = (
+        db.table("media")
+        .select("*")
+        .eq("hangout_id", canonical_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    raw_items = media_res.data or []
+    visible_items = [
+        item for item in raw_items
+        if item.get("is_shared", True) or str(item.get("uploaded_by")) == str(user_id)
+    ]
+    media_ids = [item["id"] for item in visible_items if "id" in item]
+    favorited_ids = set()
+    if media_ids and user_id:
+        fav_res = (
+            db.table("media_favorites")
+            .select("media_id")
+            .in_("media_id", media_ids)
+            .eq("user_id", str(user_id))
+            .execute()
+        )
+        if fav_res.data:
+            favorited_ids = {str(f["media_id"]) for f in fav_res.data}
 
-    # 4. Fetch notes
-    from app.services import notes as notes_service
-    notes_items = notes_service.get_hangout_notes(db=db, hangout_id=canonical_id, user_id=user_id)
+    for item in visible_items:
+        item["is_favorited"] = str(item.get("id")) in favorited_ids
 
-    # 5. Fetch expenses & summary
-    from app.services import expenses as expenses_service
-    expenses_items = expenses_service.get_hangout_expenses(db=db, hangout_id=canonical_id, user_id=user_id)
-    summary_data = expenses_service.get_expense_summary(db=db, hangout_id=canonical_id, user_id=user_id)
+    # 4. Notes
+    notes_res = (
+        db.table("notes")
+        .select("*")
+        .eq("hangout_id", canonical_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    raw_notes = notes_res.data or []
+    visible_notes = [
+        n for n in raw_notes
+        if n.get("is_shared", True) or str(n.get("created_by")) == str(user_id)
+    ]
+
+    # 5. Expenses
+    expenses_res = (
+        db.table("expenses")
+        .select("*")
+        .eq("hangout_id", canonical_id)
+        .order("created_at", desc=False)
+        .execute()
+    )
+    raw_expenses = expenses_res.data or []
+    for e in raw_expenses:
+        e["total_amount"] = float(e.get("total_amount") or 0)
+
+    visible_expenses = [
+        e for e in raw_expenses
+        if e.get("split_type") != "personal" or str(e.get("paid_by")) == str(user_id)
+    ]
+
+    # 6. Batch-fetch all profiles for media, notes, and expenses in ONE query
+    needed_profile_ids = set()
+    for m in visible_items:
+        if m.get("uploaded_by"):
+            needed_profile_ids.add(str(m["uploaded_by"]))
+    for n in visible_notes:
+        if n.get("created_by"):
+            needed_profile_ids.add(str(n["created_by"]))
+    for e in visible_expenses:
+        if e.get("paid_by"):
+            needed_profile_ids.add(str(e["paid_by"]))
+
+    profiles_map = {}
+    if needed_profile_ids:
+        prof_res = db.table("profiles").select("*").in_("id", list(needed_profile_ids)).execute()
+        if prof_res.data:
+            profiles_map = {str(p["id"]): p for p in prof_res.data}
+
+    for m in visible_items:
+        m["uploader"] = profiles_map.get(str(m.get("uploaded_by")))
+    for n in visible_notes:
+        n["author"] = profiles_map.get(str(n.get("created_by")))
+    for e in visible_expenses:
+        e["payer"] = profiles_map.get(str(e.get("paid_by")))
+
+    media_items = [_sign_media_item(item) for item in visible_items]
+    notes_items = visible_notes
+
+    # 6. Compute expense summary in-memory instantly (0ms, 0 extra DB roundtrips)
+    summary_data = compute_expense_summary_from_data(
+        hangout_id=canonical_id,
+        all_expenses=raw_expenses,
+        participants=participants,
+        creator_id=creator_id,
+        user_id=user_id,
+    )
 
     return {
         "hangout": hangout,
         "media": media_items,
         "rating": user_rating,
         "notes": notes_items,
-        "expenses": expenses_items,
+        "expenses": visible_expenses,
         "expense_summary": summary_data,
     }
 

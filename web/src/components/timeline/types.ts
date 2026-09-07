@@ -43,6 +43,12 @@ export interface Group {
   cover_image_url?: string | null
 }
 
+export interface TimelineFeedResponse {
+  hangouts: Hangout[]
+  groups: Group[]
+  memory?: Memory | null
+}
+
 export type QuickFilter = 'All' | 'Created by Me' | 'This Month' | 'Memories'
 
 export const DEFAULT_COVER = '/images/covers/hangout-default.jpg'

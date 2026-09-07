@@ -3,6 +3,7 @@ from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, HttpUrl
 from app.schemas.profile import ProfileResponse
+from app.schemas.group import GroupResponse
 from app.schemas.media import MediaResponse
 from app.schemas.note import NoteResponse
 from app.schemas.expense import ExpenseResponse, ExpenseSummaryResponse
@@ -115,4 +116,13 @@ class HangoutFullResponse(BaseModel):
     expense_summary: Optional[ExpenseSummaryResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TimelineFeedResponse(BaseModel):
+    hangouts: List[HangoutResponse] = []
+    groups: List[GroupResponse] = []
+    memory: Optional[MemoryResponse] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 
