@@ -1,5 +1,5 @@
 -- Hangouts Backend Database Schema (Consolidated reference file)
--- Last Updated: 2026-08-26
+-- Last Updated: 2026-09-07
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -174,3 +174,17 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 11. Performance Indexes
+CREATE INDEX IF NOT EXISTS idx_hangouts_created_by ON hangouts(created_by);
+CREATE INDEX IF NOT EXISTS idx_hangouts_date ON hangouts(hangout_date DESC);
+CREATE INDEX IF NOT EXISTS idx_hangouts_group_id ON hangouts(group_id);
+CREATE INDEX IF NOT EXISTS idx_hangout_participants_user_id ON hangout_participants(user_id);
+CREATE INDEX IF NOT EXISTS idx_group_members_user_status ON group_members(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_media_hangout_id ON media(hangout_id);
+CREATE INDEX IF NOT EXISTS idx_media_uploaded_by ON media(uploaded_by);
+CREATE INDEX IF NOT EXISTS idx_media_favorites_user_id ON media_favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_notes_hangout_id ON notes(hangout_id);
+CREATE INDEX IF NOT EXISTS idx_notes_created_by ON notes(created_by);
+CREATE INDEX IF NOT EXISTS idx_expenses_hangout_id ON expenses(hangout_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_paid_by ON expenses(paid_by);
