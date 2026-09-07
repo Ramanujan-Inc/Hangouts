@@ -8,6 +8,7 @@ import { ProtectedRoute } from '../../components/ProtectedRoute'
 import { useAuth } from '../../context/AuthContext'
 import { Smile, Film, FileText, DollarSign } from 'lucide-react'
 import { api } from '../../lib/api'
+import { uploadMediaItems } from '../../lib/mediaUpload'
 import { getHangoutShortId } from '../../lib/hangoutUrl'
 import { SegmentedTabs, Spinner } from '../../components/ui'
 import {
@@ -110,15 +111,7 @@ function HangoutDetailContent() {
     if (!canonicalId || items.length === 0) return
     try {
       setIsUploadingMedia(true)
-      const formData = new FormData()
-      items.forEach((item) => {
-        formData.append('files', item.file)
-      })
-      const captionsList = items.map((item) => item.caption || '')
-      formData.append('captions_json', JSON.stringify(captionsList))
-      formData.append('is_shared', String(isShared))
-
-      const uploadedItems = await api.upload<HangoutMedia[]>(`/hangouts/${canonicalId}/media/bulk`, formData)
+      const uploadedItems = await uploadMediaItems(canonicalId, items, isShared)
       const newItems = Array.isArray(uploadedItems) ? uploadedItems : [uploadedItems]
       if (fullData) {
         mutateFullData({ ...fullData, media: [...newItems, ...media] }, false)
