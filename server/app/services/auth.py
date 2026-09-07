@@ -143,11 +143,15 @@ def resend_confirmation_email(db: Client, email: str, redirect_url: Optional[str
 
 def get_oauth_authorization_url(provider: str = "google", redirect_to: Optional[str] = None) -> Dict[str, str]:
     """Generate Supabase OAuth authorization URL for the requested provider."""
+    from urllib.parse import quote
+
     callback_target = (redirect_to or f"{settings.FRONTEND_URL}/auth/callback").strip()
+    encoded_target = quote(callback_target, safe="")
     base_url = settings.SUPABASE_URL.rstrip("/")
-    auth_url = f"{base_url}/auth/v1/authorize?provider={provider}&redirect_to={callback_target}"
+    auth_url = f"{base_url}/auth/v1/authorize?provider={provider}&redirect_to={encoded_target}"
     return {
         "url": auth_url,
         "provider": provider,
     }
+
 
