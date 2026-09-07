@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import Optional, List, Dict, Any
 from supabase import Client
-from app.services.hangouts import get_hangout_participants, get_user_hangout_ids
+from app.services.hangouts import get_user_hangout_ids
 
 
 def get_memories_on_this_day(
@@ -11,13 +11,20 @@ def get_memories_on_this_day(
     group_id: Optional[str] = None,
     window_days: int = 3,
 ) -> List[Dict[str, Any]]:
-    """Retrieve historical hangouts that took place within a window (default ±3 days) of target_date in prior years."""
+    """Retrieve historical hangouts with creator and participants joined in a single query."""
     if target_date is None:
         target_date = datetime.now(timezone.utc).date()
 
     target_year = target_date.year
 
-    query = db.table("hangouts").select("*").lt("hangout_date", target_date.isoformat())
+    query = (
+        db.table("hangouts")
+        .select(
+            "*, creator:profiles!hangouts_created_by_fkey(*), "
+            "participants:hangout_participants(id, hangout_id, user_id, profile:profiles!hangout_participants_user_id_fkey(*))"
+        )
+        .lt("hangout_date", target_date.isoformat())
+    )
 
     if user_id:
         user_hangout_ids = get_user_hangout_ids(db, user_id)
@@ -51,16 +58,8 @@ def get_memories_on_this_day(
         diff = (h_date - anniversary).days
         if abs(diff) <= window_days:
             years_ago = target_year - h_date.year
-
-            # Populate creator profile
-            creator_res = db.table("profiles").select("*").eq("id", hangout["created_by"]).execute()
-            hangout["creator"] = creator_res.data[0] if creator_res.data else None
-
-            # Populate participants with profile details
-            hangout["participants"] = get_hangout_participants(db=db, hangout_id=hangout["id"])
             hangout["years_ago"] = years_ago
             hangout["days_diff"] = diff
-
             memories.append(hangout)
 
     # Sort memories: exact matches (abs(days_diff) == 0) first, then closest days_diff, then most recent years

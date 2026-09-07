@@ -76,26 +76,59 @@ def get_user_groups(db: Client, user_id: str) -> List[Dict[str, Any]]:
         .execute()
     )
 
+    if not response.data:
+        return []
+
     groups = []
-    if response.data:
-        for item in response.data:
-            group_info = item.get("groups")
-            if group_info:
-                if not group_info.get("invite_code"):
-                    new_code = uuid.uuid4().hex[:12]
-                    db.table("groups").update({"invite_code": new_code}).eq("id", group_info["id"]).execute()
-                    group_info["invite_code"] = new_code
-                group_info["user_status"] = item.get("status")
-                group_info["members"] = get_group_members(db=db, group_id=group_info["id"])
-                groups.append(group_info)
+    group_ids = []
+    for item in response.data:
+        group_info = item.get("groups")
+        if group_info:
+            group_info["user_status"] = item.get("status")
+            group_ids.append(group_info["id"])
+            groups.append(group_info)
+
+    # Batch fetch all group members for all these groups in ONE single query
+    if group_ids:
+        members_res = (
+            db.table("group_members")
+            .select("id, group_id, user_id, status, invited_by, joined_at, profile:profiles!group_members_user_id_fkey(*)")
+            .in_("group_id", group_ids)
+            .execute()
+        )
+        members_by_group: Dict[str, List[Dict[str, Any]]] = {}
+        for m in (members_res.data or []):
+            gid = str(m["group_id"])
+            if gid not in members_by_group:
+                members_by_group[gid] = []
+            members_by_group[gid].append({
+                "id": m["id"],
+                "group_id": m["group_id"],
+                "user_id": m["user_id"],
+                "status": m.get("status", "accepted"),
+                "invited_by": m.get("invited_by"),
+                "joined_at": m["joined_at"],
+                "profile": m.get("profile"),
+            })
+
+        for g in groups:
+            g["members"] = members_by_group.get(str(g["id"]), [])
+            if not g.get("invite_code"):
+                new_code = uuid.uuid4().hex[:12]
+                try:
+                    db.table("groups").update({"invite_code": new_code}).eq("id", g["id"]).execute()
+                except Exception:
+                    pass
+                g["invite_code"] = new_code
+
     return groups
 
 
 def get_user_group_invites(db: Client, user_id: str) -> List[Dict[str, Any]]:
-    """Retrieve all pending group invitations for the specified user."""
+    """Retrieve all pending group invitations for the specified user with joined group and inviter profiles."""
     response = (
         db.table("group_members")
-        .select("id, group_id, user_id, status, invited_by, joined_at")
+        .select("id, group_id, user_id, status, invited_by, joined_at, group:groups(*), inviter:profiles!group_members_invited_by_fkey(*)")
         .eq("user_id", user_id)
         .eq("status", "pending")
         .execute()
@@ -103,23 +136,13 @@ def get_user_group_invites(db: Client, user_id: str) -> List[Dict[str, Any]]:
     invites = []
     if response.data:
         for item in response.data:
-            group_res = db.table("groups").select("*").eq("id", item["group_id"]).execute()
-            group_info = group_res.data[0] if group_res.data and len(group_res.data) > 0 else None
-
-            inviter_id = item.get("invited_by")
-            inviter_profile = None
-            if inviter_id:
-                prof_res = db.table("profiles").select("*").eq("id", inviter_id).execute()
-                if prof_res.data and len(prof_res.data) > 0:
-                    inviter_profile = prof_res.data[0]
-
             invites.append({
                 "id": item["id"],
                 "group_id": item["group_id"],
                 "status": item["status"],
                 "joined_at": item["joined_at"],
-                "group": group_info,
-                "inviter": inviter_profile,
+                "group": item.get("group"),
+                "inviter": item.get("inviter"),
             })
     return invites
 
@@ -131,7 +154,10 @@ def get_group_by_id(db: Client, group_id: str) -> Optional[Dict[str, Any]]:
         group = response.data[0]
         if not group.get("invite_code"):
             new_code = uuid.uuid4().hex[:12]
-            db.table("groups").update({"invite_code": new_code}).eq("id", group["id"]).execute()
+            try:
+                db.table("groups").update({"invite_code": new_code}).eq("id", group["id"]).execute()
+            except Exception:
+                pass
             group["invite_code"] = new_code
         return group
     return None
@@ -149,10 +175,10 @@ def get_full_group_details(db: Client, group_id: str) -> Dict[str, Any]:
 
 
 def get_group_members(db: Client, group_id: str) -> List[Dict[str, Any]]:
-    """Fetch all members of a group with profile information."""
+    """Fetch all members of a group with profile information in a single joined query."""
     response = (
         db.table("group_members")
-        .select("id, group_id, user_id, status, invited_by, joined_at")
+        .select("id, group_id, user_id, status, invited_by, joined_at, profile:profiles!group_members_user_id_fkey(*)")
         .eq("group_id", group_id)
         .execute()
     )
@@ -160,9 +186,6 @@ def get_group_members(db: Client, group_id: str) -> List[Dict[str, Any]]:
     members = []
     if response.data:
         for item in response.data:
-            prof_res = db.table("profiles").select("*").eq("id", item["user_id"]).execute()
-            profile = prof_res.data[0] if prof_res.data and len(prof_res.data) > 0 else None
-
             member = {
                 "id": item["id"],
                 "group_id": item["group_id"],
@@ -170,7 +193,7 @@ def get_group_members(db: Client, group_id: str) -> List[Dict[str, Any]]:
                 "status": item.get("status", "accepted"),
                 "invited_by": item.get("invited_by"),
                 "joined_at": item["joined_at"],
-                "profile": profile,
+                "profile": item.get("profile"),
             }
             members.append(member)
     return members

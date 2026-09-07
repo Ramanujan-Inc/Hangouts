@@ -87,35 +87,29 @@ def get_hangout_expenses(
     return visible_items
 
 
-def get_expense_summary(
-    db: Client,
+def compute_expense_summary_from_data(
     hangout_id: str,
+    all_expenses: List[Dict[str, Any]],
+    participants: List[Dict[str, Any]],
+    creator_id: Optional[str] = None,
     user_id: Optional[str] = None,
+    profiles_map: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Calculate total spent, equal split share, member net balances, and simplified debt transactions."""
-    hangout_res = db.table("hangouts").select("id, created_by").eq("id", hangout_id).execute()
-    if not hangout_res.data:
-        raise NotFoundError("Hangout not found.")
-
-    # 1. Fetch participants
-    participants = get_hangout_participants(db=db, hangout_id=hangout_id)
-    participant_user_ids = {str(p["user_id"]) for p in participants}
+    """Pure in-memory calculation of total spent, equal split share, balances, and debts."""
+    participant_user_ids = {str(p["user_id"]) for p in participants if "user_id" in p}
 
     # Ensure creator is included if participants list is otherwise empty
-    if not participant_user_ids:
-        creator_id = str(hangout_res.data[0]["created_by"])
-        participant_user_ids.add(creator_id)
+    if not participant_user_ids and creator_id:
+        participant_user_ids.add(str(creator_id))
 
-    # 2. Fetch expenses
-    expenses_res = db.table("expenses").select("*").eq("hangout_id", hangout_id).execute()
-    all_expenses = expenses_res.data or []
     for e in all_expenses:
-        e["total_amount"] = float(e["total_amount"])
+        e["total_amount"] = float(e.get("total_amount") or 0)
 
     # Equal split expenses (shared across all participants)
     equal_split_expenses = [e for e in all_expenses if e.get("split_type", "equal") == "equal"]
     for e in equal_split_expenses:
-        participant_user_ids.add(str(e["paid_by"]))
+        if "paid_by" in e and e["paid_by"]:
+            participant_user_ids.add(str(e["paid_by"]))
 
     # Expenses visible to the requesting user (shared expenses + personal expenses owned by user)
     visible_expenses = [
@@ -125,27 +119,30 @@ def get_expense_summary(
     if user_id:
         participant_user_ids.add(str(user_id))
 
-    # 3. Fetch profiles for all involved members
-    profiles_map = {}
-    if participant_user_ids:
-        p_res = db.table("profiles").select("*").in_("id", list(participant_user_ids)).execute()
-        if p_res.data:
-            profiles_map = {str(p["id"]): p for p in p_res.data}
+    # Profiles map
+    resolved_profiles: Dict[str, Any] = dict(profiles_map or {})
+    for p in participants:
+        uid = str(p.get("user_id"))
+        if uid and p.get("profile") and uid not in resolved_profiles:
+            resolved_profiles[uid] = p["profile"]
+    for e in all_expenses:
+        uid = str(e.get("paid_by"))
+        if uid and e.get("payer") and uid not in resolved_profiles:
+            resolved_profiles[uid] = e["payer"]
 
-    # 4. Compute totals based on visible expenses
+    # Compute totals based on visible expenses
     total_expenses = round(sum(e["total_amount"] for e in visible_expenses), 2)
     equal_split_total = round(sum(e["total_amount"] for e in equal_split_expenses), 2)
     participant_count = len(participant_user_ids)
     per_person_share = round(equal_split_total / participant_count, 2) if participant_count > 0 else 0.0
 
-    # 5. Calculate individual member balances
+    # Calculate individual member balances
     member_balances = []
     balances_map: Dict[str, float] = {}
 
     for uid in participant_user_ids:
-        # total_paid reflects visible spending (shared expenses + viewer's own personal expenses)
-        total_paid = round(sum(e["total_amount"] for e in visible_expenses if str(e["paid_by"]) == uid), 2)
-        total_paid_equal = round(sum(e["total_amount"] for e in equal_split_expenses if str(e["paid_by"]) == uid), 2)
+        total_paid = round(sum(e["total_amount"] for e in visible_expenses if str(e.get("paid_by")) == uid), 2)
+        total_paid_equal = round(sum(e["total_amount"] for e in equal_split_expenses if str(e.get("paid_by")) == uid), 2)
         net_balance = round(total_paid_equal - per_person_share, 2)
         balances_map[uid] = net_balance
 
@@ -154,7 +151,7 @@ def get_expense_summary(
 
         member_balances.append({
             "user_id": uid,
-            "profile": profiles_map.get(uid),
+            "profile": resolved_profiles.get(uid),
             "total_paid": total_paid,
             "total_paid_equal": total_paid_equal,
             "net_balance": net_balance,
@@ -162,10 +159,9 @@ def get_expense_summary(
             "is_owed": is_owed,
         })
 
-    # Sort member balances by total_paid DESC for clean spending breakdown representation
     member_balances.sort(key=lambda m: m["total_paid"], reverse=True)
 
-    # 6. Greedy debt simplification ("Who Owes Whom")
+    # Greedy debt simplification ("Who Owes Whom")
     debtors = [{"user_id": uid, "bal": abs(bal)} for uid, bal in balances_map.items() if bal < -0.001]
     creditors = [{"user_id": uid, "bal": bal} for uid, bal in balances_map.items() if bal > 0.001]
 
@@ -184,9 +180,9 @@ def get_expense_summary(
         if amount > 0.009:
             simplified_debts.append({
                 "from_user_id": debtor["user_id"],
-                "from_user": profiles_map.get(debtor["user_id"]),
+                "from_user": resolved_profiles.get(debtor["user_id"]),
                 "to_user_id": creditor["user_id"],
-                "to_user": profiles_map.get(creditor["user_id"]),
+                "to_user": resolved_profiles.get(creditor["user_id"]),
                 "amount": amount,
             })
 
@@ -208,6 +204,43 @@ def get_expense_summary(
         "member_balances": member_balances,
         "simplified_debts": simplified_debts,
     }
+
+
+def get_expense_summary(
+    db: Client,
+    hangout_id: str,
+    user_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Calculate total spent, equal split share, member net balances, and simplified debt transactions."""
+    hangout_res = db.table("hangouts").select("id, created_by").eq("id", hangout_id).execute()
+    if not hangout_res.data:
+        raise NotFoundError("Hangout not found.")
+
+    creator_id = str(hangout_res.data[0]["created_by"]) if hangout_res.data[0].get("created_by") else None
+    participants = get_hangout_participants(db=db, hangout_id=hangout_id)
+    expenses_res = db.table("expenses").select("*").eq("hangout_id", hangout_id).execute()
+    all_expenses = expenses_res.data or []
+
+    # Fetch profiles for participants and payers
+    participant_user_ids = {str(p["user_id"]) for p in participants if "user_id" in p}
+    for e in all_expenses:
+        if "paid_by" in e and e["paid_by"]:
+            participant_user_ids.add(str(e["paid_by"]))
+
+    profiles_map = {}
+    if participant_user_ids:
+        p_res = db.table("profiles").select("*").in_("id", list(participant_user_ids)).execute()
+        if p_res.data:
+            profiles_map = {str(p["id"]): p for p in p_res.data}
+
+    return compute_expense_summary_from_data(
+        hangout_id=hangout_id,
+        all_expenses=all_expenses,
+        participants=participants,
+        creator_id=creator_id,
+        user_id=user_id,
+        profiles_map=profiles_map,
+    )
 
 
 def delete_expense(
