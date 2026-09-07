@@ -551,10 +551,10 @@ def get_hangout_full_details(db: Client, hangout_id: str, user_id: str) -> Dict[
     )
     user_rating = rating_record.data[0]["rating"] if rating_record.data else 4
 
-    # 3. Media with uploader profile joined
+    # 3. Media
     media_res = (
         db.table("media")
-        .select("*, uploader:profiles!media_uploaded_by_fkey(*)")
+        .select("*")
         .eq("hangout_id", canonical_id)
         .order("created_at", desc=True)
         .execute()
@@ -580,26 +580,24 @@ def get_hangout_full_details(db: Client, hangout_id: str, user_id: str) -> Dict[
     for item in visible_items:
         item["is_favorited"] = str(item.get("id")) in favorited_ids
 
-    media_items = [_sign_media_item(item) for item in visible_items]
-
-    # 4. Notes with author profile joined
+    # 4. Notes
     notes_res = (
         db.table("notes")
-        .select("*, author:profiles!notes_created_by_fkey(*)")
+        .select("*")
         .eq("hangout_id", canonical_id)
         .order("created_at", desc=True)
         .execute()
     )
     raw_notes = notes_res.data or []
-    notes_items = [
+    visible_notes = [
         n for n in raw_notes
         if n.get("is_shared", True) or str(n.get("created_by")) == str(user_id)
     ]
 
-    # 5. Expenses with payer profile joined
+    # 5. Expenses
     expenses_res = (
         db.table("expenses")
-        .select("*, payer:profiles!expenses_paid_by_fkey(*)")
+        .select("*")
         .eq("hangout_id", canonical_id)
         .order("created_at", desc=False)
         .execute()
@@ -612,6 +610,34 @@ def get_hangout_full_details(db: Client, hangout_id: str, user_id: str) -> Dict[
         e for e in raw_expenses
         if e.get("split_type") != "personal" or str(e.get("paid_by")) == str(user_id)
     ]
+
+    # 6. Batch-fetch all profiles for media, notes, and expenses in ONE query
+    needed_profile_ids = set()
+    for m in visible_items:
+        if m.get("uploaded_by"):
+            needed_profile_ids.add(str(m["uploaded_by"]))
+    for n in visible_notes:
+        if n.get("created_by"):
+            needed_profile_ids.add(str(n["created_by"]))
+    for e in visible_expenses:
+        if e.get("paid_by"):
+            needed_profile_ids.add(str(e["paid_by"]))
+
+    profiles_map = {}
+    if needed_profile_ids:
+        prof_res = db.table("profiles").select("*").in_("id", list(needed_profile_ids)).execute()
+        if prof_res.data:
+            profiles_map = {str(p["id"]): p for p in prof_res.data}
+
+    for m in visible_items:
+        m["uploader"] = profiles_map.get(str(m.get("uploaded_by")))
+    for n in visible_notes:
+        n["author"] = profiles_map.get(str(n.get("created_by")))
+    for e in visible_expenses:
+        e["payer"] = profiles_map.get(str(e.get("paid_by")))
+
+    media_items = [_sign_media_item(item) for item in visible_items]
+    notes_items = visible_notes
 
     # 6. Compute expense summary in-memory instantly (0ms, 0 extra DB roundtrips)
     summary_data = compute_expense_summary_from_data(
