@@ -1,8 +1,14 @@
 from typing import List, Optional
+import json
 from fastapi import APIRouter, Depends, File, Form, UploadFile, Query, status
 from supabase import Client
 from app.api.deps import get_current_user, get_db
-from app.schemas.media import MediaResponse
+from app.schemas.media import (
+    MediaResponse,
+    DirectUploadRequest,
+    DirectUploadResponse,
+    DirectMediaConfirmRequest,
+)
 from app.services import media as media_service
 
 router = APIRouter()
@@ -27,8 +33,6 @@ def upload_media(
         is_shared=is_shared,
     )
 
-
-import json
 
 @router.post("/hangouts/{id}/media/bulk", response_model=List[MediaResponse], status_code=status.HTTP_201_CREATED)
 def upload_bulk_media(
@@ -57,6 +61,38 @@ def upload_bulk_media(
         captions=resolved_captions,
         caption=caption,
         is_shared=is_shared,
+    )
+
+
+@router.post("/hangouts/{id}/media/upload-urls", response_model=DirectUploadResponse)
+def get_media_upload_urls(
+    id: str,
+    payload: DirectUploadRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """Generate presigned PUT upload URLs for client-side direct storage upload."""
+    return media_service.prepare_direct_media_uploads(
+        db=db,
+        hangout_id=id,
+        user_id=current_user["id"],
+        files=payload.files,
+    )
+
+
+@router.post("/hangouts/{id}/media/confirm", response_model=List[MediaResponse], status_code=status.HTTP_201_CREATED)
+def confirm_direct_media(
+    id: str,
+    payload: DirectMediaConfirmRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
+    """Record metadata for files uploaded directly from client to storage."""
+    return media_service.confirm_direct_media_uploads(
+        db=db,
+        hangout_id=id,
+        user_id=current_user["id"],
+        items=payload.items,
     )
 
 

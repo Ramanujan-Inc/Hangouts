@@ -22,6 +22,7 @@ import { extractBatchPhotoMetadata } from '../lib/exif'
 import { resolveBatchLocation } from '../lib/geocoding'
 import { generateVideoThumbnail } from '../lib/video'
 import { getHangoutUrl } from '../lib/hangoutUrl'
+import { uploadMediaItems } from '../lib/mediaUpload'
 
 export default function CreateHangout() {
   const router = useRouter()
@@ -350,14 +351,13 @@ export default function CreateHangout() {
       // 3. Upload attached photos into hangout media album
       if (uploadedPhotos.length > 0) {
         try {
-          const mediaForm = new FormData()
-          uploadedPhotos.forEach((photo) => mediaForm.append('files', photo.file))
-          const captionsList = uploadedPhotos.map((p) => p.caption || '')
-          mediaForm.append('captions_json', JSON.stringify(captionsList))
-          mediaForm.append('is_shared', 'true')
-          await api.post(`/hangouts/${hangoutId}/media/bulk`, mediaForm)
+          await uploadMediaItems(
+            hangoutId,
+            uploadedPhotos.map((p) => ({ file: p.file, caption: p.caption })),
+            true
+          )
         } catch (uploadErr) {
-          console.warn('Failed to bulk upload media items:', uploadErr)
+          console.warn('Failed to upload media items:', uploadErr)
         }
       }
 
