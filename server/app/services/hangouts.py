@@ -1,3 +1,4 @@
+import mimetypes
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from fastapi import UploadFile
@@ -6,8 +7,51 @@ from app.schemas.hangout import HangoutCreate, HangoutUpdate
 import uuid
 from app.core.config import settings
 from app.core.exceptions import NotFoundError, ForbiddenError, BadRequestError
-from app.core.storage import upload_file_bytes, get_public_url
+from app.core.storage import (
+    upload_file_bytes,
+    get_public_url,
+    generate_presigned_upload_url,
+    generate_presigned_download_url,
+)
 from app.services.media import ALLOWED_IMAGE_MIME_TYPES
+
+
+def _sign_cover_url(url: Optional[str]) -> Optional[str]:
+    """Attach temporary signed download URL for private R2 cover photo items."""
+    if not url:
+        return None
+    if url.startswith("http://") or url.startswith("https://") or url.startswith("/"):
+        return url
+    return generate_presigned_download_url(bucket=settings.R2_BUCKET_MEDIA, key=url)
+
+
+def prepare_hangout_cover_upload(filename: str, content_type: str) -> Dict[str, str]:
+    """Generate a presigned PUT upload URL for direct client-to-storage cover photo upload."""
+    if not content_type or content_type == "application/octet-stream":
+        guessed, _ = mimetypes.guess_type(filename or "")
+        if guessed:
+            content_type = guessed
+
+    if content_type not in ALLOWED_IMAGE_MIME_TYPES:
+        raise BadRequestError(
+            f"Invalid image type '{content_type}'. Allowed types are {', '.join(ALLOWED_IMAGE_MIME_TYPES)}."
+        )
+
+    safe_filename = filename.replace(" ", "_") if filename else "hangout_cover.jpg"
+    object_key = f"{settings.ENVIRONMENT}/covers/hng_{uuid.uuid4()}_{safe_filename}"
+
+    upload_url = generate_presigned_upload_url(
+        bucket=settings.R2_BUCKET_AVATARS,
+        key=object_key,
+        content_type=content_type,
+        expires_in=600,
+    )
+    public_url = get_public_url(bucket=settings.R2_BUCKET_AVATARS, key=object_key)
+
+    return {
+        "upload_url": upload_url,
+        "public_url": public_url,
+    }
 
 
 def upload_hangout_cover_image(db: Client, file: UploadFile) -> Dict[str, str]:
@@ -149,6 +193,9 @@ def get_hangout_by_id(db: Client, hangout_id: str, user_id: Optional[str] = None
         if not (is_creator or is_participant or is_group_member):
             raise ForbiddenError("You do not have access to view this hangout.")
 
+    if hangout.get("cover_photo_url"):
+        hangout["cover_photo_url"] = _sign_cover_url(hangout["cover_photo_url"])
+
     return hangout
 
 
@@ -262,6 +309,8 @@ def get_hangouts(
     for h in hangouts:
         if not h.get("short_id") and h.get("id"):
             h["short_id"] = str(h["id"])[:8]
+        if h.get("cover_photo_url"):
+            h["cover_photo_url"] = _sign_cover_url(h["cover_photo_url"])
 
     return hangouts
 
@@ -350,6 +399,8 @@ def get_hangouts_map(
     for h in hangouts:
         if not h.get("short_id") and h.get("id"):
             h["short_id"] = str(h["id"])[:8]
+        if h.get("cover_photo_url"):
+            h["cover_photo_url"] = _sign_cover_url(h["cover_photo_url"])
 
     return hangouts
 
@@ -535,7 +586,7 @@ def get_hangout_by_invite_code(db: Client, invite_code: str, user_id: Optional[s
         "hangout_time": hangout.get("hangout_time"),
         "location_name": hangout.get("location_name"),
         "formatted_address": hangout.get("formatted_address"),
-        "cover_photo_url": hangout.get("cover_photo_url"),
+        "cover_photo_url": _sign_cover_url(hangout.get("cover_photo_url")),
         "invite_code": hangout["invite_code"],
         "short_id": hangout.get("short_id") or str(hangout["id"])[:8],
         "creator": creator,

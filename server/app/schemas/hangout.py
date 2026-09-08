@@ -126,3 +126,14 @@ class TimelineFeedResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CoverUploadRequest(BaseModel):
+    filename: str
+    content_type: str
+
+
+class CoverUploadResponse(BaseModel):
+    upload_url: str
+    public_url: str
+
+
+

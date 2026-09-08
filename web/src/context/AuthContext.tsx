@@ -146,7 +146,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = useCallback(async (redirectPath?: string) => {
     if (typeof window === 'undefined') return;
-    const callbackUrl = `${window.location.origin}/auth/callback${redirectPath ? `?next=${encodeURIComponent(redirectPath)}` : ''}`;
+    const hasCustomRedirect = redirectPath && redirectPath !== '/timeline' && redirectPath !== '/';
+    const callbackUrl = `${window.location.origin}/auth/callback${hasCustomRedirect ? `?next=${encodeURIComponent(redirectPath)}` : ''}`;
     const res = await api.get<{ url: string; provider: string }>(
       `/auth/google/url?redirect_to=${encodeURIComponent(callbackUrl)}`
     );

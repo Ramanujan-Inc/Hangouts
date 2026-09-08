@@ -1,3 +1,4 @@
+import mimetypes
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
@@ -8,8 +9,10 @@ from app.core.exceptions import NotFoundError, ForbiddenError, BadRequestError
 from app.core.storage import (
     upload_file_bytes,
     generate_presigned_download_url,
+    generate_presigned_upload_url,
     delete_file_object,
 )
+from app.schemas.media import DirectUploadItemRequest, DirectMediaConfirmItem
 from app.services.storage import check_storage_quota
 
 ALLOWED_IMAGE_MIME_TYPES = {
@@ -131,25 +134,25 @@ def upload_bulk_media(
     captions: Optional[List[str]] = None,
     caption: Optional[str] = None,
     is_shared: bool = True,
+    cover_index: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Upload multiple photos or videos to private storage and record database entries in batch with captions."""
     if not files:
         raise BadRequestError("No files provided for upload.")
 
-    # 1. Check hangout existence
-    hangout_res = db.table("hangouts").select("id").eq("id", hangout_id).execute()
-    if not hangout_res.data:
-        raise NotFoundError("Hangout not found.")
+    from app.services.hangouts import resolve_hangout_id
+    canonical_hangout_id = resolve_hangout_id(db, hangout_id)
 
-    # 2. Get uploader profile
-    profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
-    uploader_profile = profile_res.data[0] if profile_res.data else None
-
-    now = datetime.now(timezone.utc).isoformat()
-    media_records_to_insert = []
-
+    # 1. Read files, validate MIME types, and compute total bytes in memory
+    total_bytes = 0
+    prepared_files = []
     for idx, file in enumerate(files):
         content_type = file.content_type or ""
+        if not content_type or content_type == "application/octet-stream":
+            guessed, _ = mimetypes.guess_type(file.filename or "")
+            if guessed:
+                content_type = guessed
+
         if content_type not in ALLOWED_MIME_TYPES:
             raise BadRequestError(
                 f"Unsupported file type '{content_type}' for file '{file.filename}'. Allowed types are photos ({', '.join(ALLOWED_IMAGE_MIME_TYPES)}) and videos ({', '.join(ALLOWED_VIDEO_MIME_TYPES)})."
@@ -158,40 +161,77 @@ def upload_bulk_media(
         media_type = "video" if content_type in ALLOWED_VIDEO_MIME_TYPES else "photo"
         file_bytes = file.file.read()
         file_size = len(file_bytes)
-        check_storage_quota(db, user_id, file_size)
+        total_bytes += file_size
 
-        object_key = _upload_media_to_r2(hangout_id, file_bytes, file.filename or "media", content_type)
-
-        # Resolve individual caption for this file index if provided
         file_caption = None
         if captions and idx < len(captions) and captions[idx]:
             file_caption = captions[idx]
         elif caption:
             file_caption = caption
 
+        is_item_cover = cover_index is not None and idx == cover_index
+
+        prepared_files.append({
+            "idx": idx,
+            "filename": file.filename or "media",
+            "content_type": content_type,
+            "media_type": media_type,
+            "file_bytes": file_bytes,
+            "file_size": file_size,
+            "caption": file_caption,
+            "is_cover": is_item_cover,
+        })
+
+    # 2. Check cumulative storage quota ONCE upfront (cuts N-1 Supabase roundtrips)
+    check_storage_quota(db, user_id, total_bytes)
+
+    # 3. Get uploader profile
+    profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
+    uploader_profile = profile_res.data[0] if profile_res.data else None
+
+    # 4. Upload to R2 sequentially (safe for Render's 0.1 vCPU / 512MB RAM without thread contention)
+    now = datetime.now(timezone.utc).isoformat()
+    media_records_to_insert = []
+    cover_object_key = None
+
+    for item in prepared_files:
+        object_key = _upload_media_to_r2(
+            canonical_hangout_id,
+            item["file_bytes"],
+            item["filename"],
+            item["content_type"],
+        )
+        if item["is_cover"]:
+            cover_object_key = object_key
+
         media_records_to_insert.append({
-            "hangout_id": hangout_id,
+            "hangout_id": canonical_hangout_id,
             "uploaded_by": user_id,
             "url": object_key,
             "thumbnail_url": object_key,
-            "caption": file_caption,
-            "media_type": media_type,
+            "caption": item["caption"],
+            "media_type": item["media_type"],
             "favorites_count": 0,
-            "file_size_bytes": file_size,
+            "file_size_bytes": item["file_size"],
             "is_shared": is_shared,
+            "is_cover": item["is_cover"],
             "created_at": now,
         })
 
+    # 5. Batch insert database records
     insert_res = db.table("media").insert(media_records_to_insert).execute()
     if not insert_res.data:
         raise Exception("Failed to save bulk media records.")
 
-    inserted_items = insert_res.data
-    for item in inserted_items:
-        item["uploader"] = uploader_profile
-        item["is_favorited"] = False
+    if cover_object_key:
+        db.table("hangouts").update({"cover_photo_url": cover_object_key}).eq("id", canonical_hangout_id).execute()
 
-    return [_sign_media_item(item) for item in inserted_items]
+    inserted_items = insert_res.data
+    for record in inserted_items:
+        record["uploader"] = uploader_profile
+        record["is_favorited"] = False
+
+    return [_sign_media_item(record) for record in inserted_items]
 
 
 def get_hangout_media(
@@ -305,4 +345,122 @@ def delete_media(db: Client, media_id: str, user_id: str) -> None:
     delete_file_object(bucket=settings.R2_BUCKET_MEDIA, key=media_item.get("url", ""))
 
     db.table("media").delete().eq("id", media_id).execute()
+
+
+def prepare_direct_media_uploads(
+    db: Client,
+    hangout_id: str,
+    user_id: str,
+    files: List[DirectUploadItemRequest],
+) -> Dict[str, Any]:
+    """Generate presigned PUT upload URLs for client-side direct upload to R2."""
+    if not files:
+        raise BadRequestError("No files provided for upload.")
+
+    from app.services.hangouts import resolve_hangout_id
+    canonical_hangout_id = resolve_hangout_id(db, hangout_id)
+
+    total_bytes = 0
+    resolved_files = []
+    for f in files:
+        content_type = f.content_type
+        if not content_type or content_type == "application/octet-stream":
+            guessed, _ = mimetypes.guess_type(f.filename)
+            if guessed:
+                content_type = guessed
+
+        if content_type not in ALLOWED_MIME_TYPES:
+            raise BadRequestError(
+                f"Unsupported file type '{content_type}' for '{f.filename}'. Allowed types are photos ({', '.join(ALLOWED_IMAGE_MIME_TYPES)}) and videos ({', '.join(ALLOWED_VIDEO_MIME_TYPES)})."
+            )
+
+        total_bytes += f.file_size_bytes
+        resolved_files.append((f, content_type))
+
+    check_storage_quota(db, user_id, total_bytes)
+
+    items = []
+    for f, content_type in resolved_files:
+        safe_filename = f.filename.replace(" ", "_") if f.filename else "file"
+        media_uuid = str(uuid.uuid4())
+        object_key = f"{settings.ENVIRONMENT}/hng_{canonical_hangout_id}/med_{media_uuid}_{safe_filename}"
+        upload_url = generate_presigned_upload_url(
+            bucket=settings.R2_BUCKET_MEDIA,
+            key=object_key,
+            content_type=content_type,
+            expires_in=600,
+        )
+        items.append({
+            "upload_url": upload_url,
+            "object_key": object_key,
+            "filename": f.filename,
+            "content_type": content_type,
+            "file_size_bytes": f.file_size_bytes,
+        })
+
+    return {"items": items}
+
+
+def confirm_direct_media_uploads(
+    db: Client,
+    hangout_id: str,
+    user_id: str,
+    items: List[DirectMediaConfirmItem],
+) -> List[Dict[str, Any]]:
+    """Confirm client-side uploaded files and insert media records into DB."""
+    if not items:
+        raise BadRequestError("No items provided for confirmation.")
+
+    from app.services.hangouts import resolve_hangout_id
+    canonical_hangout_id = resolve_hangout_id(db, hangout_id)
+
+    # Security check: verify all object_keys start with expected prefix
+    expected_prefix = f"{settings.ENVIRONMENT}/hng_{canonical_hangout_id}/"
+    for item in items:
+        if not item.object_key.startswith(expected_prefix):
+            raise ForbiddenError(f"Invalid object key '{item.object_key}'.")
+
+    # Get uploader profile
+    profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
+    uploader_profile = profile_res.data[0] if profile_res.data else None
+
+    now = datetime.now(timezone.utc).isoformat()
+    media_records_to_insert = []
+    for item in items:
+        content_type = item.content_type
+        if not content_type or content_type == "application/octet-stream":
+            guessed, _ = mimetypes.guess_type(item.object_key)
+            if guessed:
+                content_type = guessed
+
+        media_type = "video" if content_type in ALLOWED_VIDEO_MIME_TYPES else "photo"
+        media_records_to_insert.append({
+            "hangout_id": canonical_hangout_id,
+            "uploaded_by": user_id,
+            "url": item.object_key,
+            "thumbnail_url": item.object_key,
+            "caption": item.caption,
+            "media_type": media_type,
+            "favorites_count": 0,
+            "file_size_bytes": item.file_size_bytes,
+            "is_shared": item.is_shared,
+            "is_cover": item.is_cover,
+            "created_at": now,
+        })
+
+    insert_res = db.table("media").insert(media_records_to_insert).execute()
+    if not insert_res.data:
+        raise Exception("Failed to save confirmed media records.")
+
+    cover_item = next((item for item in items if item.is_cover), None)
+    if cover_item:
+        db.table("hangouts").update({"cover_photo_url": cover_item.object_key}).eq("id", canonical_hangout_id).execute()
+
+    inserted_items = insert_res.data
+    for record in inserted_items:
+        record["uploader"] = uploader_profile
+        record["is_favorited"] = False
+
+    return [_sign_media_item(record) for record in inserted_items]
+
 

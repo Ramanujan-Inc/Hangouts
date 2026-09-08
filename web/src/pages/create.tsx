@@ -22,6 +22,7 @@ import { extractBatchPhotoMetadata } from '../lib/exif'
 import { resolveBatchLocation } from '../lib/geocoding'
 import { generateVideoThumbnail } from '../lib/video'
 import { getHangoutUrl } from '../lib/hangoutUrl'
+import { uploadMediaItems } from '../lib/mediaUpload'
 
 export default function CreateHangout() {
   const router = useRouter()
@@ -314,18 +315,23 @@ export default function CreateHangout() {
     try {
       setSubmitting(true)
 
-      // 1. Resolve Cover Photo URL
-      let coverPhotoUrl: string | undefined = undefined
-      if (selectedCoverIndex >= 0 && uploadedPhotos[selectedCoverIndex]) {
-        const coverMedia = uploadedPhotos[selectedCoverIndex]
-        const coverForm = new FormData()
-        if (coverMedia.isVideo && coverMedia.thumbnailBlob) {
-          coverForm.append('file', coverMedia.thumbnailBlob, 'cover-thumbnail.jpg')
-        } else {
-          coverForm.append('file', coverMedia.file)
+      // 1. Check storage quota upfront if photos/videos are attached
+      if (uploadedPhotos.length > 0) {
+        const totalPhotoBytes = uploadedPhotos.reduce((sum, p) => sum + p.file.size, 0)
+        try {
+          const usage = await api.get<{ used_bytes: number; max_bytes: number }>('/storage/usage')
+          if (usage && usage.used_bytes + totalPhotoBytes > usage.max_bytes) {
+            const availableMb = Math.max(0, (usage.max_bytes - usage.used_bytes) / (1024 * 1024)).toFixed(1)
+            const requiredMb = (totalPhotoBytes / (1024 * 1024)).toFixed(1)
+            setErrorMessage(
+              `Storage quota exceeded: Selected media requires ${requiredMb} MB, but you have ${availableMb} MB available. Please remove some photos or videos before creating.`
+            )
+            setSubmitting(false)
+            return
+          }
+        } catch {
+          // If storage check network call fails, proceed and let server-side check handle it
         }
-        const coverRes = await api.post<{ url: string }>('/hangouts/cover', coverForm)
-        coverPhotoUrl = coverRes.url
       }
 
       // 2. Create the Hangout record
@@ -339,7 +345,6 @@ export default function CreateHangout() {
         place_id: placeId.trim() || undefined,
         latitude: latitude !== null ? latitude : undefined,
         longitude: longitude !== null ? longitude : undefined,
-        cover_photo_url: coverPhotoUrl,
         external_album_url: externalAlbumUrl.trim() || undefined,
         group_id: selectedGroupId || undefined,
       }
@@ -347,17 +352,20 @@ export default function CreateHangout() {
       const createdHangout = await api.post<HangoutResponse>('/hangouts', hangoutPayload)
       const hangoutId = createdHangout.id
 
-      // 3. Upload attached photos into hangout media album
+      // 3. Upload attached photos into hangout media album (starred item is marked as cover)
       if (uploadedPhotos.length > 0) {
         try {
-          const mediaForm = new FormData()
-          uploadedPhotos.forEach((photo) => mediaForm.append('files', photo.file))
-          const captionsList = uploadedPhotos.map((p) => p.caption || '')
-          mediaForm.append('captions_json', JSON.stringify(captionsList))
-          mediaForm.append('is_shared', 'true')
-          await api.post(`/hangouts/${hangoutId}/media/bulk`, mediaForm)
+          await uploadMediaItems(
+            hangoutId,
+            uploadedPhotos.map((p, idx) => ({
+              file: p.file,
+              caption: p.caption,
+              isCover: idx === selectedCoverIndex,
+            })),
+            true
+          )
         } catch (uploadErr) {
-          console.warn('Failed to bulk upload media items:', uploadErr)
+          console.warn('Failed to upload media items:', uploadErr)
         }
       }
 
