@@ -175,11 +175,13 @@ def test_get_google_auth_url(client: TestClient):
 
 def test_get_google_auth_url_with_custom_redirect(client: TestClient):
     """Test GET /api/v1/auth/google/url preserves custom redirect_to parameter."""
+    from urllib.parse import unquote
+
     custom_target = "http://localhost:3000/auth/callback?next=/groups"
     response = client.get("/api/v1/auth/google/url", params={"redirect_to": custom_target})
     assert response.status_code == 200
     data = response.json()
-    assert custom_target in data["url"]
+    assert custom_target in unquote(data["url"])
 
 
 def test_oauth_user_first_name_extraction(db: Client):
