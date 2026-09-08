@@ -82,7 +82,7 @@ export default async function handler(req: NextRequest) {
                 textTransform: 'uppercase',
               }}
             >
-              INVITE
+              SHARED MEMORY
             </span>
           </div>
 
@@ -114,7 +114,7 @@ export default async function handler(req: NextRequest) {
                 <circle cx="12" cy="7" r="4" />
               </svg>
               <span style={{ fontSize: 16, fontWeight: 700, color: '#2e2a28' }}>
-                Hosted by {host}
+                Shared by {host}
               </span>
             </div>
           ) : null}
@@ -269,7 +269,7 @@ export default async function handler(req: NextRequest) {
           }}
         >
           <span style={{ fontSize: 16, fontWeight: 600, color: '#897175' }}>
-            Shared memory, timeline & expense planning
+            Shared group memories, photos, timeline & places
           </span>
 
           <div
@@ -286,7 +286,7 @@ export default async function handler(req: NextRequest) {
               boxShadow: '0 4px 14px rgba(227, 104, 136, 0.35)',
             }}
           >
-            <span>Click to view and join</span>
+            <span>View memory</span>
             {/* Arrow SVG */}
             <svg
               width="18"

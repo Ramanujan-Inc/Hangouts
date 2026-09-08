@@ -34,6 +34,7 @@ interface JoinHangoutPageProps {
   code: string
   initialData: HangoutPreview | null
   origin: string
+  reqUrl: string
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
@@ -43,21 +44,22 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   const host = context.req.headers.host || 'hangouts-xi.vercel.app'
   const proto = (context.req.headers['x-forwarded-proto'] as string) || (host.startsWith('localhost') ? 'http' : 'https')
   const origin = `${proto}://${host}`
+  const reqUrl = context.req.url || `/join/hangout/${code}`
 
   try {
     const res = await fetch(`${apiUrl}/hangouts/join/${code}`)
     if (res.ok) {
       const initialData = await res.json()
-      return { props: { code, initialData, origin } }
+      return { props: { code, initialData, origin, reqUrl } }
     }
   } catch (err) {
     // Fallback to client-side fetch
   }
 
-  return { props: { code, initialData: null, origin } }
+  return { props: { code, initialData: null, origin, reqUrl } }
 }
 
-export default function JoinHangoutPage({ code, initialData, origin }: JoinHangoutPageProps) {
+export default function JoinHangoutPage({ code, initialData, origin, reqUrl }: JoinHangoutPageProps) {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
 
@@ -112,13 +114,13 @@ export default function JoinHangoutPage({ code, initialData, origin }: JoinHango
   const creatorAvatar = getAvatarUrl(hangout?.creator?.avatar_url)
   const hostName = hangout?.creator?.username || 'Host'
 
-  const pageTitle = hangout ? `Join "${hangout.title}" on Hangout` : 'Join Hangout'
+  const pageTitle = hangout ? `"${hangout.title}" – Shared Memory on Hangout` : 'Hangout Memory'
   const pageDescription = hangout
     ? hangout.description ||
-      `Hangout scheduled for ${formatDate(hangout.hangout_date, 'long')}${
+      `Shared memories from "${hangout.title}" on ${formatDate(hangout.hangout_date, 'long')}${
         hangout.location_name ? ` at ${hangout.location_name}` : ''
-      }. Click to view details and join!`
-    : 'Join this hangout to view details, preserve shared memories, map location history, notes and expenses.'
+      }. View photos, timeline, map location history, and group notes on Hangout.`
+    : 'Archive and relive group memories, timelines, photos, and places together on Hangout.'
 
   const ogParams = new URLSearchParams()
   if (hangout?.title) ogParams.set('title', hangout.title)
@@ -129,12 +131,12 @@ export default function JoinHangoutPage({ code, initialData, origin }: JoinHango
 
   const siteOrigin = origin || 'https://hangouts-xi.vercel.app'
   const ogImageUrl = `${siteOrigin}/api/og/hangout?${ogParams.toString()}`
-  const canonicalUrl = `${siteOrigin}/join/hangout/${code}`
+  const canonicalUrl = `${siteOrigin}${reqUrl || `/join/hangout/${code}`}`
 
   return (
     <div className="join-page-wrapper">
       <Head>
-        <title>{hangout ? `Join ${hangout.title} | Hangout` : 'Join Hangout'}</title>
+        <title>{hangout ? `"${hangout.title}" | Hangout Memory` : 'Hangout Memory'}</title>
         <meta name="description" content={pageDescription} />
 
         {/* Open Graph / Facebook / Messenger */}
@@ -144,6 +146,8 @@ export default function JoinHangoutPage({ code, initialData, origin }: JoinHango
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDescription} />
         <meta property="og:image" content={ogImageUrl} />
+        <meta property="og:image:secure_url" content={ogImageUrl} />
+        <meta property="og:image:type" content="image/png" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta property="og:image:alt" content={pageTitle} />

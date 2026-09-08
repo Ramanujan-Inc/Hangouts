@@ -27,6 +27,7 @@ interface JoinGroupPageProps {
   code: string
   initialData: GroupPreview | null
   origin: string
+  reqUrl: string
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
@@ -36,21 +37,22 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   const host = context.req.headers.host || 'hangouts-xi.vercel.app'
   const proto = (context.req.headers['x-forwarded-proto'] as string) || (host.startsWith('localhost') ? 'http' : 'https')
   const origin = `${proto}://${host}`
+  const reqUrl = context.req.url || `/join/group/${code}`
 
   try {
     const res = await fetch(`${apiUrl}/groups/join/${code}`)
     if (res.ok) {
       const initialData = await res.json()
-      return { props: { code, initialData, origin } }
+      return { props: { code, initialData, origin, reqUrl } }
     }
   } catch (err) {
     // Fallback to client-side fetch
   }
 
-  return { props: { code, initialData: null, origin } }
+  return { props: { code, initialData: null, origin, reqUrl } }
 }
 
-export default function JoinGroupPage({ code, initialData, origin }: JoinGroupPageProps) {
+export default function JoinGroupPage({ code, initialData, origin, reqUrl }: JoinGroupPageProps) {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
 
@@ -104,10 +106,10 @@ export default function JoinGroupPage({ code, initialData, origin }: JoinGroupPa
   const creatorAvatar = getAvatarUrl(group?.creator?.avatar_url)
   const creatorName = group?.creator?.username || 'Creator'
 
-  const pageTitle = group ? `Join "${group.name}" on Hangout` : 'Join Group'
+  const pageTitle = group ? `"${group.name}" – Memory Circle on Hangout` : 'Memory Circle | Hangout'
   const pageDescription = group
-    ? `Join the "${group.name}" friend circle on Hangout to plan hangouts, share notes, and preserve memories together.`
-    : 'Join this friend circle on Hangout to plan hangouts, share notes, and preserve memories together.'
+    ? `Join "${group.name}" on Hangout to preserve shared memories, timelines, photos, and places together.`
+    : 'Archive and relive group memories, timelines, photos, and places together on Hangout.'
 
   const ogParams = new URLSearchParams()
   if (group?.name) ogParams.set('name', group.name)
@@ -117,12 +119,12 @@ export default function JoinGroupPage({ code, initialData, origin }: JoinGroupPa
 
   const siteOrigin = origin || 'https://hangouts-xi.vercel.app'
   const ogImageUrl = `${siteOrigin}/api/og/group?${ogParams.toString()}`
-  const canonicalUrl = `${siteOrigin}/join/group/${code}`
+  const canonicalUrl = `${siteOrigin}${reqUrl || `/join/group/${code}`}`
 
   return (
     <div className="join-page-wrapper">
       <Head>
-        <title>{group ? `Join ${group.name} | Hangout` : 'Join Group'}</title>
+        <title>{group ? `"${group.name}" | Memory Circle` : 'Memory Circle | Hangout'}</title>
         <meta name="description" content={pageDescription} />
 
         {/* Open Graph / Facebook / Messenger */}
@@ -132,6 +134,8 @@ export default function JoinGroupPage({ code, initialData, origin }: JoinGroupPa
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDescription} />
         <meta property="og:image" content={ogImageUrl} />
+        <meta property="og:image:secure_url" content={ogImageUrl} />
+        <meta property="og:image:type" content="image/png" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta property="og:image:alt" content={pageTitle} />

@@ -80,7 +80,7 @@ export default async function handler(req: NextRequest) {
                 textTransform: 'uppercase',
               }}
             >
-              GROUP INVITE
+              FRIEND CIRCLE
             </span>
           </div>
 
@@ -235,7 +235,7 @@ export default async function handler(req: NextRequest) {
           }}
         >
           <span style={{ fontSize: 16, fontWeight: 600, color: '#897175' }}>
-            Shared memory, timeline & expense planning
+            Preserve shared memories, photos & timelines together
           </span>
 
           <div
@@ -252,7 +252,7 @@ export default async function handler(req: NextRequest) {
               boxShadow: '0 4px 14px rgba(227, 104, 136, 0.35)',
             }}
           >
-            <span>Join Group</span>
+            <span>View memories</span>
             <svg
               width="18"
               height="18"
