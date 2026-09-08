@@ -134,6 +134,7 @@ def upload_bulk_media(
     captions: Optional[List[str]] = None,
     caption: Optional[str] = None,
     is_shared: bool = True,
+    cover_index: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Upload multiple photos or videos to private storage and record database entries in batch with captions."""
     if not files:
@@ -168,13 +169,17 @@ def upload_bulk_media(
         elif caption:
             file_caption = caption
 
+        is_item_cover = cover_index is not None and idx == cover_index
+
         prepared_files.append({
+            "idx": idx,
             "filename": file.filename or "media",
             "content_type": content_type,
             "media_type": media_type,
             "file_bytes": file_bytes,
             "file_size": file_size,
             "caption": file_caption,
+            "is_cover": is_item_cover,
         })
 
     # 2. Check cumulative storage quota ONCE upfront (cuts N-1 Supabase roundtrips)
@@ -187,6 +192,7 @@ def upload_bulk_media(
     # 4. Upload to R2 sequentially (safe for Render's 0.1 vCPU / 512MB RAM without thread contention)
     now = datetime.now(timezone.utc).isoformat()
     media_records_to_insert = []
+    cover_object_key = None
 
     for item in prepared_files:
         object_key = _upload_media_to_r2(
@@ -195,6 +201,9 @@ def upload_bulk_media(
             item["filename"],
             item["content_type"],
         )
+        if item["is_cover"]:
+            cover_object_key = object_key
+
         media_records_to_insert.append({
             "hangout_id": canonical_hangout_id,
             "uploaded_by": user_id,
@@ -205,6 +214,7 @@ def upload_bulk_media(
             "favorites_count": 0,
             "file_size_bytes": item["file_size"],
             "is_shared": is_shared,
+            "is_cover": item["is_cover"],
             "created_at": now,
         })
 
@@ -212,6 +222,9 @@ def upload_bulk_media(
     insert_res = db.table("media").insert(media_records_to_insert).execute()
     if not insert_res.data:
         raise Exception("Failed to save bulk media records.")
+
+    if cover_object_key:
+        db.table("hangouts").update({"cover_photo_url": cover_object_key}).eq("id", canonical_hangout_id).execute()
 
     inserted_items = insert_res.data
     for record in inserted_items:
@@ -431,12 +444,17 @@ def confirm_direct_media_uploads(
             "favorites_count": 0,
             "file_size_bytes": item.file_size_bytes,
             "is_shared": item.is_shared,
+            "is_cover": item.is_cover,
             "created_at": now,
         })
 
     insert_res = db.table("media").insert(media_records_to_insert).execute()
     if not insert_res.data:
         raise Exception("Failed to save confirmed media records.")
+
+    cover_item = next((item for item in items if item.is_cover), None)
+    if cover_item:
+        db.table("hangouts").update({"cover_photo_url": cover_item.object_key}).eq("id", canonical_hangout_id).execute()
 
     inserted_items = insert_res.data
     for record in inserted_items:

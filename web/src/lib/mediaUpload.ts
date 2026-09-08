@@ -4,6 +4,7 @@ import { HangoutMedia } from '../components/hangout/types'
 export interface UploadMediaItem {
   file: File
   caption?: string
+  isCover?: boolean
 }
 
 interface DirectUploadItemResponse {
@@ -78,6 +79,7 @@ export async function uploadMediaItems(
           content_type: presignedData.items[index].content_type || item.file.type || 'application/octet-stream',
           caption: item.caption || null,
           is_shared: isShared,
+          is_cover: Boolean(item.isCover),
         })),
       }
 
@@ -104,9 +106,71 @@ export async function uploadMediaItems(
   formData.append('captions_json', JSON.stringify(captionsList))
   formData.append('is_shared', String(isShared))
 
+  const coverIndex = items.findIndex((item) => item.isCover)
+  if (coverIndex >= 0) {
+    formData.append('cover_index', String(coverIndex))
+  }
+
   const fallbackItems = await api.upload<HangoutMedia[]>(
     `/hangouts/${hangoutId}/media/bulk`,
     formData
   )
   return Array.isArray(fallbackItems) ? fallbackItems : [fallbackItems]
+}
+
+interface CoverUploadResponse {
+  upload_url: string
+  public_url: string
+}
+
+/**
+ * Upload a hangout cover photo.
+ *
+ * Tries direct client-to-storage (Cloudflare R2 public bucket) upload first
+ * to avoid streaming large image bytes through Render.
+ * Transparently falls back to multipart POST /hangouts/cover if direct upload fails.
+ */
+export async function uploadCoverPhoto(
+  file: File | Blob,
+  filename?: string
+): Promise<string> {
+  const actualFilename = filename || (file instanceof File ? file.name : 'cover-thumbnail.jpg')
+  const contentType = file.type || 'image/jpeg'
+
+  try {
+    // 1. Request presigned PUT URL from backend
+    const presigned = await api.post<CoverUploadResponse>('/hangouts/cover/upload-url', {
+      filename: actualFilename,
+      content_type: contentType,
+    })
+
+    if (presigned?.upload_url && presigned?.public_url) {
+      // 2. Direct PUT stream from browser to Cloudflare R2
+      const putRes = await fetch(presigned.upload_url, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': contentType,
+        },
+      })
+
+      if (putRes.ok) {
+        return presigned.public_url
+      }
+      console.warn(
+        `Direct cover storage upload failed with status ${putRes.status}; falling back to multipart`
+      )
+    }
+  } catch (directErr) {
+    console.warn(
+      'Direct cover upload failed; falling back to multipart /hangouts/cover:',
+      directErr
+    )
+  }
+
+  // Fallback: Multipart upload through Render backend
+  const coverForm = new FormData()
+  coverForm.append('file', file, actualFilename)
+  const coverRes = await api.post<{ url: string }>('/hangouts/cover', coverForm)
+  return coverRes.url
 }

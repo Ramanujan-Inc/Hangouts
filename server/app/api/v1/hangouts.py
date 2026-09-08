@@ -13,10 +13,24 @@ from app.schemas.hangout import (
     RatingCreate,
     RatingResponse,
     HangoutJoinPreviewResponse,
+    CoverUploadRequest,
+    CoverUploadResponse,
 )
 from app.services import hangouts as hangout_service
 
 router = APIRouter()
+
+
+@router.post("/cover/upload-url", response_model=CoverUploadResponse)
+def get_hangout_cover_upload_url(
+    payload: CoverUploadRequest,
+    _: dict = Depends(get_current_user),
+):
+    """Generate a presigned PUT upload URL for direct client-to-storage cover photo upload."""
+    return hangout_service.prepare_hangout_cover_upload(
+        filename=payload.filename,
+        content_type=payload.content_type,
+    )
 
 
 @router.post("/cover", response_model=dict, status_code=status.HTTP_201_CREATED)

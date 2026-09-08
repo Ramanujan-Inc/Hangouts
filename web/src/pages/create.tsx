@@ -315,21 +315,7 @@ export default function CreateHangout() {
     try {
       setSubmitting(true)
 
-      // 1. Resolve Cover Photo URL
-      let coverPhotoUrl: string | undefined = undefined
-      if (selectedCoverIndex >= 0 && uploadedPhotos[selectedCoverIndex]) {
-        const coverMedia = uploadedPhotos[selectedCoverIndex]
-        const coverForm = new FormData()
-        if (coverMedia.isVideo && coverMedia.thumbnailBlob) {
-          coverForm.append('file', coverMedia.thumbnailBlob, 'cover-thumbnail.jpg')
-        } else {
-          coverForm.append('file', coverMedia.file)
-        }
-        const coverRes = await api.post<{ url: string }>('/hangouts/cover', coverForm)
-        coverPhotoUrl = coverRes.url
-      }
-
-      // 1b. Check storage quota upfront if photos/videos are attached
+      // 1. Check storage quota upfront if photos/videos are attached
       if (uploadedPhotos.length > 0) {
         const totalPhotoBytes = uploadedPhotos.reduce((sum, p) => sum + p.file.size, 0)
         try {
@@ -359,7 +345,6 @@ export default function CreateHangout() {
         place_id: placeId.trim() || undefined,
         latitude: latitude !== null ? latitude : undefined,
         longitude: longitude !== null ? longitude : undefined,
-        cover_photo_url: coverPhotoUrl,
         external_album_url: externalAlbumUrl.trim() || undefined,
         group_id: selectedGroupId || undefined,
       }
@@ -367,12 +352,16 @@ export default function CreateHangout() {
       const createdHangout = await api.post<HangoutResponse>('/hangouts', hangoutPayload)
       const hangoutId = createdHangout.id
 
-      // 3. Upload attached photos into hangout media album
+      // 3. Upload attached photos into hangout media album (starred item is marked as cover)
       if (uploadedPhotos.length > 0) {
         try {
           await uploadMediaItems(
             hangoutId,
-            uploadedPhotos.map((p) => ({ file: p.file, caption: p.caption })),
+            uploadedPhotos.map((p, idx) => ({
+              file: p.file,
+              caption: p.caption,
+              isCover: idx === selectedCoverIndex,
+            })),
             true
           )
         } catch (uploadErr) {

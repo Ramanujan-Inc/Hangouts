@@ -13,6 +13,7 @@ class MediaBase(BaseModel):
     favorites_count: int = 0
     file_size_bytes: int = 0
     is_shared: bool = True
+    is_cover: bool = False
 
 
 class MediaCreate(MediaBase):
@@ -24,6 +25,7 @@ class MediaUpdate(BaseModel):
     media_type: Optional[Literal["photo", "video"]] = None
     favorites_count: Optional[int] = None
     is_shared: Optional[bool] = None
+    is_cover: Optional[bool] = None
 
 
 class MediaResponse(MediaBase):
@@ -78,6 +80,7 @@ class DirectMediaConfirmItem(BaseModel):
     content_type: str
     caption: Optional[str] = None
     is_shared: bool = True
+    is_cover: bool = False
 
 
 class DirectMediaConfirmRequest(BaseModel):

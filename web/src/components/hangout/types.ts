@@ -51,6 +51,7 @@ export interface HangoutMedia {
   favorites_count: number
   file_size_bytes?: number
   is_shared: boolean
+  is_cover?: boolean
   created_at?: string
   uploader?: UserProfile | null
   span?: 1 | 2

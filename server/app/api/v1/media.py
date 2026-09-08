@@ -42,6 +42,7 @@ def upload_bulk_media(
     captions_json: Optional[str] = Form(None),
     caption: Optional[str] = Form(None),
     is_shared: bool = Form(True),
+    cover_index: Optional[int] = Form(None),
     current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
 ):
@@ -61,6 +62,7 @@ def upload_bulk_media(
         captions=resolved_captions,
         caption=caption,
         is_shared=is_shared,
+        cover_index=cover_index,
     )
 
 
