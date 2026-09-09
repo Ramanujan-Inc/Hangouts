@@ -1,150 +1,173 @@
+import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from supabase import Client
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload
+from app.models.note import Note
+from app.models.hangout import Hangout
+from app.models.profile import Profile
 from app.schemas.note import NoteCreate, NoteUpdate
 from app.core.exceptions import NotFoundError, ForbiddenError
 
 
+def _note_to_dict(note: Note) -> Dict[str, Any]:
+    author_dict = None
+    if note.creator:
+        author_dict = {
+            "id": str(note.creator.id),
+            "username": note.creator.username,
+            "email": note.creator.email,
+            "avatar_url": note.creator.avatar_url,
+            "created_at": note.creator.created_at.isoformat(),
+            "updated_at": note.creator.updated_at.isoformat(),
+        }
+    return {
+        "id": str(note.id),
+        "hangout_id": str(note.hangout_id),
+        "created_by": str(note.created_by),
+        "content": note.content,
+        "color": note.color,
+        "is_shared": note.is_shared,
+        "created_at": note.created_at.isoformat(),
+        "updated_at": note.updated_at.isoformat(),
+        "author": author_dict,
+    }
+
+
 def create_note(
-    db: Client,
+    db: Session,
     hangout_id: str,
     user_id: str,
     note_create: NoteCreate,
 ) -> Dict[str, Any]:
     """Create a new note within a hangout."""
-    # 1. Check hangout existence
-    hangout_res = db.table("hangouts").select("id").eq("id", hangout_id).execute()
-    if not hangout_res.data:
+    try:
+        h_uuid = uuid.UUID(str(hangout_id))
+        u_uuid = uuid.UUID(str(user_id))
+    except (ValueError, AttributeError):
         raise NotFoundError("Hangout not found.")
 
-    now = datetime.now(timezone.utc).isoformat()
-    note_dict = {
-        "hangout_id": hangout_id,
-        "created_by": user_id,
-        "content": note_create.content,
-        "color": note_create.color or "butter",
-        "is_shared": note_create.is_shared,
-        "created_at": now,
-        "updated_at": now,
-    }
+    hangout = db.get(Hangout, h_uuid)
+    if not hangout:
+        raise NotFoundError("Hangout not found.")
 
-    res = db.table("notes").insert(note_dict).execute()
-    if not res.data:
-        raise Exception("Failed to create note.")
-
-    note_data = res.data[0]
-
-    # Attach author profile
-    profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
-    if profile_res.data:
-        note_data["author"] = profile_res.data[0]
-
-    return note_data
+    note = Note(
+        hangout_id=h_uuid,
+        created_by=u_uuid,
+        content=note_create.content,
+        color=note_create.color or "butter",
+        is_shared=note_create.is_shared,
+    )
+    db.add(note)
+    db.flush()
+    db.refresh(note, attribute_names=["creator"])
+    return _note_to_dict(note)
 
 
 def get_hangout_notes(
-    db: Client,
+    db: Session,
     hangout_id: str,
     user_id: str,
 ) -> List[Dict[str, Any]]:
     """Retrieve notes for a specific hangout, enforcing privacy rules (private notes visible only to author)."""
-    # 1. Check hangout existence
-    hangout_res = db.table("hangouts").select("id").eq("id", hangout_id).execute()
-    if not hangout_res.data:
+    try:
+        h_uuid = uuid.UUID(str(hangout_id))
+        u_uuid = uuid.UUID(str(user_id))
+    except (ValueError, AttributeError):
         raise NotFoundError("Hangout not found.")
 
-    res = db.table("notes").select("*").eq("hangout_id", hangout_id).order("created_at", desc=True).execute()
-    items = res.data or []
+    hangout = db.get(Hangout, h_uuid)
+    if not hangout:
+        raise NotFoundError("Hangout not found.")
 
-    # 2. Filter private items not authored by current user
-    visible_items = []
-    for item in items:
-        if not item.get("is_shared", True) and str(item.get("created_by")) != str(user_id):
+    notes = db.scalars(
+        select(Note)
+        .options(joinedload(Note.creator))
+        .where(Note.hangout_id == h_uuid)
+        .order_by(Note.created_at.desc())
+    ).all()
+
+    visible_notes = []
+    for note in notes:
+        if not note.is_shared and note.created_by != u_uuid:
             continue
-        visible_items.append(item)
+        visible_notes.append(_note_to_dict(note))
 
-    # 3. Attach author profiles
-    author_ids = list({item["created_by"] for item in visible_items if "created_by" in item})
-    profiles_map = {}
-    if author_ids:
-        profiles_res = db.table("profiles").select("*").in_("id", author_ids).execute()
-        if profiles_res.data:
-            profiles_map = {p["id"]: p for p in profiles_res.data}
-
-    for item in visible_items:
-        item["author"] = profiles_map.get(item.get("created_by"))
-
-    return visible_items
+    return visible_notes
 
 
 def get_my_notes(
-    db: Client,
+    db: Session,
     user_id: str,
 ) -> List[Dict[str, Any]]:
     """Retrieve all notes created by current user across all hangouts, ordered by created_at DESC."""
-    res = db.table("notes").select("*").eq("created_by", user_id).order("created_at", desc=True).execute()
-    items = res.data or []
+    try:
+        u_uuid = uuid.UUID(str(user_id))
+    except (ValueError, AttributeError):
+        return []
 
-    if items:
-        profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
-        author_profile = profile_res.data[0] if profile_res.data else None
-        for item in items:
-            item["author"] = author_profile
+    notes = db.scalars(
+        select(Note)
+        .options(joinedload(Note.creator))
+        .where(Note.created_by == u_uuid)
+        .order_by(Note.created_at.desc())
+    ).all()
 
-    return items
+    return [_note_to_dict(note) for note in notes]
 
 
 def update_note(
-    db: Client,
+    db: Session,
     note_id: str,
     user_id: str,
     note_update: NoteUpdate,
 ) -> Dict[str, Any]:
     """Update a note's content or sharing status (author only)."""
-    note_res = db.table("notes").select("*").eq("id", note_id).execute()
-    if not note_res.data:
+    try:
+        n_uuid = uuid.UUID(str(note_id))
+        u_uuid = uuid.UUID(str(user_id))
+    except (ValueError, AttributeError):
         raise NotFoundError("Note not found.")
 
-    note_item = note_res.data[0]
-    if str(note_item.get("created_by")) != str(user_id):
+    note = db.scalar(
+        select(Note).options(joinedload(Note.creator)).where(Note.id == n_uuid)
+    )
+    if not note:
+        raise NotFoundError("Note not found.")
+
+    if note.created_by != u_uuid:
         raise ForbiddenError("Only the author can update this note.")
 
-    update_dict: Dict[str, Any] = {}
     if note_update.content is not None:
-        update_dict["content"] = note_update.content
+        note.content = note_update.content
     if note_update.color is not None:
-        update_dict["color"] = note_update.color
+        note.color = note_update.color
     if note_update.is_shared is not None:
-        update_dict["is_shared"] = note_update.is_shared
+        note.is_shared = note_update.is_shared
 
-    if not update_dict:
-        profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
-        note_item["author"] = profile_res.data[0] if profile_res.data else None
-        return note_item
-
-    update_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
-    update_res = db.table("notes").update(update_dict).eq("id", note_id).execute()
-    if not update_res.data:
-        raise Exception("Failed to update note.")
-
-    updated_note = update_res.data[0]
-    profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
-    updated_note["author"] = profile_res.data[0] if profile_res.data else None
-    return updated_note
+    note.updated_at = datetime.now(timezone.utc)
+    db.flush()
+    return _note_to_dict(note)
 
 
 def delete_note(
-    db: Client,
+    db: Session,
     note_id: str,
     user_id: str,
 ) -> None:
     """Delete a note (author only)."""
-    note_res = db.table("notes").select("*").eq("id", note_id).execute()
-    if not note_res.data:
+    try:
+        n_uuid = uuid.UUID(str(note_id))
+        u_uuid = uuid.UUID(str(user_id))
+    except (ValueError, AttributeError):
         raise NotFoundError("Note not found.")
 
-    note_item = note_res.data[0]
-    if str(note_item.get("created_by")) != str(user_id):
+    note = db.get(Note, n_uuid)
+    if not note:
+        raise NotFoundError("Note not found.")
+
+    if note.created_by != u_uuid:
         raise ForbiddenError("Only the author can delete this note.")
 
-    db.table("notes").delete().eq("id", note_id).execute()
+    db.delete(note)
+    db.flush()

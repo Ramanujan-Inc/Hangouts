@@ -8,10 +8,17 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
 
-    # Supabase Settings (Database & Auth)
+    # Supabase Settings (Auth & REST fallback)
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
     SUPABASE_JWT_SECRET: str = ""
+
+    # PostgreSQL Database Connection & Pool Settings
+    DATABASE_URL: str = ""
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
 
     # Cloudflare R2 Storage Settings
     R2_ACCOUNT_ID: Optional[str] = None

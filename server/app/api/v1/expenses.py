@@ -1,6 +1,6 @@
 from typing import List
 from fastapi import APIRouter, Depends, status
-from supabase import Client
+from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.schemas.expense import ExpenseCreate, ExpenseResponse, ExpenseSummaryResponse
 from app.services import expenses as expense_service
@@ -18,7 +18,7 @@ def create_expense(
     id: str,
     expense_create: ExpenseCreate,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Log an expense for a hangout with split type (equal or personal)."""
     return expense_service.create_expense(
@@ -37,7 +37,7 @@ def create_expense(
 def list_hangout_expenses(
     id: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Retrieve logged expenses for a hangout in chronological order. Personal expenses visible only to owner."""
     return expense_service.get_hangout_expenses(
@@ -55,7 +55,7 @@ def list_hangout_expenses(
 def get_expense_summary(
     id: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Calculate total spent, equal split share, member net balances, and simplified debt transactions (who owes whom)."""
     return expense_service.get_expense_summary(
@@ -73,7 +73,7 @@ def get_expense_summary(
 def delete_expense(
     expense_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Delete an expense record (payer or hangout creator only)."""
     expense_service.delete_expense(

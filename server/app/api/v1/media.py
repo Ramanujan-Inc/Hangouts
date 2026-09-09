@@ -1,7 +1,7 @@
 from typing import List, Optional
 import json
 from fastapi import APIRouter, Depends, File, Form, UploadFile, Query, status
-from supabase import Client
+from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.schemas.media import (
     MediaResponse,
@@ -21,7 +21,7 @@ def upload_media(
     caption: Optional[str] = Form(None),
     is_shared: bool = Form(True),
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Upload a photo or video to a hangout's gallery."""
     return media_service.upload_media(
@@ -44,7 +44,7 @@ def upload_bulk_media(
     is_shared: bool = Form(True),
     cover_index: Optional[int] = Form(None),
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Upload multiple photos or videos to a hangout's gallery in batch with individual or global captions."""
     resolved_captions = captions
@@ -71,7 +71,7 @@ def get_media_upload_urls(
     id: str,
     payload: DirectUploadRequest,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Generate presigned PUT upload URLs for client-side direct storage upload."""
     return media_service.prepare_direct_media_uploads(
@@ -87,7 +87,7 @@ def confirm_direct_media(
     id: str,
     payload: DirectMediaConfirmRequest,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Record metadata for files uploaded directly from client to storage."""
     return media_service.confirm_direct_media_uploads(
@@ -103,7 +103,7 @@ def list_hangout_media(
     id: str,
     type: Optional[str] = Query(None, description="Filter by media type ('photo' or 'video')"),
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Retrieve media gallery items for a hangout with privacy filtering."""
     return media_service.get_hangout_media(
@@ -118,7 +118,7 @@ def list_hangout_media(
 def favorite_media(
     media_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Add media item to user's favorites."""
     return media_service.favorite_media(
@@ -132,7 +132,7 @@ def favorite_media(
 def unfavorite_media(
     media_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Remove media item from user's favorites."""
     return media_service.unfavorite_media(
@@ -146,7 +146,7 @@ def unfavorite_media(
 def delete_media(
     media_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Delete a media item (uploader only)."""
     media_service.delete_media(

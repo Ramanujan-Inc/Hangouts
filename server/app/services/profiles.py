@@ -1,7 +1,10 @@
+import uuid
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, status, UploadFile
-from supabase import Client
+from sqlalchemy import select, func
+from sqlalchemy.orm import Session
+from app.models.profile import Profile
 from app.schemas.profile import ProfileUpdate
 from app.core.config import settings
 from app.core.exceptions import BadRequestError
@@ -9,7 +12,18 @@ from app.core.storage import upload_file_bytes, get_avatar_public_url
 from app.services.media import ALLOWED_IMAGE_MIME_TYPES
 
 
-def upload_user_avatar(db: Client, user_id: str, file: UploadFile) -> Dict[str, str]:
+def _profile_to_dict(profile: Profile) -> Dict[str, Any]:
+    return {
+        "id": str(profile.id),
+        "username": profile.username,
+        "email": profile.email,
+        "avatar_url": profile.avatar_url,
+        "created_at": profile.created_at.isoformat(),
+        "updated_at": profile.updated_at.isoformat(),
+    }
+
+
+def upload_user_avatar(db: Session, user_id: str, file: UploadFile) -> Dict[str, str]:
     """Upload custom avatar image to the public R2 avatars bucket and update user profile avatar_url."""
     content_type = file.content_type or ""
     if content_type not in ALLOWED_IMAGE_MIME_TYPES:
@@ -18,14 +32,12 @@ def upload_user_avatar(db: Client, user_id: str, file: UploadFile) -> Dict[str, 
         )
     file_bytes = file.file.read()
 
-    # Determine extension and key
     filename = file.filename or "avatar.jpg"
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "jpg"
     safe_ext = ext if ext in ["jpg", "jpeg", "png", "webp", "gif", "heic"] else "jpg"
     timestamp = int(datetime.now(timezone.utc).timestamp())
     object_key = f"{settings.ENVIRONMENT}/usr_{user_id}_{timestamp}.{safe_ext}"
 
-    # Upload to public avatars bucket
     upload_file_bytes(
         bucket=settings.R2_BUCKET_AVATARS,
         key=object_key,
@@ -42,35 +54,37 @@ def upload_user_avatar(db: Client, user_id: str, file: UploadFile) -> Dict[str, 
     return {"url": public_url}
 
 
-
-def get_profile_by_id(db: Client, profile_id: str) -> Optional[Dict[str, Any]]:
+def get_profile_by_id(db: Session, profile_id: str) -> Optional[Dict[str, Any]]:
     """Fetch a profile record by UUID."""
-    response = db.table("profiles").select("*").eq("id", profile_id).execute()
-    if response.data and len(response.data) > 0:
-        return response.data[0]
+    try:
+        profile_uuid = uuid.UUID(str(profile_id))
+    except (ValueError, AttributeError):
+        return None
+    profile = db.get(Profile, profile_uuid)
+    if profile:
+        return _profile_to_dict(profile)
     return None
 
 
-def get_profile_by_username(db: Client, username: str) -> Optional[Dict[str, Any]]:
+def get_profile_by_username(db: Session, username: str) -> Optional[Dict[str, Any]]:
     """Fetch a profile record by exact username (case-insensitive)."""
     if not username or not username.strip():
         return None
-    response = db.table("profiles").select("*").ilike("username", username.strip()).execute()
-    if response.data and len(response.data) > 0:
-        return response.data[0]
+    profile = db.scalar(
+        select(Profile).where(func.lower(Profile.username) == username.strip().lower())
+    )
+    if profile:
+        return _profile_to_dict(profile)
     return None
 
 
-def get_profile_by_identifier(db: Client, identifier: str) -> Optional[Dict[str, Any]]:
+def get_profile_by_identifier(db: Session, identifier: str) -> Optional[Dict[str, Any]]:
     """Fetch a profile record by UUID or exact username (case-insensitive)."""
     if not identifier or not identifier.strip():
         return None
 
     trimmed = identifier.strip()
-
-    # If identifier looks like a UUID, check ID first
     try:
-        import uuid
         uuid.UUID(trimmed)
         by_id = get_profile_by_id(db, trimmed)
         if by_id:
@@ -78,65 +92,52 @@ def get_profile_by_identifier(db: Client, identifier: str) -> Optional[Dict[str,
     except (ValueError, AttributeError):
         pass
 
-    # Check by exact username
     return get_profile_by_username(db, trimmed)
 
 
 def update_profile(
-    db: Client,
+    db: Session,
     profile_id: str,
     profile_update: ProfileUpdate,
 ) -> Dict[str, Any]:
     """Update profile attributes for a given profile ID."""
-    update_data = profile_update.model_dump(exclude_unset=True)
-    if not update_data:
-        existing = get_profile_by_id(db, profile_id)
-        if existing:
-            return existing
+    try:
+        profile_uuid = uuid.UUID(str(profile_id))
+    except (ValueError, AttributeError):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile not found.",
         )
 
+    profile = db.get(Profile, profile_uuid)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found.",
+        )
+
+    update_data = profile_update.model_dump(exclude_unset=True)
+    if not update_data:
+        return _profile_to_dict(profile)
+
     if "username" in update_data and update_data["username"]:
         username_val = update_data["username"].strip()
-        existing = (
-            db.table("profiles")
-            .select("id")
-            .ilike("username", username_val)
-            .neq("id", profile_id)
-            .execute()
+        existing = db.scalar(
+            select(Profile.id).where(
+                func.lower(Profile.username) == username_val.lower(),
+                Profile.id != profile_uuid,
+            )
         )
-        if existing.data and len(existing.data) > 0:
+        if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Username is already taken.",
             )
-        update_data["username"] = username_val
+        profile.username = username_val
 
-    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    if "avatar_url" in update_data:
+        profile.avatar_url = update_data["avatar_url"]
 
-    try:
-        response = (
-            db.table("profiles")
-            .update(update_data)
-            .eq("id", profile_id)
-            .execute()
-        )
-    except Exception as e:
-        if "unique" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username is already taken.",
-            )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to update profile: {str(e)}",
-        )
-
-    if response.data and len(response.data) > 0:
-        return response.data[0]
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Failed to update profile.",
-    )
+    profile.updated_at = datetime.now(timezone.utc)
+    db.flush()
+    return _profile_to_dict(profile)

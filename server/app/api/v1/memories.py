@@ -1,7 +1,7 @@
 from datetime import date
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
-from supabase import Client
+from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.schemas.hangout import MemoryResponse
 from app.services import memories as memories_service
@@ -20,7 +20,7 @@ def get_on_this_day_memories(
         description="Filter memories by group UUID.",
     ),
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Retrieve 'On This Day' memories for historical hangouts matching the month and day."""
     return memories_service.get_memories_on_this_day(
