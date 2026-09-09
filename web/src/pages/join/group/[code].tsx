@@ -26,26 +26,33 @@ interface GroupPreview {
 interface JoinGroupPageProps {
   code: string
   initialData: GroupPreview | null
+  origin: string
+  reqUrl: string
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const code = (context.params?.code as string) || ''
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1'
 
+  const host = context.req.headers.host || 'hangouts-xi.vercel.app'
+  const proto = (context.req.headers['x-forwarded-proto'] as string) || (host.startsWith('localhost') ? 'http' : 'https')
+  const origin = `${proto}://${host}`
+  const reqUrl = context.req.url || `/join/group/${code}`
+
   try {
     const res = await fetch(`${apiUrl}/groups/join/${code}`)
     if (res.ok) {
       const initialData = await res.json()
-      return { props: { code, initialData } }
+      return { props: { code, initialData, origin, reqUrl } }
     }
   } catch (err) {
     // Fallback to client-side fetch
   }
 
-  return { props: { code, initialData: null } }
+  return { props: { code, initialData: null, origin, reqUrl } }
 }
 
-export default function JoinGroupPage({ code, initialData }: JoinGroupPageProps) {
+export default function JoinGroupPage({ code, initialData, origin, reqUrl }: JoinGroupPageProps) {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
 
@@ -99,27 +106,45 @@ export default function JoinGroupPage({ code, initialData }: JoinGroupPageProps)
   const creatorAvatar = getAvatarUrl(group?.creator?.avatar_url)
   const creatorName = group?.creator?.username || 'Creator'
 
+  const pageTitle = group ? `"${group.name}" – Memory Circle on Hangout` : 'Memory Circle | Hangout'
+  const pageDescription = group
+    ? `Join "${group.name}" on Hangout to preserve shared memories, timelines, photos, and places together.`
+    : 'Archive and relive group memories, timelines, photos, and places together on Hangout.'
+
+  const ogParams = new URLSearchParams()
+  if (group?.name) ogParams.set('name', group.name)
+  if (group?.creator?.username) ogParams.set('creator', group.creator.username)
+  if (group?.member_count) ogParams.set('members', String(group.member_count))
+  if (group?.cover_image_url) ogParams.set('cover', group.cover_image_url)
+
+  const siteOrigin = origin || 'https://hangouts-xi.vercel.app'
+  const ogImageUrl = `${siteOrigin}/api/og/group?${ogParams.toString()}`
+  const canonicalUrl = `${siteOrigin}${reqUrl || `/join/group/${code}`}`
+
   return (
     <div className="join-page-wrapper">
       <Head>
-        <title>{group ? `Join ${group.name} | Hangout` : 'Join Group'}</title>
-        {group && (
-          <>
-            <meta property="og:title" content={`Join "${group.name}" on Hangout`} />
-            <meta
-              property="og:description"
-              content={`Join the "${group.name}" friend circle on Hangout to plan hangouts, share notes, and preserve memories together.`}
-            />
-            {group.cover_image_url && (
-              <meta property="og:image" content={group.cover_image_url} />
-            )}
-            <meta name="twitter:card" content="summary_large_image" />
-            <meta name="twitter:title" content={`Join "${group.name}" on Hangout`} />
-            {group.cover_image_url && (
-              <meta name="twitter:image" content={group.cover_image_url} />
-            )}
-          </>
-        )}
+        <title>{group ? `"${group.name}" | Memory Circle` : 'Memory Circle | Hangout'}</title>
+        <meta name="description" content={pageDescription} />
+
+        {/* Open Graph / Facebook / Messenger */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:site_name" content="Hangout" />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDescription} />
+        <meta property="og:image" content={ogImageUrl} />
+        <meta property="og:image:secure_url" content={ogImageUrl} />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content={pageTitle} />
+
+        {/* Twitter / X */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:description" content={pageDescription} />
+        <meta name="twitter:image" content={ogImageUrl} />
       </Head>
 
       <Toast
