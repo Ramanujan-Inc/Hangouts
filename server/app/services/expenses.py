@@ -1,88 +1,114 @@
+import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from supabase import Client
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload
+from app.models.expense import Expense
+from app.models.hangout import Hangout
+from app.models.profile import Profile
 from app.schemas.expense import ExpenseCreate
 from app.core.exceptions import NotFoundError, ForbiddenError, BadRequestError
 from app.services.hangouts import get_hangout_participants
 
 
+def _expense_to_dict(expense: Expense) -> Dict[str, Any]:
+    payer_dict = None
+    if expense.payer:
+        payer_dict = {
+            "id": str(expense.payer.id),
+            "username": expense.payer.username,
+            "email": expense.payer.email,
+            "avatar_url": expense.payer.avatar_url,
+            "created_at": expense.payer.created_at.isoformat(),
+            "updated_at": expense.payer.updated_at.isoformat(),
+        }
+    return {
+        "id": str(expense.id),
+        "hangout_id": str(expense.hangout_id),
+        "paid_by": str(expense.paid_by) if expense.paid_by else None,
+        "description": expense.description,
+        "total_amount": float(expense.total_amount),
+        "split_type": expense.split_type,
+        "created_at": expense.created_at.isoformat(),
+        "payer": payer_dict,
+    }
+
+
 def create_expense(
-    db: Client,
+    db: Session,
     hangout_id: str,
     user_id: str,
     expense_create: ExpenseCreate,
 ) -> Dict[str, Any]:
     """Log an expense for a hangout."""
-    # 1. Check hangout existence
-    hangout_res = db.table("hangouts").select("id").eq("id", hangout_id).execute()
-    if not hangout_res.data:
+    try:
+        h_uuid = uuid.UUID(str(hangout_id))
+    except (ValueError, AttributeError):
+        raise NotFoundError("Hangout not found.")
+
+    hangout = db.get(Hangout, h_uuid)
+    if not hangout:
         raise NotFoundError("Hangout not found.")
 
     if expense_create.total_amount <= 0:
         raise BadRequestError("Total amount must be greater than 0.")
 
-    paid_by = str(expense_create.paid_by) if expense_create.paid_by else user_id
+    paid_by_str = str(expense_create.paid_by) if expense_create.paid_by else user_id
 
     # Personal expenses can only be logged for oneself
-    if expense_create.split_type == "personal" and str(paid_by) != str(user_id):
+    if expense_create.split_type == "personal" and str(paid_by_str) != str(user_id):
         raise BadRequestError("Personal expenses can only be logged for yourself.")
 
-    # Verify payer profile exists
-    payer_res = db.table("profiles").select("*").eq("id", paid_by).execute()
-    if not payer_res.data:
+    try:
+        paid_by_uuid = uuid.UUID(paid_by_str)
+    except (ValueError, AttributeError):
         raise NotFoundError("Payer profile not found.")
 
-    now = datetime.now(timezone.utc).isoformat()
-    expense_dict = {
-        "hangout_id": hangout_id,
-        "paid_by": paid_by,
-        "description": expense_create.description,
-        "total_amount": float(expense_create.total_amount),
-        "split_type": expense_create.split_type,
-        "created_at": now,
-    }
+    payer = db.get(Profile, paid_by_uuid)
+    if not payer:
+        raise NotFoundError("Payer profile not found.")
 
-    res = db.table("expenses").insert(expense_dict).execute()
-    if not res.data:
-        raise Exception("Failed to log expense.")
+    expense = Expense(
+        hangout_id=h_uuid,
+        paid_by=paid_by_uuid,
+        description=expense_create.description,
+        total_amount=expense_create.total_amount,
+        split_type=expense_create.split_type,
+    )
+    db.add(expense)
+    db.flush()
+    db.refresh(expense, attribute_names=["payer"])
 
-    expense_data = res.data[0]
-    expense_data["total_amount"] = float(expense_data["total_amount"])
-    expense_data["payer"] = payer_res.data[0]
-
-    return expense_data
+    return _expense_to_dict(expense)
 
 
 def get_hangout_expenses(
-    db: Client,
+    db: Session,
     hangout_id: str,
     user_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Retrieve all logged expenses for a hangout, ordered chronologically. Personal expenses are visible only to the owner."""
-    hangout_res = db.table("hangouts").select("id").eq("id", hangout_id).execute()
-    if not hangout_res.data:
+    try:
+        h_uuid = uuid.UUID(str(hangout_id))
+    except (ValueError, AttributeError):
         raise NotFoundError("Hangout not found.")
 
-    res = db.table("expenses").select("*").eq("hangout_id", hangout_id).order("created_at", desc=False).execute()
-    items = res.data or []
+    hangout = db.get(Hangout, h_uuid)
+    if not hangout:
+        raise NotFoundError("Hangout not found.")
 
-    # Filter out personal expenses not owned by the current user
+    expenses = db.scalars(
+        select(Expense)
+        .options(joinedload(Expense.payer))
+        .where(Expense.hangout_id == h_uuid)
+        .order_by(Expense.created_at.asc())
+    ).all()
+
     visible_items = []
-    for item in items:
-        if item.get("split_type") == "personal" and str(item.get("paid_by")) != str(user_id):
+    for e in expenses:
+        if e.split_type == "personal" and (not user_id or str(e.paid_by) != str(user_id)):
             continue
-        visible_items.append(item)
-
-    payer_ids = list({item["paid_by"] for item in visible_items if "paid_by" in item})
-    profiles_map = {}
-    if payer_ids:
-        profiles_res = db.table("profiles").select("*").in_("id", payer_ids).execute()
-        if profiles_res.data:
-            profiles_map = {p["id"]: p for p in profiles_res.data}
-
-    for item in visible_items:
-        item["payer"] = profiles_map.get(item.get("paid_by"))
-        item["total_amount"] = float(item["total_amount"])
+        visible_items.append(_expense_to_dict(e))
 
     return visible_items
 
@@ -98,20 +124,17 @@ def compute_expense_summary_from_data(
     """Pure in-memory calculation of total spent, equal split share, balances, and debts."""
     participant_user_ids = {str(p["user_id"]) for p in participants if "user_id" in p}
 
-    # Ensure creator is included if participants list is otherwise empty
     if not participant_user_ids and creator_id:
         participant_user_ids.add(str(creator_id))
 
     for e in all_expenses:
         e["total_amount"] = float(e.get("total_amount") or 0)
 
-    # Equal split expenses (shared across all participants)
     equal_split_expenses = [e for e in all_expenses if e.get("split_type", "equal") == "equal"]
     for e in equal_split_expenses:
         if "paid_by" in e and e["paid_by"]:
             participant_user_ids.add(str(e["paid_by"]))
 
-    # Expenses visible to the requesting user (shared expenses + personal expenses owned by user)
     visible_expenses = [
         e for e in all_expenses
         if e.get("split_type", "equal") != "personal" or (user_id and str(e.get("paid_by")) == str(user_id))
@@ -119,7 +142,6 @@ def compute_expense_summary_from_data(
     if user_id:
         participant_user_ids.add(str(user_id))
 
-    # Profiles map
     resolved_profiles: Dict[str, Any] = dict(profiles_map or {})
     for p in participants:
         uid = str(p.get("user_id"))
@@ -130,13 +152,11 @@ def compute_expense_summary_from_data(
         if uid and e.get("payer") and uid not in resolved_profiles:
             resolved_profiles[uid] = e["payer"]
 
-    # Compute totals based on visible expenses
     total_expenses = round(sum(e["total_amount"] for e in visible_expenses), 2)
     equal_split_total = round(sum(e["total_amount"] for e in equal_split_expenses), 2)
     participant_count = len(participant_user_ids)
     per_person_share = round(equal_split_total / participant_count, 2) if participant_count > 0 else 0.0
 
-    # Calculate individual member balances
     member_balances = []
     balances_map: Dict[str, float] = {}
 
@@ -161,7 +181,6 @@ def compute_expense_summary_from_data(
 
     member_balances.sort(key=lambda m: m["total_paid"], reverse=True)
 
-    # Greedy debt simplification ("Who Owes Whom")
     debtors = [{"user_id": uid, "bal": abs(bal)} for uid, bal in balances_map.items() if bal < -0.001]
     creditors = [{"user_id": uid, "bal": bal} for uid, bal in balances_map.items() if bal > 0.001]
 
@@ -207,21 +226,30 @@ def compute_expense_summary_from_data(
 
 
 def get_expense_summary(
-    db: Client,
+    db: Session,
     hangout_id: str,
     user_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Calculate total spent, equal split share, member net balances, and simplified debt transactions."""
-    hangout_res = db.table("hangouts").select("id, created_by").eq("id", hangout_id).execute()
-    if not hangout_res.data:
+    try:
+        h_uuid = uuid.UUID(str(hangout_id))
+    except (ValueError, AttributeError):
         raise NotFoundError("Hangout not found.")
 
-    creator_id = str(hangout_res.data[0]["created_by"]) if hangout_res.data[0].get("created_by") else None
-    participants = get_hangout_participants(db=db, hangout_id=hangout_id)
-    expenses_res = db.table("expenses").select("*").eq("hangout_id", hangout_id).execute()
-    all_expenses = expenses_res.data or []
+    hangout = db.get(Hangout, h_uuid)
+    if not hangout:
+        raise NotFoundError("Hangout not found.")
 
-    # Fetch profiles for participants and payers
+    creator_id = str(hangout.created_by) if hangout.created_by else None
+    participants = get_hangout_participants(db=db, hangout_id=hangout_id)
+
+    expenses = db.scalars(
+        select(Expense)
+        .options(joinedload(Expense.payer))
+        .where(Expense.hangout_id == h_uuid)
+    ).all()
+    all_expenses = [_expense_to_dict(e) for e in expenses]
+
     participant_user_ids = {str(p["user_id"]) for p in participants if "user_id" in p}
     for e in all_expenses:
         if "paid_by" in e and e["paid_by"]:
@@ -229,9 +257,19 @@ def get_expense_summary(
 
     profiles_map = {}
     if participant_user_ids:
-        p_res = db.table("profiles").select("*").in_("id", list(participant_user_ids)).execute()
-        if p_res.data:
-            profiles_map = {str(p["id"]): p for p in p_res.data}
+        p_uuids = [uuid.UUID(uid) for uid in participant_user_ids]
+        p_list = db.scalars(select(Profile).where(Profile.id.in_(p_uuids))).all()
+        profiles_map = {
+            str(p.id): {
+                "id": str(p.id),
+                "username": p.username,
+                "email": p.email,
+                "avatar_url": p.avatar_url,
+                "created_at": p.created_at.isoformat(),
+                "updated_at": p.updated_at.isoformat(),
+            }
+            for p in p_list
+        }
 
     return compute_expense_summary_from_data(
         hangout_id=hangout_id,
@@ -244,28 +282,33 @@ def get_expense_summary(
 
 
 def delete_expense(
-    db: Client,
+    db: Session,
     expense_id: str,
     user_id: str,
 ) -> None:
     """Delete an expense record (allowed by payer, or hangout creator for shared expenses)."""
-    expense_res = db.table("expenses").select("*").eq("id", expense_id).execute()
-    if not expense_res.data:
+    try:
+        e_uuid = uuid.UUID(str(expense_id))
+        u_uuid = uuid.UUID(str(user_id))
+    except (ValueError, AttributeError):
         raise NotFoundError("Expense not found.")
 
-    expense = expense_res.data[0]
-    is_payer = str(expense.get("paid_by")) == str(user_id)
-
-    # Personal expenses are strictly visible and manageable only by the owner
-    if expense.get("split_type") == "personal" and not is_payer:
+    expense = db.get(Expense, e_uuid)
+    if not expense:
         raise NotFoundError("Expense not found.")
 
-    hangout_res = db.table("hangouts").select("created_by").eq("id", expense["hangout_id"]).execute()
+    is_payer = expense.paid_by == u_uuid
+
+    if expense.split_type == "personal" and not is_payer:
+        raise NotFoundError("Expense not found.")
+
+    hangout = db.get(Hangout, expense.hangout_id)
     is_creator = False
-    if hangout_res.data and str(hangout_res.data[0].get("created_by")) == str(user_id):
+    if hangout and hangout.created_by == u_uuid:
         is_creator = True
 
     if not is_payer and not is_creator:
         raise ForbiddenError("Only the payer or hangout creator can delete this expense.")
 
-    db.table("expenses").delete().eq("id", expense_id).execute()
+    db.delete(expense)
+    db.flush()

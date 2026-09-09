@@ -1,23 +1,23 @@
-from typing import Optional
+from typing import Optional, Generator
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from supabase import Client
+from sqlalchemy.orm import Session
 import jwt
 
 from app.core.config import settings
 from app.core.supabase import get_supabase_client
+from app.core.database import get_db_session
 
 security = HTTPBearer(auto_error=False)
 
 
-def get_db() -> Client:
-    """Dependency for obtaining the persistent, connection-pooled Supabase client."""
-    return get_supabase_client()
+def get_db() -> Generator[Session, None, None]:
+    """Dependency for obtaining a managed SQLAlchemy database session."""
+    yield from get_db_session()
 
 
 def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: Client = Depends(get_db),
 ) -> dict:
     """Dependency that extracts and validates the Bearer JWT token from request headers.
 
@@ -59,7 +59,8 @@ def get_current_user(
 
     # 2. Fallback verification via Supabase auth API
     try:
-        user_response = db.auth.get_user(token)
+        supabase = get_supabase_client()
+        user_response = supabase.auth.get_user(token)
         if user_response and user_response.user:
             return {
                 "id": str(user_response.user.id),
@@ -85,7 +86,7 @@ def require_group_access():
     def dependency(
         group_id: str,
         current_user: dict = Depends(get_current_user),
-        db: Client = Depends(get_db),
+        db: Session = Depends(get_db),
     ) -> str:
         from app.services import groups as group_service
         from app.core.exceptions import ForbiddenError
@@ -101,17 +102,11 @@ def require_group_access():
 
 def get_optional_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: Client = Depends(get_db),
 ) -> Optional[dict]:
     """Dependency that extracts user if Bearer token is provided, or returns None if omitted/invalid."""
     if not credentials or not credentials.credentials:
         return None
     try:
-        return get_current_user(credentials=credentials, db=db)
+        return get_current_user(credentials=credentials)
     except HTTPException:
         return None
-
-
-
-
-

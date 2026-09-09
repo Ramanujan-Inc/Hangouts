@@ -53,12 +53,25 @@ def create_test_user(db: Client) -> Generator[Callable[..., Dict[str, Any]], Non
         user_id = str(user_res.user.id)
         created_users.append(user_id)
 
-        auth_client = get_supabase_client()
-        session_res = auth_client.auth.sign_in_with_password({
-            "email": email,
-            "password": password,
-        })
-        access_token = session_res.session.access_token
+        if settings.SUPABASE_JWT_SECRET:
+            import time
+            import jwt
+            payload = {
+                "sub": user_id,
+                "email": email,
+                "aud": "authenticated",
+                "role": "authenticated",
+                "user_metadata": {"username": user_name},
+                "exp": int(time.time()) + 86400,
+            }
+            access_token = jwt.encode(payload, settings.SUPABASE_JWT_SECRET, algorithm="HS256")
+        else:
+            auth_client = get_supabase_client()
+            session_res = auth_client.auth.sign_in_with_password({
+                "email": email,
+                "password": password,
+            })
+            access_token = session_res.session.access_token
 
         # Query profile to get actual assigned username (e.g. if collision trigger appended a suffix)
         profile_res = admin_client.table("profiles").select("username").eq("id", user_id).single().execute()

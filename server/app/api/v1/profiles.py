@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
-from supabase import Client
+from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.schemas.profile import ProfileResponse, ProfileUpdate
 from app.services import profiles as profile_service
@@ -11,7 +11,7 @@ router = APIRouter()
 def upload_avatar(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Upload a custom user avatar photo to storage, update the profile, and return the new avatar URL."""
     return profile_service.upload_user_avatar(
@@ -24,7 +24,7 @@ def upload_avatar(
 @router.get("/me", response_model=ProfileResponse)
 def read_current_user_profile(
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Retrieve profile of the currently authenticated user."""
     profile = profile_service.get_profile_by_id(db=db, profile_id=current_user["id"])
@@ -40,7 +40,7 @@ def read_current_user_profile(
 def update_current_user_profile(
     profile_update: ProfileUpdate,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Update profile information of the currently authenticated user."""
     updated_profile = profile_service.update_profile(
@@ -55,7 +55,7 @@ def update_current_user_profile(
 @router.get("/{identifier}", response_model=ProfileResponse)
 def read_user_profile(
     identifier: str,
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
     _: dict = Depends(get_current_user),
 ):
     """Fetch public user profile by UUID or exact username."""

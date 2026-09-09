@@ -1,7 +1,10 @@
+import uuid
 from datetime import date, datetime, timezone
 from typing import Optional, List, Dict, Any
-from supabase import Client
-from app.services.hangouts import get_user_hangout_ids
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload, selectinload
+from app.models.hangout import Hangout, HangoutParticipant
+from app.services.hangouts import get_user_hangout_ids, _hangout_to_dict
 
 
 def find_anniversary_memories(
@@ -50,7 +53,7 @@ def find_anniversary_memories(
 
 
 def get_memories_on_this_day(
-    db: Client,
+    db: Session,
     user_id: Optional[str] = None,
     target_date: Optional[date] = None,
     group_id: Optional[str] = None,
@@ -61,25 +64,30 @@ def get_memories_on_this_day(
         target_date = datetime.now(timezone.utc).date()
 
     query = (
-        db.table("hangouts")
-        .select(
-            "*, creator:profiles!hangouts_created_by_fkey(*), "
-            "participants:hangout_participants(id, hangout_id, user_id, profile:profiles!hangout_participants_user_id_fkey(*))"
+        select(Hangout)
+        .options(
+            joinedload(Hangout.creator),
+            selectinload(Hangout.participants).joinedload(HangoutParticipant.user),
         )
-        .lt("hangout_date", target_date.isoformat())
+        .where(Hangout.hangout_date < target_date)
     )
 
     if user_id:
         user_hangout_ids = get_user_hangout_ids(db, user_id)
         if not user_hangout_ids:
             return []
-        query = query.in_("id", user_hangout_ids)
+        h_uuids = [uuid.UUID(hid) for hid in user_hangout_ids]
+        query = query.where(Hangout.id.in_(h_uuids))
 
     if group_id:
-        query = query.eq("group_id", str(group_id))
+        try:
+            g_uuid = uuid.UUID(str(group_id))
+            query = query.where(Hangout.group_id == g_uuid)
+        except (ValueError, AttributeError):
+            return []
 
-    response = query.order("hangout_date", desc=True).execute()
-    hangouts = response.data if response.data else []
+    query = query.order_by(Hangout.hangout_date.desc())
+    hangouts = db.scalars(query).all()
+    hangouts_dict = [_hangout_to_dict(h) for h in hangouts]
 
-    return find_anniversary_memories(hangouts, target_date=target_date, window_days=window_days)
-
+    return find_anniversary_memories(hangouts_dict, target_date=target_date, window_days=window_days)

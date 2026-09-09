@@ -1,6 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, status, File, UploadFile
-from supabase import Client
+from sqlalchemy.orm import Session
 from app.api.deps import (
     get_current_user,
     get_optional_current_user,
@@ -26,7 +26,7 @@ router = APIRouter()
 def upload_group_cover(
     file: UploadFile = File(...),
     _: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Upload a custom group cover photo to storage and return its public URL."""
     return group_service.upload_group_cover_image(db=db, file=file)
@@ -36,7 +36,7 @@ def upload_group_cover(
 def create_new_group(
     group_create: GroupCreate,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Create a new group. The authenticated user is set as the initial accepted member."""
     return group_service.create_group(
@@ -49,7 +49,7 @@ def create_new_group(
 @router.get("", response_model=List[GroupResponse])
 def list_my_groups(
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """List all groups the currently authenticated user is an accepted member of."""
     return group_service.get_user_groups(db=db, user_id=current_user["id"])
@@ -58,7 +58,7 @@ def list_my_groups(
 @router.get("/invites", response_model=List[GroupInviteResponse])
 def list_my_group_invites(
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """List all pending group invitations for the current user."""
     return group_service.get_user_group_invites(
@@ -71,7 +71,7 @@ def list_my_group_invites(
 def get_group_join_preview(
     invite_code: str,
     current_user: Optional[dict] = Depends(get_optional_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get public preview of a group by its invite code."""
     user_id = current_user["id"] if current_user else None
@@ -82,7 +82,7 @@ def get_group_join_preview(
 def join_group_via_invite(
     invite_code: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Join a group using its invite code (authenticated)."""
     return group_service.join_group_by_invite_code(
@@ -96,7 +96,7 @@ def join_group_via_invite(
 def get_group_details(
     group_id: str,
     _: str = Depends(require_group_access()),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get detailed information for a specific group, including member list."""
     return group_service.get_full_group_details(db=db, group_id=group_id)
@@ -108,7 +108,7 @@ def invite_member_to_group(
     member_add: GroupMemberAdd,
     _: str = Depends(require_group_access()),
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Invite a user to a group by their username (Any active group member can invite)."""
     return group_service.add_group_member(
@@ -124,7 +124,7 @@ def respond_to_invite(
     group_id: str,
     respond_data: GroupInviteRespond,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Accept or decline a pending group invitation."""
     return group_service.respond_to_group_invite(
@@ -140,7 +140,7 @@ def remove_member_from_group(
     group_id: str,
     user_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Remove a member from a group (Self-removal only)."""
     if current_user["id"] != user_id:

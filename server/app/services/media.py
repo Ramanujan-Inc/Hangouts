@@ -3,7 +3,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from fastapi import UploadFile
-from supabase import Client
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload
+from app.models.media import Media, MediaFavorite
+from app.models.hangout import Hangout
+from app.models.profile import Profile
 from app.core.config import settings
 from app.core.exceptions import NotFoundError, ForbiddenError, BadRequestError
 from app.core.storage import (
@@ -66,8 +70,41 @@ def _sign_media_item(item: Dict[str, Any]) -> Dict[str, Any]:
     return signed
 
 
+def _media_to_dict(
+    media: Media,
+    is_favorited: bool = False,
+    uploader_profile: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    prof_dict = uploader_profile
+    if not prof_dict and media.uploader:
+        prof_dict = {
+            "id": str(media.uploader.id),
+            "username": media.uploader.username,
+            "email": media.uploader.email,
+            "avatar_url": media.uploader.avatar_url,
+            "created_at": media.uploader.created_at.isoformat(),
+            "updated_at": media.uploader.updated_at.isoformat(),
+        }
+    return {
+        "id": str(media.id),
+        "hangout_id": str(media.hangout_id),
+        "uploaded_by": str(media.uploaded_by),
+        "url": media.url,
+        "thumbnail_url": media.thumbnail_url,
+        "caption": media.caption,
+        "media_type": media.media_type,
+        "favorites_count": media.favorites_count,
+        "file_size_bytes": media.file_size_bytes,
+        "is_shared": media.is_shared,
+        "is_cover": media.is_cover,
+        "created_at": media.created_at.isoformat(),
+        "is_favorited": is_favorited,
+        "uploader": prof_dict,
+    }
+
+
 def upload_media(
-    db: Client,
+    db: Session,
     hangout_id: str,
     user_id: str,
     file: UploadFile,
@@ -75,59 +112,50 @@ def upload_media(
     is_shared: bool = True,
 ) -> Dict[str, Any]:
     """Upload photo or video media file to private storage and record database entry."""
-    # 1. Check hangout existence
-    hangout_res = db.table("hangouts").select("id").eq("id", hangout_id).execute()
-    if not hangout_res.data:
+    from app.services.hangouts import resolve_hangout_id
+    canonical_id = resolve_hangout_id(db, hangout_id)
+    h_uuid = uuid.UUID(canonical_id)
+    u_uuid = uuid.UUID(str(user_id))
+
+    hangout = db.get(Hangout, h_uuid)
+    if not hangout:
         raise NotFoundError("Hangout not found.")
 
-    # 2. Validate MIME type
     content_type = file.content_type or ""
     if content_type not in ALLOWED_MIME_TYPES:
         raise BadRequestError(
             f"Unsupported file type '{content_type}'. Allowed types are photos ({', '.join(ALLOWED_IMAGE_MIME_TYPES)}) and videos ({', '.join(ALLOWED_VIDEO_MIME_TYPES)})."
         )
 
-    # 3. Determine media_type ('photo' or 'video')
     media_type = "video" if content_type in ALLOWED_VIDEO_MIME_TYPES else "photo"
-
-    # 4. Upload file object to private R2 storage
     file_bytes = file.file.read()
     file_size = len(file_bytes)
     check_storage_quota(db, user_id, file_size)
 
-    object_key = _upload_media_to_r2(hangout_id, file_bytes, file.filename or "media", content_type)
+    object_key = _upload_media_to_r2(canonical_id, file_bytes, file.filename or "media", content_type)
 
-    now = datetime.now(timezone.utc).isoformat()
-    media_data = {
-        "hangout_id": hangout_id,
-        "uploaded_by": user_id,
-        "url": object_key,
-        "thumbnail_url": object_key,
-        "caption": caption,
-        "media_type": media_type,
-        "favorites_count": 0,
-        "file_size_bytes": file_size,
-        "is_shared": is_shared,
-        "created_at": now,
-    }
+    media = Media(
+        hangout_id=h_uuid,
+        uploaded_by=u_uuid,
+        url=object_key,
+        thumbnail_url=object_key,
+        caption=caption,
+        media_type=media_type,
+        favorites_count=0,
+        file_size_bytes=file_size,
+        is_shared=is_shared,
+        is_cover=False,
+    )
+    db.add(media)
+    db.flush()
+    db.refresh(media, attribute_names=["uploader"])
 
-    insert_res = db.table("media").insert(media_data).execute()
-    if not insert_res.data:
-        raise Exception("Failed to save media record.")
-
-    media_record = insert_res.data[0]
-    media_record["is_favorited"] = False
-
-    # Attach uploader profile
-    profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
-    if profile_res.data:
-        media_record["uploader"] = profile_res.data[0]
-
-    return _sign_media_item(media_record)
+    media_dict = _media_to_dict(media, is_favorited=False)
+    return _sign_media_item(media_dict)
 
 
 def upload_bulk_media(
-    db: Client,
+    db: Session,
     hangout_id: str,
     user_id: str,
     files: List[UploadFile],
@@ -141,9 +169,14 @@ def upload_bulk_media(
         raise BadRequestError("No files provided for upload.")
 
     from app.services.hangouts import resolve_hangout_id
-    canonical_hangout_id = resolve_hangout_id(db, hangout_id)
+    canonical_id = resolve_hangout_id(db, hangout_id)
+    h_uuid = uuid.UUID(canonical_id)
+    u_uuid = uuid.UUID(str(user_id))
 
-    # 1. Read files, validate MIME types, and compute total bytes in memory
+    hangout = db.get(Hangout, h_uuid)
+    if not hangout:
+        raise NotFoundError("Hangout not found.")
+
     total_bytes = 0
     prepared_files = []
     for idx, file in enumerate(files):
@@ -182,21 +215,24 @@ def upload_bulk_media(
             "is_cover": is_item_cover,
         })
 
-    # 2. Check cumulative storage quota ONCE upfront (cuts N-1 Supabase roundtrips)
     check_storage_quota(db, user_id, total_bytes)
 
-    # 3. Get uploader profile
-    profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
-    uploader_profile = profile_res.data[0] if profile_res.data else None
+    uploader = db.get(Profile, u_uuid)
+    uploader_profile = {
+        "id": str(uploader.id),
+        "username": uploader.username,
+        "email": uploader.email,
+        "avatar_url": uploader.avatar_url,
+        "created_at": uploader.created_at.isoformat(),
+        "updated_at": uploader.updated_at.isoformat(),
+    } if uploader else None
 
-    # 4. Upload to R2 sequentially (safe for Render's 0.1 vCPU / 512MB RAM without thread contention)
-    now = datetime.now(timezone.utc).isoformat()
-    media_records_to_insert = []
+    inserted_media_objects = []
     cover_object_key = None
 
     for item in prepared_files:
         object_key = _upload_media_to_r2(
-            canonical_hangout_id,
+            canonical_id,
             item["file_bytes"],
             item["filename"],
             item["content_type"],
@@ -204,151 +240,166 @@ def upload_bulk_media(
         if item["is_cover"]:
             cover_object_key = object_key
 
-        media_records_to_insert.append({
-            "hangout_id": canonical_hangout_id,
-            "uploaded_by": user_id,
-            "url": object_key,
-            "thumbnail_url": object_key,
-            "caption": item["caption"],
-            "media_type": item["media_type"],
-            "favorites_count": 0,
-            "file_size_bytes": item["file_size"],
-            "is_shared": is_shared,
-            "is_cover": item["is_cover"],
-            "created_at": now,
-        })
-
-    # 5. Batch insert database records
-    insert_res = db.table("media").insert(media_records_to_insert).execute()
-    if not insert_res.data:
-        raise Exception("Failed to save bulk media records.")
+        m = Media(
+            hangout_id=h_uuid,
+            uploaded_by=u_uuid,
+            url=object_key,
+            thumbnail_url=object_key,
+            caption=item["caption"],
+            media_type=item["media_type"],
+            favorites_count=0,
+            file_size_bytes=item["file_size"],
+            is_shared=is_shared,
+            is_cover=item["is_cover"],
+        )
+        db.add(m)
+        inserted_media_objects.append(m)
 
     if cover_object_key:
-        db.table("hangouts").update({"cover_photo_url": cover_object_key}).eq("id", canonical_hangout_id).execute()
+        hangout.cover_photo_url = cover_object_key
 
-    inserted_items = insert_res.data
-    for record in inserted_items:
-        record["uploader"] = uploader_profile
-        record["is_favorited"] = False
+    db.flush()
 
-    return [_sign_media_item(record) for record in inserted_items]
+    results = []
+    for m in inserted_media_objects:
+        d = _media_to_dict(m, is_favorited=False, uploader_profile=uploader_profile)
+        results.append(_sign_media_item(d))
+
+    return results
 
 
 def get_hangout_media(
-    db: Client,
+    db: Session,
     hangout_id: str,
     user_id: str,
     media_type_filter: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Retrieve gallery media for a hangout, enforcing privacy rules and signing URLs."""
-    # 1. Check hangout existence
-    hangout_res = db.table("hangouts").select("id").eq("id", hangout_id).execute()
-    if not hangout_res.data:
+    from app.services.hangouts import resolve_hangout_id
+    canonical_id = resolve_hangout_id(db, hangout_id)
+    h_uuid = uuid.UUID(canonical_id)
+    u_uuid = uuid.UUID(str(user_id)) if user_id else None
+
+    hangout = db.get(Hangout, h_uuid)
+    if not hangout:
         raise NotFoundError("Hangout not found.")
 
-    query = db.table("media").select("*").eq("hangout_id", hangout_id)
+    query = (
+        select(Media)
+        .options(joinedload(Media.uploader))
+        .where(Media.hangout_id == h_uuid)
+    )
     if media_type_filter:
-        query = query.eq("media_type", media_type_filter)
+        query = query.where(Media.media_type == media_type_filter)
+    query = query.order_by(Media.created_at.desc())
 
-    res = query.order("created_at", desc=True).execute()
-    items = res.data or []
+    media_items = db.scalars(query).all()
 
-    # 2. Filter private items not owned by current user
-    visible_items = []
-    for item in items:
-        if not item.get("is_shared", True) and str(item.get("uploaded_by")) != str(user_id):
-            continue
-        visible_items.append(item)
+    visible_items = [
+        m for m in media_items
+        if m.is_shared or (u_uuid and m.uploaded_by == u_uuid)
+    ]
 
-    # 3. Attach uploader profiles
-    uploader_ids = list({item["uploaded_by"] for item in visible_items if "uploaded_by" in item})
-    profiles_map = {}
-    if uploader_ids:
-        profiles_res = db.table("profiles").select("*").in_("id", uploader_ids).execute()
-        if profiles_res.data:
-            profiles_map = {p["id"]: p for p in profiles_res.data}
-
-    # 4. Attach is_favorited for user_id
-    media_ids = [item["id"] for item in visible_items if "id" in item]
     favorited_ids = set()
-    if media_ids and user_id:
-        fav_res = db.table("media_favorites").select("media_id").in_("media_id", media_ids).eq("user_id", str(user_id)).execute()
-        if fav_res.data:
-            favorited_ids = {str(f["media_id"]) for f in fav_res.data}
+    if visible_items and u_uuid:
+        m_ids = [m.id for m in visible_items]
+        fav_rows = db.scalars(
+            select(MediaFavorite.media_id).where(
+                MediaFavorite.media_id.in_(m_ids),
+                MediaFavorite.user_id == u_uuid,
+            )
+        ).all()
+        favorited_ids = set(fav_rows)
 
-    for item in visible_items:
-        item["uploader"] = profiles_map.get(item.get("uploaded_by"))
-        item["is_favorited"] = str(item.get("id")) in favorited_ids
+    result = []
+    for m in visible_items:
+        d = _media_to_dict(m, is_favorited=(m.id in favorited_ids))
+        result.append(_sign_media_item(d))
 
-    return [_sign_media_item(item) for item in visible_items]
+    return result
 
 
-def favorite_media(db: Client, media_id: str, user_id: str) -> Dict[str, Any]:
+def favorite_media(db: Session, media_id: str, user_id: str) -> Dict[str, Any]:
     """Toggle or set favorite for a media item."""
-    media_res = db.table("media").select("*").eq("id", media_id).execute()
-    if not media_res.data:
+    try:
+        m_uuid = uuid.UUID(str(media_id))
+        u_uuid = uuid.UUID(str(user_id))
+    except (ValueError, AttributeError):
         raise NotFoundError("Media item not found.")
 
-    media_item = media_res.data[0]
-    
-    # Check if already favorited
-    fav_res = db.table("media_favorites").select("id").eq("media_id", media_id).eq("user_id", user_id).execute()
-    if not fav_res.data:
-        # Add favorite
-        db.table("media_favorites").insert({"media_id": media_id, "user_id": user_id}).execute()
-        new_count = media_item.get("favorites_count", 0) + 1
-        db.table("media").update({"favorites_count": new_count}).eq("id", media_id).execute()
-        media_item["favorites_count"] = new_count
+    media = db.scalar(
+        select(Media).options(joinedload(Media.uploader)).where(Media.id == m_uuid)
+    )
+    if not media:
+        raise NotFoundError("Media item not found.")
 
-    media_item["is_favorited"] = True
-    profile_res = db.table("profiles").select("*").eq("id", media_item["uploaded_by"]).execute()
-    if profile_res.data:
-        media_item["uploader"] = profile_res.data[0]
+    existing_fav = db.scalar(
+        select(MediaFavorite).where(
+            MediaFavorite.media_id == m_uuid,
+            MediaFavorite.user_id == u_uuid,
+        )
+    )
+    if not existing_fav:
+        fav = MediaFavorite(media_id=m_uuid, user_id=u_uuid)
+        db.add(fav)
+        media.favorites_count += 1
+        db.flush()
 
-    return _sign_media_item(media_item)
+    d = _media_to_dict(media, is_favorited=True)
+    return _sign_media_item(d)
 
 
-def unfavorite_media(db: Client, media_id: str, user_id: str) -> Dict[str, Any]:
+def unfavorite_media(db: Session, media_id: str, user_id: str) -> Dict[str, Any]:
     """Remove favorite from a media item."""
-    media_res = db.table("media").select("*").eq("id", media_id).execute()
-    if not media_res.data:
+    try:
+        m_uuid = uuid.UUID(str(media_id))
+        u_uuid = uuid.UUID(str(user_id))
+    except (ValueError, AttributeError):
         raise NotFoundError("Media item not found.")
 
-    media_item = media_res.data[0]
-    
-    fav_res = db.table("media_favorites").select("id").eq("media_id", media_id).eq("user_id", user_id).execute()
-    if fav_res.data:
-        db.table("media_favorites").delete().eq("media_id", media_id).eq("user_id", user_id).execute()
-        new_count = max(0, media_item.get("favorites_count", 1) - 1)
-        db.table("media").update({"favorites_count": new_count}).eq("id", media_id).execute()
-        media_item["favorites_count"] = new_count
+    media = db.scalar(
+        select(Media).options(joinedload(Media.uploader)).where(Media.id == m_uuid)
+    )
+    if not media:
+        raise NotFoundError("Media item not found.")
 
-    media_item["is_favorited"] = False
-    profile_res = db.table("profiles").select("*").eq("id", media_item["uploaded_by"]).execute()
-    if profile_res.data:
-        media_item["uploader"] = profile_res.data[0]
+    existing_fav = db.scalar(
+        select(MediaFavorite).where(
+            MediaFavorite.media_id == m_uuid,
+            MediaFavorite.user_id == u_uuid,
+        )
+    )
+    if existing_fav:
+        db.delete(existing_fav)
+        media.favorites_count = max(0, media.favorites_count - 1)
+        db.flush()
 
-    return _sign_media_item(media_item)
+    d = _media_to_dict(media, is_favorited=False)
+    return _sign_media_item(d)
 
 
-def delete_media(db: Client, media_id: str, user_id: str) -> None:
+def delete_media(db: Session, media_id: str, user_id: str) -> None:
     """Delete a media item from R2 storage and database (only allowed by original uploader)."""
-    media_res = db.table("media").select("*").eq("id", media_id).execute()
-    if not media_res.data:
+    try:
+        m_uuid = uuid.UUID(str(media_id))
+        u_uuid = uuid.UUID(str(user_id))
+    except (ValueError, AttributeError):
         raise NotFoundError("Media item not found.")
 
-    media_item = media_res.data[0]
-    if str(media_item.get("uploaded_by")) != str(user_id):
+    media = db.get(Media, m_uuid)
+    if not media:
+        raise NotFoundError("Media item not found.")
+
+    if media.uploaded_by != u_uuid:
         raise ForbiddenError("Only the original uploader can delete this media item.")
 
-    # Delete object from private R2 bucket
-    delete_file_object(bucket=settings.R2_BUCKET_MEDIA, key=media_item.get("url", ""))
-
-    db.table("media").delete().eq("id", media_id).execute()
+    delete_file_object(bucket=settings.R2_BUCKET_MEDIA, key=media.url)
+    db.delete(media)
+    db.flush()
 
 
 def prepare_direct_media_uploads(
-    db: Client,
+    db: Session,
     hangout_id: str,
     user_id: str,
     files: List[DirectUploadItemRequest],
@@ -358,7 +409,7 @@ def prepare_direct_media_uploads(
         raise BadRequestError("No files provided for upload.")
 
     from app.services.hangouts import resolve_hangout_id
-    canonical_hangout_id = resolve_hangout_id(db, hangout_id)
+    canonical_id = resolve_hangout_id(db, hangout_id)
 
     total_bytes = 0
     resolved_files = []
@@ -383,7 +434,7 @@ def prepare_direct_media_uploads(
     for f, content_type in resolved_files:
         safe_filename = f.filename.replace(" ", "_") if f.filename else "file"
         media_uuid = str(uuid.uuid4())
-        object_key = f"{settings.ENVIRONMENT}/hng_{canonical_hangout_id}/med_{media_uuid}_{safe_filename}"
+        object_key = f"{settings.ENVIRONMENT}/hng_{canonical_id}/med_{media_uuid}_{safe_filename}"
         upload_url = generate_presigned_upload_url(
             bucket=settings.R2_BUCKET_MEDIA,
             key=object_key,
@@ -402,7 +453,7 @@ def prepare_direct_media_uploads(
 
 
 def confirm_direct_media_uploads(
-    db: Client,
+    db: Session,
     hangout_id: str,
     user_id: str,
     items: List[DirectMediaConfirmItem],
@@ -412,20 +463,28 @@ def confirm_direct_media_uploads(
         raise BadRequestError("No items provided for confirmation.")
 
     from app.services.hangouts import resolve_hangout_id
-    canonical_hangout_id = resolve_hangout_id(db, hangout_id)
+    canonical_id = resolve_hangout_id(db, hangout_id)
+    h_uuid = uuid.UUID(canonical_id)
+    u_uuid = uuid.UUID(str(user_id))
 
-    # Security check: verify all object_keys start with expected prefix
-    expected_prefix = f"{settings.ENVIRONMENT}/hng_{canonical_hangout_id}/"
+    expected_prefix = f"{settings.ENVIRONMENT}/hng_{canonical_id}/"
     for item in items:
         if not item.object_key.startswith(expected_prefix):
             raise ForbiddenError(f"Invalid object key '{item.object_key}'.")
 
-    # Get uploader profile
-    profile_res = db.table("profiles").select("*").eq("id", user_id).execute()
-    uploader_profile = profile_res.data[0] if profile_res.data else None
+    uploader = db.get(Profile, u_uuid)
+    uploader_profile = {
+        "id": str(uploader.id),
+        "username": uploader.username,
+        "email": uploader.email,
+        "avatar_url": uploader.avatar_url,
+        "created_at": uploader.created_at.isoformat(),
+        "updated_at": uploader.updated_at.isoformat(),
+    } if uploader else None
 
-    now = datetime.now(timezone.utc).isoformat()
-    media_records_to_insert = []
+    inserted_objects = []
+    cover_item = next((item for item in items if item.is_cover), None)
+
     for item in items:
         content_type = item.content_type
         if not content_type or content_type == "application/octet-stream":
@@ -434,33 +493,31 @@ def confirm_direct_media_uploads(
                 content_type = guessed
 
         media_type = "video" if content_type in ALLOWED_VIDEO_MIME_TYPES else "photo"
-        media_records_to_insert.append({
-            "hangout_id": canonical_hangout_id,
-            "uploaded_by": user_id,
-            "url": item.object_key,
-            "thumbnail_url": item.object_key,
-            "caption": item.caption,
-            "media_type": media_type,
-            "favorites_count": 0,
-            "file_size_bytes": item.file_size_bytes,
-            "is_shared": item.is_shared,
-            "is_cover": item.is_cover,
-            "created_at": now,
-        })
+        m = Media(
+            hangout_id=h_uuid,
+            uploaded_by=u_uuid,
+            url=item.object_key,
+            thumbnail_url=item.object_key,
+            caption=item.caption,
+            media_type=media_type,
+            favorites_count=0,
+            file_size_bytes=item.file_size_bytes,
+            is_shared=item.is_shared,
+            is_cover=item.is_cover,
+        )
+        db.add(m)
+        inserted_objects.append(m)
 
-    insert_res = db.table("media").insert(media_records_to_insert).execute()
-    if not insert_res.data:
-        raise Exception("Failed to save confirmed media records.")
-
-    cover_item = next((item for item in items if item.is_cover), None)
     if cover_item:
-        db.table("hangouts").update({"cover_photo_url": cover_item.object_key}).eq("id", canonical_hangout_id).execute()
+        hangout = db.get(Hangout, h_uuid)
+        if hangout:
+            hangout.cover_photo_url = cover_item.object_key
 
-    inserted_items = insert_res.data
-    for record in inserted_items:
-        record["uploader"] = uploader_profile
-        record["is_favorited"] = False
+    db.flush()
 
-    return [_sign_media_item(record) for record in inserted_items]
+    results = []
+    for m in inserted_objects:
+        d = _media_to_dict(m, is_favorited=False, uploader_profile=uploader_profile)
+        results.append(_sign_media_item(d))
 
-
+    return results

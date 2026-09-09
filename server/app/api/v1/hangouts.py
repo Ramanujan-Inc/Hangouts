@@ -1,6 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, status, Query, File, UploadFile
-from supabase import Client
+from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_optional_current_user, get_db
 from app.schemas.hangout import (
     HangoutCreate,
@@ -37,7 +37,7 @@ def get_hangout_cover_upload_url(
 def upload_hangout_cover(
     file: UploadFile = File(...),
     _: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Upload a custom hangout cover photo to storage and return its public URL."""
     return hangout_service.upload_hangout_cover_image(db=db, file=file)
@@ -47,7 +47,7 @@ def upload_hangout_cover(
 def create_hangout(
     hangout_create: HangoutCreate,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Create a new hangout and automatically add the creator as an initial participant."""
     return hangout_service.create_hangout(
@@ -65,7 +65,7 @@ def list_hangouts(
     date: Optional[str] = Query(None, description="Filter by exact or partial date (YYYY, YYYY-MM, YYYY-MM-DD)"),
     group_name: Optional[str] = Query(None, description="Filter by group name"),
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Search & filter hangouts matching hangout_name, location_name, date, group_name, or general q."""
     return hangout_service.get_hangouts(
@@ -87,7 +87,7 @@ def get_timeline_feed(
     date: Optional[str] = Query(None, description="Filter by exact or partial date (YYYY, YYYY-MM, YYYY-MM-DD)"),
     group_name: Optional[str] = Query(None, description="Filter by group name"),
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Consolidated feed endpoint for the Timeline page returning hangouts, user groups, and anniversary memory in a single network request."""
     return hangout_service.get_timeline_feed(
@@ -109,7 +109,7 @@ def get_hangouts_map(
     min_lng: Optional[float] = Query(None, description="Minimum longitude for bounding box"),
     max_lng: Optional[float] = Query(None, description="Maximum longitude for bounding box"),
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Spatial Map Query returning hangouts with non-null coordinates within optional bounding box."""
     return hangout_service.get_hangouts_map(
@@ -127,7 +127,7 @@ def get_hangouts_map(
 def get_hangout_join_preview(
     invite_code: str,
     current_user: Optional[dict] = Depends(get_optional_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get public preview of a hangout by its invite code."""
     user_id = current_user["id"] if current_user else None
@@ -138,7 +138,7 @@ def get_hangout_join_preview(
 def join_hangout_via_invite(
     invite_code: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Join a hangout using its invite code (authenticated)."""
     return hangout_service.join_hangout_by_invite_code(
@@ -152,7 +152,7 @@ def join_hangout_via_invite(
 def get_hangout_full(
     id: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Retrieve complete hangout package in one consolidated request."""
     return hangout_service.get_hangout_full_details(db=db, hangout_id=id, user_id=current_user["id"])
@@ -162,7 +162,7 @@ def get_hangout_full(
 def get_hangout_details(
     id: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get detailed hangout information by full UUID or 8-character short_id."""
     return hangout_service.get_hangout_by_id(db=db, hangout_id=id, user_id=current_user["id"])
@@ -173,7 +173,7 @@ def update_hangout(
     id: str,
     hangout_update: HangoutUpdate,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Update hangout details (creator only)."""
     return hangout_service.update_hangout(
@@ -188,7 +188,7 @@ def update_hangout(
 def delete_hangout(
     id: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Delete a hangout (creator only)."""
     hangout_service.delete_hangout(
@@ -203,7 +203,7 @@ def add_participant(
     id: str,
     participant_create: ParticipantCreate,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Add a participant to the hangout (allowed by any active participant or creator)."""
     return hangout_service.add_participant(
@@ -219,7 +219,7 @@ def remove_participant(
     id: str,
     user_id: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Remove a participant (creator can kick; participants can leave/remove self)."""
     hangout_service.remove_participant(
@@ -235,7 +235,7 @@ def rate_hangout(
     id: str,
     rating_data: RatingCreate,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Set or update user's individual rating (1-5) for a hangout."""
     return hangout_service.upsert_hangout_rating(
@@ -250,7 +250,7 @@ def rate_hangout(
 def get_hangout_rating(
     id: str,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get the current user's rating for a hangout."""
     return hangout_service.get_user_hangout_rating(
