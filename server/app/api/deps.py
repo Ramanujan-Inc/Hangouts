@@ -11,7 +11,7 @@ security = HTTPBearer(auto_error=False)
 
 
 def get_db() -> Client:
-    """Dependency for obtaining a fresh Supabase client per request."""
+    """Dependency for obtaining the persistent, connection-pooled Supabase client."""
     return get_supabase_client()
 
 
